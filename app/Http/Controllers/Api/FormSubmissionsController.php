@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\FormSubmission;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class FormSubmissionsController extends Controller
 {
@@ -30,19 +32,22 @@ class FormSubmissionsController extends Controller
             $fields = $form->payload['fields'];
         }
 
-        // Tipos que NO son de entrada (no deben validar required ni guardarse)
+        $formCodeKey = data_get($form->payload, '_code_key');
+
+        // Tipos que NO son de entrada
         $nonInputTypes = ['static_text', 'separator', 'fixed_image', 'fixed_file'];
 
-        // Tipos "choice" (validan contra options)
-        $choiceTypes = ['select', 'list', 'radio'];
+        // Tipos choice
+        $choiceTypes = ['select', 'radio', 'list'];
 
-        // Tipos de entrada soportados
-        $inputTypes = array_merge(['text', 'textarea', 'number', 'date', 'datetime', 'checkbox'], $choiceTypes);
+        // Tipos soportados
+        $inputTypes = array_merge(
+            ['text', 'textarea', 'number', 'date', 'datetime', 'checkbox', 'contact', 'address', 'table', 'photo', 'file', 'signature'],
+            $choiceTypes
+        );
 
-        // Aquí vamos construyendo lo que sí se va a guardar (solo campos input)
         $cleanAnswers = [];
 
-        // ---- validación por field ----
         foreach ($fields as $f) {
             if (!is_array($f)) continue;
 
@@ -53,32 +58,27 @@ class FormSubmissionsController extends Controller
             $type = (string) ($f['type'] ?? 'text');
             $required = (bool) ($f['required'] ?? false);
 
-            // Si el field es NO-input, lo ignoramos totalmente
             if (in_array($type, $nonInputTypes, true)) {
                 continue;
             }
 
-            // Si llega un type desconocido, lo tratamos como text (para no romper)
             if (!in_array($type, $inputTypes, true)) {
                 $type = 'text';
             }
 
             $val = $answers[$id] ?? null;
 
-            // --- Checkbox ---
+            // checkbox
             if ($type === 'checkbox') {
-                // Normaliza checkbox a boolean (si viene "1"/1/"0"/0/true/false/"true"/"false")
                 if ($val === '1' || $val === 1) $val = true;
                 if ($val === '0' || $val === 0) $val = false;
                 if ($val === 'true') $val = true;
                 if ($val === 'false') $val = false;
 
-                // Si viene null y no requerido, lo dejamos false
                 if ($val === null) $val = false;
 
                 $val = (bool) $val;
 
-                // Checkbox requerido: debe ser TRUE
                 if ($required && $val !== true) {
                     return response()->json(['message' => "Debes aceptar: {$label}"], 422);
                 }
@@ -87,21 +87,24 @@ class FormSubmissionsController extends Controller
                 continue;
             }
 
-            // --- required (para no-checkbox) ---
+            // required general
             if ($required) {
                 $isEmpty = is_null($val) || (is_string($val) && trim($val) === '');
+                if (is_array($val) && count($val) === 0) $isEmpty = true;
+
                 if ($isEmpty) {
                     return response()->json(['message' => "Falta responder: {$label}"], 422);
                 }
             }
 
-            // Si viene vacío y no es requerido, no validamos tipo y NO guardamos nada
             $isEmpty = is_null($val) || (is_string($val) && trim($val) === '');
+            if (is_array($val) && count($val) === 0) $isEmpty = true;
+
             if ($isEmpty) {
                 continue;
             }
 
-            // --- Validación por tipo ---
+            // number
             if ($type === 'number') {
                 if (!is_numeric($val)) {
                     return response()->json(['message' => "El campo {$label} debe ser numérico."], 422);
@@ -110,6 +113,7 @@ class FormSubmissionsController extends Controller
                 continue;
             }
 
+            // date
             if ($type === 'date') {
                 $ts = strtotime((string) $val);
                 if ($ts === false) {
@@ -119,6 +123,7 @@ class FormSubmissionsController extends Controller
                 continue;
             }
 
+            // datetime
             if ($type === 'datetime') {
                 $ts = strtotime((string) $val);
                 if ($ts === false) {
@@ -128,6 +133,7 @@ class FormSubmissionsController extends Controller
                 continue;
             }
 
+            // choice
             if (in_array($type, $choiceTypes, true)) {
                 $opts = $f['options'] ?? [];
                 if (!is_array($opts)) $opts = [];
@@ -138,7 +144,6 @@ class FormSubmissionsController extends Controller
                     return response()->json(['message' => "Falta responder: {$label}"], 422);
                 }
 
-                // Si hay opciones definidas, validar que exista en la lista
                 if ($valStr !== '' && count($opts) > 0 && !in_array($valStr, $opts, true)) {
                     return response()->json(['message' => "El campo {$label} tiene una opción inválida."], 422);
                 }
@@ -147,14 +152,110 @@ class FormSubmissionsController extends Controller
                 continue;
             }
 
+            // contact / address
+            if ($type === 'contact' || $type === 'address') {
+                if (is_array($val)) {
+                    $cleanAnswers[$id] = $val;
+                } else {
+                    $cleanAnswers[$id] = is_string($val) ? trim($val) : (string) $val;
+                }
+                continue;
+            }
+
+            // table
+            if ($type === 'table') {
+                if (!is_array($val)) {
+                    return response()->json(['message' => "El campo {$label} (tabla) debe ser un arreglo de filas."], 422);
+                }
+
+                $cols = $f['columns'] ?? [];
+                if (!is_array($cols)) $cols = [];
+
+                $rows = array_values(array_filter($val, function ($row) {
+                    if (is_array($row)) return count($row) > 0;
+                    return $row !== null && $row !== '';
+                }));
+
+                if ($required && count($rows) < 1) {
+                    return response()->json(['message' => "Falta responder: {$label}"], 422);
+                }
+
+                if (count($cols) > 0) {
+                    foreach ($rows as $row) {
+                        if (!is_array($row)) {
+                            return response()->json(['message' => "El campo {$label} (tabla) tiene filas inválidas."], 422);
+                        }
+
+                        $isAssoc = array_keys($row) !== range(0, count($row) - 1);
+                        if ($isAssoc) {
+                            foreach ($cols as $c) {
+                                if (!array_key_exists($c, $row)) {
+                                    $row[$c] = $row[$c] ?? '';
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $cleanAnswers[$id] = $rows;
+                continue;
+            }
+
+            // photo / file / signature
+            if (in_array($type, ['photo', 'file', 'signature'], true)) {
+                if ($type === 'signature') {
+                    if (is_array($val)) {
+                        $cleanAnswers[$id] = $val;
+                        continue;
+                    }
+
+                    $v = is_string($val) ? trim($val) : (string) $val;
+
+                    if ($required && $v === '') {
+                        return response()->json(['message' => "Falta responder: {$label}"], 422);
+                    }
+
+                    if ($v === '') {
+                        continue;
+                    }
+
+                    // ✅ guardar PNG físico solo para este formulario
+                    if (
+                        $formCodeKey === 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil' &&
+                        str_starts_with($v, 'data:image/')
+                    ) {
+                        $storedPath = $this->storeSignatureForChecklistHerramienta($v, $user?->id, $id);
+
+                        if (!$storedPath) {
+                            return response()->json(['message' => "No se pudo guardar la firma del campo {$label}."], 422);
+                        }
+
+                        $cleanAnswers[$id] = $storedPath;
+                        continue;
+                    }
+
+                    // fallback
+                    $cleanAnswers[$id] = $v;
+                    continue;
+                }
+
+                if (is_array($val)) {
+                    $cleanAnswers[$id] = $val;
+                } else {
+                    $v = is_string($val) ? trim($val) : (string) $val;
+
+                    if ($required && $v === '') {
+                        return response()->json(['message' => "Falta responder: {$label}"], 422);
+                    }
+
+                    $cleanAnswers[$id] = $v;
+                }
+                continue;
+            }
+
             // text / textarea / fallback
             $cleanAnswers[$id] = is_string($val) ? trim($val) : (string) $val;
         }
-
-        // Opcional: si quieres bloquear submissions vacías:
-        // if (count($cleanAnswers) === 0) {
-        //     return response()->json(['message' => "No hay respuestas para guardar."], 422);
-        // }
 
         $submission = FormSubmission::create([
             'form_id' => $form->id,
@@ -169,7 +270,6 @@ class FormSubmissionsController extends Controller
     {
         $user = $request->user();
 
-        // Usuario normal: solo puede ver submissions de formularios PUBLICADOS
         if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
             return response()->json(['message' => 'No encontrado.'], 404);
         }
@@ -181,5 +281,35 @@ class FormSubmissionsController extends Controller
             ->get(['id', 'form_id', 'user_id', 'answers', 'created_at']);
 
         return response()->json(['submissions' => $subs]);
+    }
+
+    /**
+     * Guarda la firma como PNG físico para el checklist de herramienta.
+     */
+    private function storeSignatureForChecklistHerramienta(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            // si en un futuro quieres aceptar jpg/webp, aquí lo amplías
+            return null;
+        }
+
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+
+        $binary = base64_decode($base64, true);
+
+        if ($binary === false) {
+            return null;
+        }
+
+        $directory = 'forms/signatures/SSTPOPTA08F001_CheckListHerramientaElectricaPortatil';
+
+        $fileName = 'firma_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . Str::random(8) . '.png';
+
+        $relativePath = $directory . '/' . $fileName;
+
+        Storage::disk('public')->put($relativePath, $binary);
+
+        return $relativePath;
     }
 }

@@ -87,24 +87,18 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::post('empresas', [EmpresasController::class, 'store']);
         Route::put('empresas/{empresa}', [EmpresasController::class, 'update']);
         Route::delete('empresas/{empresa}', [EmpresasController::class, 'destroy']);
-    
+
         Route::get('grupos', [GruposController::class, 'index']);
         Route::post('grupos', [GruposController::class, 'store']);
         Route::put('grupos/{grupo}', [GruposController::class, 'update']);
         Route::delete('grupos/{grupo}', [GruposController::class, 'destroy']);
 
-        // ---------------- FORMS (Admin CRUD) ----------------
+        // ---------------- FORMS (Admin solo lectura + publicar) ----------------
         Route::get('/forms', [FormsController::class, 'adminIndex'])
             ->middleware('perm:formularios.view');
 
-        Route::post('/forms', [FormsController::class, 'store'])
-            ->middleware('perm:formularios.create');
-
-        Route::put('/forms/{form}', [FormsController::class, 'update'])
-            ->middleware('perm:formularios.edit');
-
-        Route::delete('/forms/{form}', [FormsController::class, 'destroy'])
-            ->middleware('perm:formularios.delete');
+        Route::get('/forms/{form}', [FormsController::class, 'show'])
+            ->middleware('perm:formularios.view');
 
         // Publicar / Despublicar
         Route::post('/forms/{form}/publish', [FormsController::class, 'publish'])

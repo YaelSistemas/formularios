@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { setupAutoSync } from "./offline/sync";
 
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -18,6 +19,12 @@ import { registerSW } from "virtual:pwa-register";
 import { apiMe } from "./services/api";
 
 registerSW({ immediate: true });
+
+// ✅ instala auto-sync global 1 sola vez
+setupAutoSync({
+  intervalMs: 15000, // cada 15s (ajústalo)
+  runOnStart: true,  // intenta sync al cargar si hay internet
+});
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem("token");

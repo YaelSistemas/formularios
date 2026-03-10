@@ -4,110 +4,52 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Form;
+use App\Support\Forms\FormRegistry;
 use Illuminate\Http\Request;
 
 class FormsController extends Controller
 {
+    public function __construct(
+        protected FormRegistry $formRegistry
+    ) {
+    }
+
     /**
      * LISTA (Usuario autenticado)
+     * - Admin: ve todos los formularios de código
      * - Usuario normal: solo PUBLICADO
-     * - Admin: todos
      */
     public function index(Request $request)
     {
+        $this->syncCodeForms($request->user()?->id);
+
         $user = $request->user();
 
-        if ($user && $user->hasRole('Administrador')) {
-            $forms = Form::query()
-                ->orderByDesc('id')
-                ->get(['id', 'title', 'status', 'created_at']);
-        } else {
-            $forms = Form::query()
-                ->where('status', 'PUBLICADO')
-                ->orderByDesc('id')
-                ->get(['id', 'title', 'status', 'created_at']);
+        $query = Form::query()
+            ->orderByDesc('id');
+
+        if (!($user && $user->hasRole('Administrador'))) {
+            $query->where('status', 'PUBLICADO');
         }
+
+        $forms = $query->get(['id', 'title', 'status', 'created_at', 'payload'])
+            ->filter(fn ($form) => filled(data_get($form->payload, '_code_key')))
+            ->values();
 
         return response()->json(['forms' => $forms]);
     }
 
     /**
-     * CREAR (Admin)
-     * - Se llama desde /api/admin/forms
-     * - payload estándar: { fields: [...] }
-     */
-    public function store(Request $request)
-    {
-        $user = $request->user();
-
-        $data = $request->validate([
-            'title'   => ['required', 'string', 'max:255'],
-            'payload' => ['nullable', 'array'],
-            'status'  => ['nullable', 'in:BORRADOR,PUBLICADO,INACTIVO'],
-
-            // validación suave del builder (si viene payload.fields)
-            'payload.fields' => ['nullable', 'array'],
-            'payload.fields.*.id' => ['required_with:payload.fields', 'string', 'max:120'],
-
-            // label puede venir vacío en tipos como separator (lo validamos después)
-            'payload.fields.*.label' => ['nullable', 'string', 'max:150'],
-
-            // ✅ NUEVOS TYPES
-            'payload.fields.*.type' => ['required_with:payload.fields', 'in:text,textarea,number,date,datetime,select,list,radio,checkbox,static_text,separator,fixed_image,fixed_file'],
-            'payload.fields.*.required' => ['nullable', 'boolean'],
-
-            // opciones para select/list/radio
-            'payload.fields.*.options' => ['nullable', 'array'],
-            'payload.fields.*.options.*' => ['nullable', 'string', 'max:150'],
-
-            // ✅ extra props para nuevos tipos
-            'payload.fields.*.text' => ['nullable', 'string', 'max:5000'], // static_text
-            'payload.fields.*.url'  => ['nullable', 'string', 'max:2048'], // fixed_image / fixed_file
-        ]);
-
-        $payload = $this->normalizePayload($data['payload'] ?? []);
-
-        // Validación adicional de selects/list/radio (mínimo 2 opciones)
-        $selectErr = $this->validateChoiceFields($payload);
-        if ($selectErr) {
-            return response()->json(['message' => $selectErr], 422);
-        }
-
-        // Validación extra de tipos "fijos"
-        $extraErr = $this->validateFixedFields($payload);
-        if ($extraErr) {
-            return response()->json(['message' => $extraErr], 422);
-        }
-
-        // Si intentan crear ya PUBLICADO, validamos que sea publicable
-        $status = $data['status'] ?? 'BORRADOR';
-        if ($status === 'PUBLICADO') {
-            $pubErr = $this->validatePublishable($payload);
-            if ($pubErr) {
-                return response()->json(['message' => $pubErr], 422);
-            }
-        }
-
-        $form = Form::create([
-            'user_id' => $user ? $user->id : null,
-            'title'   => $data['title'],
-            'payload' => $payload,
-            'status'  => $status,
-        ]);
-
-        $resp = $form->toArray();
-        $resp['payload'] = $payload;
-
-        return response()->json(['ok' => true, 'form' => $resp], 201);
-    }
-
-    /**
-     * VER DETALLE (Usuario autenticado)
-     * - Usuario normal: solo si está PUBLICADO
-     * - Admin: cualquiera
+     * VER DETALLE
      */
     public function show(Request $request, Form $form)
     {
+        $this->syncCodeForms($request->user()?->id);
+
+        if (!filled(data_get($form->payload, '_code_key'))) {
+            return response()->json(['message' => 'No encontrado.'], 404);
+        }
+
         $user = $request->user();
 
         if (!($user && $user->hasRole('Administrador'))) {
@@ -125,92 +67,59 @@ class FormsController extends Controller
     }
 
     /**
-     * EDITAR (Admin)
-     * - PUT /api/admin/forms/{form}
+     * DESHABILITADO
+     * Los formularios ahora se crean por código.
+     */
+    public function store(Request $request)
+    {
+        return response()->json([
+            'message' => 'La creación desde panel está deshabilitada. Los formularios ahora se definen por código.',
+        ], 405);
+    }
+
+    /**
+     * DESHABILITADO
+     * Los formularios ahora se editan por código.
      */
     public function update(Request $request, Form $form)
     {
-        $data = $request->validate([
-            'title'   => ['required', 'string', 'max:255'],
-            'payload' => ['nullable', 'array'],
-            'status'  => ['required', 'in:BORRADOR,PUBLICADO,INACTIVO'],
-
-            'payload.fields' => ['nullable', 'array'],
-            'payload.fields.*.id' => ['required_with:payload.fields', 'string', 'max:120'],
-            'payload.fields.*.label' => ['nullable', 'string', 'max:150'],
-            'payload.fields.*.type' => ['required_with:payload.fields', 'in:text,textarea,number,date,datetime,select,list,radio,checkbox,static_text,separator,fixed_image,fixed_file'],
-            'payload.fields.*.required' => ['nullable', 'boolean'],
-
-            'payload.fields.*.options' => ['nullable', 'array'],
-            'payload.fields.*.options.*' => ['nullable', 'string', 'max:150'],
-
-            'payload.fields.*.text' => ['nullable', 'string', 'max:5000'],
-            'payload.fields.*.url'  => ['nullable', 'string', 'max:2048'],
-        ]);
-
-        $payload = $this->normalizePayload($data['payload'] ?? []);
-
-        $selectErr = $this->validateChoiceFields($payload);
-        if ($selectErr) {
-            return response()->json(['message' => $selectErr], 422);
-        }
-
-        $extraErr = $this->validateFixedFields($payload);
-        if ($extraErr) {
-            return response()->json(['message' => $extraErr], 422);
-        }
-
-        // Si lo dejan PUBLICADO desde update, validamos que sea publicable
-        if (($data['status'] ?? 'BORRADOR') === 'PUBLICADO') {
-            $pubErr = $this->validatePublishable($payload);
-            if ($pubErr) {
-                return response()->json(['message' => $pubErr], 422);
-            }
-        }
-
-        $form->title = $data['title'];
-        $form->payload = $payload;
-        $form->status = $data['status'];
-        $form->save();
-
-        $resp = $form->toArray();
-        $resp['payload'] = $payload;
-
-        return response()->json(['ok' => true, 'form' => $resp]);
+        return response()->json([
+            'message' => 'La edición desde panel está deshabilitada. Los formularios ahora se definen por código.',
+        ], 405);
     }
 
     /**
-     * ELIMINAR (Admin)
-     * - DELETE /api/admin/forms/{form}
+     * DESHABILITADO
+     * Los formularios ahora se eliminan quitándolos del catálogo en código.
      */
     public function destroy(Request $request, Form $form)
     {
-        $form->delete();
-        return response()->json(['ok' => true]);
+        return response()->json([
+            'message' => 'La eliminación desde panel está deshabilitada. Quita el formulario del catálogo en código.',
+        ], 405);
     }
 
-    /**
-     * PUBLICAR (Admin)
-     * - POST /api/admin/forms/{form}/publish
-     */
     public function publish(Request $request, Form $form)
     {
+        $this->syncCodeForms($request->user()?->id);
+
+        if (!filled(data_get($form->payload, '_code_key'))) {
+            return response()->json(['message' => 'No encontrado.'], 404);
+        }
+
         $payload = $this->normalizePayload($form->payload ?? []);
 
-        $selectErr = $this->validateChoiceFields($payload);
-        if ($selectErr) {
-            return response()->json(['message' => $selectErr], 422);
-        }
+        $choiceErr = $this->validateChoiceFields($payload);
+        if ($choiceErr) return response()->json(['message' => $choiceErr], 422);
 
-        $extraErr = $this->validateFixedFields($payload);
-        if ($extraErr) {
-            return response()->json(['message' => $extraErr], 422);
-        }
+        $fixedErr = $this->validateFixedFields($payload);
+        if ($fixedErr) return response()->json(['message' => $fixedErr], 422);
+
+        $tableErr = $this->validateTableFields($payload);
+        if ($tableErr) return response()->json(['message' => $tableErr], 422);
 
         $pubErr = $this->validatePublishable($payload);
-        if ($pubErr) {
-            return response()->json(['message' => $pubErr], 422);
-        }
+        if ($pubErr) return response()->json(['message' => $pubErr], 422);
 
         $form->payload = $payload;
         $form->status = 'PUBLICADO';
@@ -222,68 +131,154 @@ class FormsController extends Controller
         return response()->json(['ok' => true, 'form' => $resp]);
     }
 
-    /**
-     * DESPUBLICAR (Admin)
-     * - POST /api/admin/forms/{form}/unpublish
-     */
     public function unpublish(Request $request, Form $form)
     {
+        $this->syncCodeForms($request->user()?->id);
+
+        if (!filled(data_get($form->payload, '_code_key'))) {
+            return response()->json(['message' => 'No encontrado.'], 404);
+        }
+
         $form->status = 'BORRADOR';
         $form->save();
 
         return response()->json(['ok' => true, 'form' => $form]);
     }
 
+    public function adminIndex(Request $request)
+    {
+        $this->syncCodeForms($request->user()?->id);
+
+        $forms = Form::query()
+            ->orderByDesc('id')
+            ->get(['id', 'title', 'status', 'created_at', 'payload'])
+            ->filter(fn ($form) => filled(data_get($form->payload, '_code_key')))
+            ->values();
+
+        return response()->json(['forms' => $forms]);
+    }
+
     /**
-     * Normaliza el payload para que el builder quede estándar:
-     * - Si viene { fields: [...] } => lo deja igual (limpio)
-     * - Si viene payload viejo => fields vacío y se guarda en _legacy
+     * Sincroniza el catálogo en código hacia la tabla forms.
+     * - Crea si no existe
+     * - Actualiza title/payload si ya existe
+     * - Conserva status actual
+     */
+    private function syncCodeForms(?int $userId = null): void
+    {
+        foreach ($this->formRegistry->all() as $item) {
+            $key = (string) ($item['key'] ?? '');
+            $title = (string) ($item['title'] ?? '');
+            $payload = $item['payload'] ?? [];
+
+            if ($key === '' || $title === '' || !is_array($payload)) {
+                continue;
+            }
+
+            $payload['_code_key'] = $key;
+            $normalizedPayload = $this->normalizePayload($payload);
+
+            $existing = Form::query()
+                ->where('payload->_code_key', $key)
+                ->first();
+
+            if ($existing) {
+                $existing->title = $title;
+                $existing->payload = $normalizedPayload;
+                $existing->save();
+                continue;
+            }
+
+            Form::create([
+                'user_id' => $userId,
+                'title'   => $title,
+                'payload' => $normalizedPayload,
+                'status'  => 'BORRADOR',
+            ]);
+        }
+    }
+
+    /**
+     * Normaliza payload.fields y conserva props extra por tipo.
      */
     private function normalizePayload($payload): array
     {
-        if (!is_array($payload)) {
-            return ['fields' => []];
-        }
+        if (!is_array($payload)) return ['fields' => []];
 
         if (array_key_exists('fields', $payload) && is_array($payload['fields'])) {
             $payload['fields'] = array_values(array_filter(array_map(function ($f) {
                 if (!is_array($f)) return null;
 
-                $id = isset($f['id']) ? (string) $f['id'] : null;
-                $type = isset($f['type']) ? (string) $f['type'] : null;
-
-                $label = isset($f['label']) ? trim((string) $f['label']) : '';
+                $id = isset($f['id']) ? (string)$f['id'] : null;
+                $type = isset($f['type']) ? (string)$f['type'] : null;
+                $label = isset($f['label']) ? trim((string)$f['label']) : '';
 
                 if (!$id || !$type) return null;
 
                 $field = [
                     'id'       => $id,
-                    'label'    => $label, // puede ir vacío en separator
+                    'label'    => $label,
                     'type'     => $type,
-                    'required' => (bool) ($f['required'] ?? false),
+                    'required' => (bool)($f['required'] ?? false),
                 ];
 
-                // select/list/radio => options
-                if (in_array($field['type'], ['select', 'list', 'radio'], true)) {
+                if (in_array($type, ['select', 'radio'], true)) {
                     $opts = $f['options'] ?? [];
                     if (!is_array($opts)) $opts = [];
                     $field['options'] = array_values(array_filter(array_map(function ($o) {
-                        $s = trim((string) $o);
+                        $s = trim((string)$o);
                         return $s !== '' ? $s : null;
                     }, $opts)));
                 }
 
-                // static_text => text
-                if ($field['type'] === 'static_text') {
-                    $field['text'] = isset($f['text']) ? (string) $f['text'] : '';
+                if ($type === 'static_text') {
+                    $field['text'] = (string)($f['text'] ?? '');
                 }
 
-                // fixed_image / fixed_file => url
-                if (in_array($field['type'], ['fixed_image', 'fixed_file'], true)) {
-                    $field['url'] = isset($f['url']) ? (string) $f['url'] : '';
+                if (in_array($type, ['fixed_image', 'fixed_file'], true)) {
+                    $field['url'] = (string)($f['url'] ?? '');
                 }
 
-                // separator: no requiere nada extra
+                if ($type === 'table') {
+                    $cols = $f['columns'] ?? [];
+                    if (!is_array($cols)) $cols = [];
+                    $field['columns'] = array_values(array_filter(array_map(function ($c) {
+                        $s = trim((string)$c);
+                        return $s !== '' ? $s : null;
+                    }, $cols)));
+
+                    $rowSchema = $f['row_schema'] ?? [];
+                    if (!is_array($rowSchema)) $rowSchema = [];
+
+                    $field['row_schema'] = array_values(array_filter(array_map(function ($col) {
+                        if (!is_array($col)) return null;
+
+                        $colId = isset($col['id']) ? (string)$col['id'] : null;
+                        $colType = isset($col['type']) ? (string)$col['type'] : null;
+                        $colLabel = isset($col['label']) ? trim((string)$col['label']) : '';
+
+                        if (!$colId || !$colType) return null;
+
+                        $normalizedCol = [
+                            'id' => $colId,
+                            'label' => $colLabel,
+                            'type' => $colType,
+                            'required' => (bool)($col['required'] ?? false),
+                        ];
+
+                        if (in_array($colType, ['select', 'radio'], true)) {
+                            $colOpts = $col['options'] ?? [];
+                            if (!is_array($colOpts)) $colOpts = [];
+
+                            $normalizedCol['options'] = array_values(array_filter(array_map(function ($o) {
+                                $s = trim((string)$o);
+                                return $s !== '' ? $s : null;
+                            }, $colOpts)));
+                        }
+
+                        return $normalizedCol;
+                    }, $rowSchema)));
+                }
 
                 return $field;
             }, $payload['fields'])));
@@ -291,15 +286,11 @@ class FormsController extends Controller
             return $payload;
         }
 
-        return [
-            'fields' => [],
-            '_legacy' => $payload,
-        ];
+        return ['fields' => [], '_legacy' => $payload];
     }
 
     /**
-     * Reglas extra para select/list/radio:
-     * - options mínimo 2
+     * select/radio: mínimo 2 opciones
      */
     private function validateChoiceFields(array $payload): ?string
     {
@@ -308,7 +299,7 @@ class FormsController extends Controller
 
         foreach ($fields as $f) {
             $type = $f['type'] ?? null;
-            if (in_array($type, ['select', 'list', 'radio'], true)) {
+            if (in_array($type, ['select', 'radio'], true)) {
                 $options = $f['options'] ?? [];
                 if (!is_array($options) || count($options) < 2) {
                     $label = $f['label'] ?? '(sin etiqueta)';
@@ -321,9 +312,7 @@ class FormsController extends Controller
     }
 
     /**
-     * Validación extra para tipos fijos:
-     * - static_text => text no vacío
-     * - fixed_image/fixed_file => url no vacío
+     * static_text/fixed_*: contenido obligatorio
      */
     private function validateFixedFields(array $payload): ?string
     {
@@ -335,18 +324,15 @@ class FormsController extends Controller
             $label = $f['label'] ?? '(sin etiqueta)';
 
             if ($type === 'static_text') {
-                $text = trim((string)($f['text'] ?? ''));
-                if ($text === '') return "El campo \"{$label}\" (texto fijo) requiere contenido.";
+                if (trim((string)($f['text'] ?? '')) === '') {
+                    return "El campo \"{$label}\" (texto fijo) requiere contenido.";
+                }
             }
 
-            if ($type === 'fixed_image') {
-                $url = trim((string)($f['url'] ?? ''));
-                if ($url === '') return "El campo \"{$label}\" (imagen fija) requiere URL.";
-            }
-
-            if ($type === 'fixed_file') {
-                $url = trim((string)($f['url'] ?? ''));
-                if ($url === '') return "El campo \"{$label}\" (archivo fijo) requiere URL.";
+            if (in_array($type, ['fixed_image', 'fixed_file'], true)) {
+                if (trim((string)($f['url'] ?? '')) === '') {
+                    return "El campo \"{$label}\" ({$type}) requiere URL.";
+                }
             }
         }
 
@@ -354,9 +340,33 @@ class FormsController extends Controller
     }
 
     /**
-     * Validación para permitir PUBLICAR:
-     * - Debe tener al menos 1 field
-     * - Campos deben ser válidos según su tipo
+     * table: mínimo 1 columna y normaliza row_schema
+     */
+    private function validateTableFields(array $payload): ?string
+    {
+        $fields = $payload['fields'] ?? [];
+        if (!is_array($fields)) return null;
+
+        foreach ($fields as $f) {
+            if (($f['type'] ?? null) !== 'table') continue;
+
+            $label = $f['label'] ?? '(sin etiqueta)';
+            $cols = $f['columns'] ?? [];
+            if (!is_array($cols) || count($cols) < 1) {
+                return "El campo \"{$label}\" (tabla) debe tener al menos 1 columna.";
+            }
+
+            $rowSchema = $f['row_schema'] ?? [];
+            if (!is_array($rowSchema) || count($rowSchema) < 1) {
+                return "El campo \"{$label}\" (tabla) debe tener row_schema definido.";
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Validación para permitir PUBLICAR
      */
     private function validatePublishable(array $payload): ?string
     {
@@ -371,40 +381,14 @@ class FormsController extends Controller
             $label = isset($f['label']) ? trim((string)$f['label']) : '';
 
             if (!$id || !$type) {
-                return 'El formulario tiene campos inválidos. Revisa el builder.';
+                return 'El formulario tiene campos inválidos. Revisa el catálogo en código.';
             }
 
-            // separator: label puede estar vacío
-            if ($type !== 'separator' && $label === '') {
-                return 'El formulario tiene campos sin etiqueta. Revisa el builder.';
-            }
-
-            // select/list/radio: opciones ya validadas, pero protegemos:
-            if (in_array($type, ['select', 'list', 'radio'], true)) {
-                $opts = $f['options'] ?? [];
-                if (!is_array($opts) || count($opts) < 2) {
-                    return 'Hay campos de selección sin suficientes opciones.';
-                }
-            }
-
-            // static_text / fixed_*: ya validados, pero protegemos:
-            if ($type === 'static_text' && trim((string)($f['text'] ?? '')) === '') {
-                return 'Hay textos fijos vacíos.';
-            }
-            if (in_array($type, ['fixed_image', 'fixed_file'], true) && trim((string)($f['url'] ?? '')) === '') {
-                return 'Hay archivos/imagenes fijas sin URL.';
+            if (!in_array($type, ['separator', 'static_text', 'fixed_image', 'fixed_file'], true) && $label === '') {
+                return 'El formulario tiene campos sin etiqueta. Revisa el catálogo en código.';
             }
         }
 
         return null;
-    }
-
-    public function adminIndex(Request $request)
-    {
-        $forms = Form::query()
-            ->orderByDesc('id')
-            ->get(['id', 'title', 'status', 'created_at', 'payload']);
-
-        return response()->json(['forms' => $forms]);
     }
 }

@@ -5,11 +5,12 @@ export const db = new Dexie("formularios_pwa");
 
 /**
  * v1 (legacy)
- * - Si ya llegaste a crear DB con v1 en algún equipo, esta versión debe quedarse
- *   para que Dexie pueda migrar correctamente a v2.
+ * - Si ya se creó BD en algún equipo, NO borres esta versión.
+ * - Mantén los índices básicos que ya existían.
  */
 db.version(1).stores({
   // Guarda la “carga” (answers, form_id, etc.)
+  // Nota: aquí solo declaramos índices, no "columnas"
   records: "++id, uuid, type, created_at, synced",
 
   // Cola de sincronización
@@ -18,33 +19,39 @@ db.version(1).stores({
 
 /**
  * v2 (actual)
- * - Agregamos retry_count y next_retry_at al outbox
- * - IMPORTANTE: al cambiar el schema hay que subir la versión
+ * - Agrega retry_count y next_retry_at
+ * - Importante: conservamos índices previos + agregamos los nuevos
  */
 db.version(2).stores({
   records: "++id, uuid, type, created_at, synced",
+
+  // ✅ IMPORTANTE:
+  // - indexamos status porque syncNow() filtra por status
+  // - indexamos uuid porque hacemos búsquedas por uuid frecuentemente
+  // - añadimos retry_count y next_retry_at para backoff
   outbox: "++id, uuid, type, created_at, status, last_error, retry_count, next_retry_at",
 });
 
 /**
- * (Opcional pero recomendado)
- * Asegura valores por defecto al crear/actualizar DB en v2.
- * - No rompe si ya existe data.
+ * Opcional (solo corre en BD NUEVA)
  */
 db.on("populate", async () => {
-  // se ejecuta solo en BD nueva
+  // nada por ahora
 });
 
+/**
+ * Normaliza campos faltantes al iniciar (por si venías de v1)
+ */
 db.on("ready", async () => {
-  // Normaliza campos faltantes (por si venías de v1)
   try {
-    await db.outbox
-      .toCollection()
-      .modify((o) => {
-        if (o.retry_count === undefined || o.retry_count === null) o.retry_count = 0;
-        if (o.next_retry_at === undefined) o.next_retry_at = null;
-        if (o.last_error === undefined) o.last_error = null;
-      });
+    await db.outbox.toCollection().modify((o) => {
+      if (o.retry_count === undefined || o.retry_count === null) o.retry_count = 0;
+      if (o.next_retry_at === undefined) o.next_retry_at = null;
+      if (o.last_error === undefined) o.last_error = null;
+
+      // si por algún motivo no existe status (muy raro), lo marcamos pending
+      if (!o.status) o.status = "pending";
+    });
   } catch {
     // ignore
   }
