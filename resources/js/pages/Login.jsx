@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { apiLogin, apiMe } from "../services/api";
 
 export default function Login() {
-  const [email, setEmail] = useState("");     // ✅ sin autollenar
-  const [password, setPassword] = useState(""); // ✅ sin autollenar
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export default function Login() {
       try {
         const data = await apiMe();
         localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "/";
+        window.location.href = "/forms";
       } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -37,7 +37,7 @@ export default function Login() {
 
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
-      window.location.href = "/";
+      window.location.href = "/forms";
     } catch (ex) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -68,7 +68,13 @@ export default function Login() {
     },
     logoWrap: { display: "flex", justifyContent: "center", marginBottom: 18 },
     logo: { height: 64, width: "auto", objectFit: "contain" },
-    label: { display: "block", fontSize: 13, fontWeight: 600, color: "#3f3f46", marginBottom: 6 },
+    label: {
+      display: "block",
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#3f3f46",
+      marginBottom: 6,
+    },
     input: {
       width: "100%",
       borderRadius: 6,
@@ -78,7 +84,10 @@ export default function Login() {
       outline: "none",
       fontSize: 14,
     },
-    inputFocus: { borderColor: "#3b82f6", boxShadow: "0 0 0 3px rgba(59,130,246,.2)" },
+    inputFocus: {
+      borderColor: "#3b82f6",
+      boxShadow: "0 0 0 3px rgba(59,130,246,.2)",
+    },
     err: {
       marginBottom: 12,
       borderRadius: 6,
@@ -140,7 +149,11 @@ export default function Login() {
           </div>
 
           <div style={styles.actions}>
-            <button type="submit" disabled={loading} style={{ ...styles.btn, ...(loading ? styles.btnDisabled : {}) }}>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ ...styles.btn, ...(loading ? styles.btnDisabled : {}) }}
+            >
               {loading ? "INICIANDO..." : "INICIAR SESIÓN"}
             </button>
           </div>

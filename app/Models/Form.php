@@ -11,4 +11,9 @@ class Form extends Model
     protected $casts = [
         'payload' => 'array',
     ];
+
+    public function submissions()
+    {
+        return $this->hasMany(FormSubmission::class);
+    }
 }

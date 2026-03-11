@@ -13,7 +13,7 @@ class SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil implements
 
     public static function title(): string
     {
-        return 'Checklist de herramienta eléctrica portátil';
+        return 'SST-POP-TA-08-FO-01 Checklist de Herramienta Eléctrica Portátil';
     }
 
     public static function payload(): array
@@ -37,7 +37,7 @@ class SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil implements
                     'label' => 'Empresa',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'VULCANIZACION Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
                 ],
                 [
                     'id' => 'header_line_2',
@@ -51,28 +51,28 @@ class SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil implements
                     'label' => 'Nombre del formato',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'Checklist de herramienta electrica portatil',
+                    'text' => 'Checklist de Herramienta Eléctrica Portátil',
                 ],
                 [
                     'id' => 'header_line_4',
                     'label' => 'Código',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'Codigo: SST-POP',
+                    'text' => 'Codigo: SST-POP-TA-08-FO-01',
                 ],
                 [
                     'id' => 'header_line_5',
                     'label' => 'Fecha de emisión',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'Fecha de emision',
+                    'text' => 'Fecha de Emisión. 27/03/2025',
                 ],
                 [
                     'id' => 'header_line_6',
                     'label' => 'Número de revisión',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'Numero de revision',
+                    'text' => 'Número de Revisión: 03',
                 ],
 
                 [

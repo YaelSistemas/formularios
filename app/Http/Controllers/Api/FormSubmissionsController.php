@@ -275,10 +275,22 @@ class FormSubmissionsController extends Controller
         }
 
         $subs = FormSubmission::query()
+            ->with(['user:id,name'])
             ->where('form_id', $form->id)
             ->orderByDesc('id')
             ->limit(10)
-            ->get(['id', 'form_id', 'user_id', 'answers', 'created_at']);
+            ->get(['id', 'form_id', 'user_id', 'answers', 'created_at'])
+            ->map(function ($sub) {
+                return [
+                    'id' => $sub->id,
+                    'form_id' => $sub->form_id,
+                    'user_id' => $sub->user_id,
+                    'user_name' => $sub->user?->name,
+                    'answers' => $sub->answers,
+                    'created_at' => $sub->created_at,
+                ];
+            })
+            ->values();
 
         return response()->json(['submissions' => $subs]);
     }
@@ -289,7 +301,6 @@ class FormSubmissionsController extends Controller
     private function storeSignatureForChecklistHerramienta(string $dataUrl, ?int $userId, string $fieldId): ?string
     {
         if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
-            // si en un futuro quieres aceptar jpg/webp, aquí lo amplías
             return null;
         }
 

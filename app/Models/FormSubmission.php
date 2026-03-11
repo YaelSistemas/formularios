@@ -11,4 +11,9 @@ class FormSubmission extends Model
     protected $casts = [
         'answers' => 'array',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

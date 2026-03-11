@@ -26,13 +26,15 @@ class FormsController extends Controller
         $user = $request->user();
 
         $query = Form::query()
+            ->withCount('submissions')
             ->orderByDesc('id');
 
         if (!($user && $user->hasRole('Administrador'))) {
             $query->where('status', 'PUBLICADO');
         }
 
-        $forms = $query->get(['id', 'title', 'status', 'created_at', 'payload'])
+        $forms = $query
+            ->get(['id', 'title', 'status', 'created_at', 'payload'])
             ->filter(fn ($form) => filled(data_get($form->payload, '_code_key')))
             ->values();
 
@@ -150,6 +152,7 @@ class FormsController extends Controller
         $this->syncCodeForms($request->user()?->id);
 
         $forms = Form::query()
+            ->withCount('submissions')
             ->orderByDesc('id')
             ->get(['id', 'title', 'status', 'created_at', 'payload'])
             ->filter(fn ($form) => filled(data_get($form->payload, '_code_key')))

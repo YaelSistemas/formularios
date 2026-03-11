@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiPost } from "../../services/api";
 import { enqueue, syncNow } from "../../offline/sync";
 
@@ -21,6 +21,58 @@ export default function FormFill({
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+
+  const [successModal, setSuccessModal] = useState({
+    open: false,
+    title: "",
+    text: "",
+  });
+
+  const successTimerRef = useRef(null);
+
+  const clearSuccessTimer = () => {
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+  };
+
+  const closeSuccessModal = () => {
+    clearSuccessTimer();
+    setSuccessModal({
+      open: false,
+      title: "",
+      text: "",
+    });
+  };
+
+  const openSuccessModalAndBack = (title, text) => {
+    clearSuccessTimer();
+
+    setSuccessModal({
+      open: true,
+      title,
+      text,
+    });
+
+    successTimerRef.current = setTimeout(() => {
+      setSuccessModal({
+        open: false,
+        title: "",
+        text: "",
+      });
+
+      if (typeof onBack === "function") {
+        onBack();
+      }
+    }, 10000);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearSuccessTimer();
+    };
+  }, []);
 
   const buildInitAnswers = (keepPrev = null, preload = null) => {
     const init = {};
@@ -185,22 +237,29 @@ export default function FormFill({
     try {
       await apiPost(`/forms/${form.id}/submit`, { answers });
 
-      setMsg("✅ Respuestas guardadas.");
+      setMsg("");
       resetForm();
 
       if (navigator.onLine) syncNow().catch(() => null);
+
+      openSuccessModalAndBack(
+        "Registro creado correctamente",
+        "Las respuestas se guardaron exitosamente."
+      );
     } catch (e2) {
       if (shouldQueueOffline(e2)) {
         try {
           await enqueue("form_submission", offlinePayload);
 
-          setMsg(
-            "📴 Sin conexión. Guardado OFFLINE ✅\n" +
-              "En cuanto vuelva el internet, se subirá automáticamente."
-          );
+          setMsg("");
           resetForm();
 
           if (navigator.onLine) syncNow().catch(() => null);
+
+          openSuccessModalAndBack(
+            "Registro guardado offline",
+            "Se guardó en el dispositivo y se sincronizará automáticamente cuando vuelva la conexión."
+          );
         } catch (qe) {
           setMsg("Error guardando offline: " + String(qe?.message || qe));
         }
@@ -237,5 +296,123 @@ export default function FormFill({
     }
   };
 
-  return renderLayout();
+  return (
+    <>
+      {renderLayout()}
+
+      {successModal.open ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 3000,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              background: "#fff",
+              borderRadius: 18,
+              border: "1px solid #dbe4ee",
+              boxShadow: "0 20px 50px rgba(15,23,42,0.18)",
+              padding: 24,
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                margin: "0 auto 16px",
+                borderRadius: 999,
+                background: "#ecfdf5",
+                border: "1px solid #86efac",
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M20 7 9 18l-5-5"
+                  stroke="#16a34a"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 22,
+                lineHeight: 1.2,
+                color: "#0f172a",
+              }}
+            >
+              {successModal.title}
+            </h3>
+
+            <p
+              style={{
+                margin: "10px 0 0",
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: "#64748b",
+              }}
+            >
+              {successModal.text}
+            </p>
+
+            <div
+              style={{
+                marginTop: 18,
+                fontSize: 12,
+                color: "#94a3b8",
+              }}
+            >
+              Esta ventana se cerrará automáticamente en 10 segundos.
+            </div>
+
+            <div
+              style={{
+                marginTop: 20,
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  closeSuccessModal();
+                  if (typeof onBack === "function") {
+                    onBack();
+                  }
+                }}
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid #c7d2fe",
+                  background: "#2563eb",
+                  color: "#fff",
+                  padding: "11px 22px",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  boxShadow: "0 8px 18px rgba(37,99,235,0.18)",
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
 }

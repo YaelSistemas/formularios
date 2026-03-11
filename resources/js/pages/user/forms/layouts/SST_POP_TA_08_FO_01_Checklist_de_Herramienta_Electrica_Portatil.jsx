@@ -30,10 +30,30 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     field: null,
   });
 
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth < 768;
+  });
+
   const signatureCanvasRef = useRef(null);
   const signatureWrapperRef = useRef(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef({ x: 0, y: 0 });
+  const topRef = useRef(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const scrollToTopSafe = () => {
+    try {
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const toggleSection = (id) => {
     setCollapsedSections((prev) => ({
@@ -75,6 +95,17 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     }));
   };
 
+  const isObservationColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+    return id === "observaciones" || label === "observaciones";
+  };
+
+  const isEmptyValue = (value, type) => {
+    if (type === "checkbox") return value !== true;
+    return value === null || value === undefined || String(value).trim() === "";
+  };
+
   const addTableRow = () => {
     const field = tableModal.field;
     if (!field) return;
@@ -82,20 +113,14 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     const rowSchema = Array.isArray(field.row_schema) ? field.row_schema : [];
 
     for (const col of rowSchema) {
-      if (!col?.id || !col.required) continue;
+      if (!col?.id) continue;
+      if (isObservationColumn(col)) continue;
 
       const v = tableRowDraft[col.id];
 
-      if (col.type === "checkbox") {
-        if (!v) {
-          setMsg(`Falta responder: ${col.label}`);
-          return;
-        }
-        continue;
-      }
-
-      if (v === null || v === undefined || String(v).trim() === "") {
+      if (isEmptyValue(v, col.type)) {
         setMsg(`Falta responder: ${col.label}`);
+        scrollToTopSafe();
         return;
       }
 
@@ -103,6 +128,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
         const opts = Array.isArray(col.options) ? col.options : [];
         if (opts.length && !opts.includes(v)) {
           setMsg(`Selecciona una opción válida para: ${col.label}`);
+          scrollToTopSafe();
           return;
         }
       }
@@ -270,10 +296,15 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const renderBasicInput = (f) => {
     const commonStyle = {
       width: "100%",
-      padding: 10,
-      borderRadius: 8,
-      border: "1px solid #ccc",
+      padding: isMobile ? 11 : 10,
+      borderRadius: 12,
+      border: "1px solid #d1d5db",
       background: readOnly ? "#f8fafc" : "#fff",
+      fontSize: isMobile ? 16 : 14,
+      color: "#111827",
+      outline: "none",
+      boxSizing: "border-box",
+      minHeight: isMobile ? 46 : "auto",
     };
 
     if (f.type === "textarea") {
@@ -327,7 +358,18 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
         <div style={{ display: "grid", gap: 8 }}>
           {opts.length ? (
             opts.map((opt) => (
-              <label key={opt} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <label
+                key={opt}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: isMobile ? "10px 12px" : 0,
+                  borderRadius: isMobile ? 12 : 0,
+                  border: isMobile ? "1px solid #e5e7eb" : "none",
+                  background: isMobile ? "#fff" : "transparent",
+                }}
+              >
                 <input
                   type="radio"
                   name={f.id}
@@ -361,7 +403,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             <div
               style={{
                 border: "1px solid #d1d5db",
-                borderRadius: 10,
+                borderRadius: 12,
                 background: "#fff",
                 padding: 10,
               }}
@@ -382,11 +424,12 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             <div
               style={{
                 border: "1px dashed #cbd5e1",
-                borderRadius: 10,
+                borderRadius: 12,
                 background: "#f8fafc",
-                padding: 16,
+                padding: isMobile ? 14 : 16,
                 textAlign: "center",
                 color: "#64748b",
+                fontSize: isMobile ? 14 : 14,
               }}
             >
               Sin firma capturada
@@ -399,13 +442,14 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 type="button"
                 onClick={() => openSignatureModal(f)}
                 style={{
-                  borderRadius: 10,
+                  borderRadius: 12,
                   border: "1px solid #c7d2fe",
                   background: "#eef2ff",
                   color: "#1e40af",
-                  padding: "10px 12px",
+                  padding: isMobile ? "10px 14px" : "10px 12px",
                   cursor: "pointer",
                   fontWeight: 800,
+                  fontSize: isMobile ? 14 : 14,
                 }}
               >
                 {value ? "Volver a firmar" : "Capturar firma"}
@@ -416,13 +460,14 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                   type="button"
                   onClick={() => removeSignature(f.id)}
                   style={{
-                    borderRadius: 10,
+                    borderRadius: 12,
                     border: "1px solid #fecaca",
                     background: "#fef2f2",
                     color: "#b91c1c",
-                    padding: "10px 12px",
+                    padding: isMobile ? "10px 14px" : "10px 12px",
                     cursor: "pointer",
                     fontWeight: 800,
+                    fontSize: isMobile ? 14 : 14,
                   }}
                 >
                   Eliminar firma
@@ -457,10 +502,13 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const renderTableModalField = (f) => {
     const commonStyle = {
       width: "100%",
-      padding: 10,
-      borderRadius: 8,
-      border: "1px solid #ccc",
+      padding: isMobile ? 11 : 10,
+      borderRadius: 12,
+      border: "1px solid #d1d5db",
       background: "#fff",
+      fontSize: isMobile ? 16 : 14,
+      boxSizing: "border-box",
+      minHeight: isMobile ? 46 : "auto",
     };
 
     if (f.type === "textarea") {
@@ -508,7 +556,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     if (f.type === "radio") {
       const opts = Array.isArray(f.options) ? f.options : [];
       return (
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           {opts.length ? (
             opts.map((opt) => (
               <label
@@ -516,8 +564,12 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 8,
+                  gap: 10,
                   flexWrap: "wrap",
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  borderRadius: 0,
                 }}
               >
                 <input
@@ -575,7 +627,11 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
           <img
             src={url}
             alt={f.label || "Imagen"}
-            style={{ maxWidth: "100%", width: 420, borderRadius: 10 }}
+            style={{
+              maxWidth: "100%",
+              width: isMobile ? 250 : 420,
+              borderRadius: 10,
+            }}
           />
         </div>
       );
@@ -588,14 +644,20 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
       return (
         <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ overflowX: "auto" }}>
+          <div
+            style={{
+              overflowX: "auto",
+              borderRadius: 12,
+              border: "1px solid #d1d5db",
+              background: "#fff",
+            }}
+          >
             <table
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                minWidth: 1200,
+                minWidth: isMobile ? 900 : 1200,
                 background: "#fff",
-                border: "1px solid #d1d5db",
               }}
             >
               <thead>
@@ -605,10 +667,10 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                       key={`${f.id}_col_${idx}`}
                       style={{
                         border: "1px solid #d1d5db",
-                        padding: 10,
+                        padding: isMobile ? 9 : 10,
                         background: "#f8fafc",
                         textAlign: "left",
-                        fontSize: 12,
+                        fontSize: isMobile ? 11 : 12,
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -619,10 +681,10 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                     <th
                       style={{
                         border: "1px solid #d1d5db",
-                        padding: 10,
+                        padding: isMobile ? 9 : 10,
                         background: "#f8fafc",
                         textAlign: "center",
-                        fontSize: 12,
+                        fontSize: isMobile ? 11 : 12,
                         width: 90,
                         whiteSpace: "nowrap",
                       }}
@@ -641,8 +703,8 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                           key={`${f.id}_${rowIndex}_${col.id}`}
                           style={{
                             border: "1px solid #d1d5db",
-                            padding: 10,
-                            fontSize: 13,
+                            padding: isMobile ? 9 : 10,
+                            fontSize: isMobile ? 12 : 13,
                             verticalAlign: "top",
                           }}
                         >
@@ -653,7 +715,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                         <td
                           style={{
                             border: "1px solid #d1d5db",
-                            padding: 10,
+                            padding: isMobile ? 9 : 10,
                             textAlign: "center",
                             verticalAlign: "top",
                           }}
@@ -669,6 +731,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                               padding: "6px 10px",
                               cursor: "pointer",
                               fontWeight: 700,
+                              fontSize: isMobile ? 12 : 13,
                             }}
                           >
                             Quitar
@@ -686,6 +749,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                         padding: 12,
                         textAlign: "center",
                         color: "#64748b",
+                        fontSize: isMobile ? 12 : 13,
                       }}
                     >
                       Sin registros capturados
@@ -702,16 +766,17 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 type="button"
                 onClick={() => openTableModal(f)}
                 style={{
-                  borderRadius: 10,
+                  borderRadius: 12,
                   border: "1px solid #c7d2fe",
                   background: "#eef2ff",
                   color: "#1e40af",
-                  padding: "10px 12px",
+                  padding: isMobile ? "10px 14px" : "10px 12px",
                   cursor: "pointer",
                   fontWeight: 800,
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 8,
+                  fontSize: isMobile ? 14 : 14,
                 }}
               >
                 <i className="fa-solid fa-circle-plus"></i>
@@ -748,204 +813,548 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
   const isCollapsed = !!collapsedSections[indicacionesToggle?.id];
 
+  const topButtonStyle = {
+    borderRadius: 12,
+    border: "1px solid #d1d5db",
+    background: "#fff",
+    color: "#111827",
+    padding: isMobile ? "10px 14px" : "10px 14px",
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: isMobile ? 14 : 14,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+  };
+
+  const primaryButtonStyle = {
+    borderRadius: 12,
+    border: "1px solid #c7d2fe",
+    background: "#2563eb",
+    color: "#fff",
+    padding: isMobile ? "11px 16px" : "12px 18px",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: isMobile ? 14 : 14,
+    boxShadow: "0 8px 18px rgba(37,99,235,0.18)",
+  };
+
+  const fieldBlockStyle = {
+    display: "grid",
+    gap: isMobile ? 8 : 6,
+    padding: isMobile ? "12px 12px 10px" : 0,
+    borderRadius: isMobile ? 14 : 0,
+    background: isMobile ? "#fafafa" : "transparent",
+    border: isMobile ? "1px solid #eef2f7" : "none",
+  };
+
+  const validateBeforeSubmit = () => {
+    if (!taller || String(answers[taller.id] ?? "").trim() === "") {
+      setMsg("Debes seleccionar el Taller.");
+      scrollToTopSafe();
+      return false;
+    }
+
+    if (
+      !nombreInspector ||
+      String(answers[nombreInspector.id] ?? "").trim() === ""
+    ) {
+      setMsg("Debes capturar el Nombre del inspector.");
+      scrollToTopSafe();
+      return false;
+    }
+
+    if (
+      !firmaInspector ||
+      !answers[firmaInspector.id] ||
+      String(answers[firmaInspector.id]).trim() === ""
+    ) {
+      setMsg("Debes capturar la Firma del inspector.");
+      scrollToTopSafe();
+      return false;
+    }
+
+    if (!tablaHerramientas) {
+      setMsg("No se encontró la tabla de herramientas.");
+      scrollToTopSafe();
+      return false;
+    }
+
+    const rows = Array.isArray(answers[tablaHerramientas.id])
+      ? answers[tablaHerramientas.id]
+      : [];
+
+    if (!rows.length) {
+      setMsg("Debes agregar al menos una fila en la tabla de herramientas.");
+      scrollToTopSafe();
+      return false;
+    }
+
+    const rowSchema = Array.isArray(tablaHerramientas.row_schema)
+      ? tablaHerramientas.row_schema
+      : [];
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i] || {};
+
+      for (const col of rowSchema) {
+        if (!col?.id) continue;
+        if (isObservationColumn(col)) continue;
+
+        const value = row[col.id];
+
+        if (isEmptyValue(value, col.type)) {
+          setMsg(`En la fila ${i + 1} falta responder: ${col.label}`);
+          scrollToTopSafe();
+          return false;
+        }
+
+        if (col.type === "select" || col.type === "radio") {
+          const opts = Array.isArray(col.options) ? col.options : [];
+          if (opts.length && !opts.includes(value)) {
+            setMsg(`En la fila ${i + 1} selecciona una opción válida para: ${col.label}`);
+            scrollToTopSafe();
+            return false;
+          }
+        }
+      }
+    }
+
+    setMsg("");
+    return true;
+  };
+
+  const handleSubmit = (e) => {
+    if (readOnly) {
+      e.preventDefault();
+      return;
+    }
+
+    const ok = validateBeforeSubmit();
+    if (!ok) {
+      e.preventDefault();
+      return;
+    }
+
+    onSubmit?.(e);
+  };
+
   return (
-    <div style={{ padding: 16 }}>
+    <div
+      ref={topRef}
+      style={{
+        minHeight: "100%",
+        background: "#f8fafc",
+        padding: isMobile ? "8px 8px 22px" : "14px 14px 28px",
+      }}
+    >
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          alignItems: "center",
-          flexWrap: "wrap",
+          maxWidth: isMobile ? 980 : 1040,
+          width: isMobile ? "95%" : "100%",
+          margin: "0 auto",
         }}
       >
-        <div>
-          <h2 style={{ margin: 0 }}>
-            {readOnly ? "Ver respuesta" : `Llenar: ${form?.title}`}
-          </h2>
-
-          {readOnly && responseMeta ? (
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-              Respuesta #{responseMeta.id} • Usuario: {responseMeta.user_id} • Fecha:{" "}
-              {responseMeta.created_at ? new Date(responseMeta.created_at).toLocaleString() : "—"}
-            </div>
-          ) : null}
-        </div>
-
-        <button type="button" onClick={onBack}>
-          Volver
-        </button>
-      </div>
-
-      {msg ? <p style={{ marginTop: 10, whiteSpace: "pre-line" }}>{msg}</p> : null}
-
-      {!isOnline && !readOnly ? (
         <div
           style={{
-            marginTop: 10,
-            fontSize: 12,
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid rgba(0,0,0,0.15)",
-            opacity: 0.9,
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: isMobile ? 16 : 18,
+            padding: isMobile ? 16 : 18,
+            marginBottom: isMobile ? 12 : 16,
+            boxShadow: "0 6px 24px rgba(15,23,42,0.05)",
           }}
         >
-          Estás en <b>modo offline</b>. Al enviar, se guardará en el dispositivo y se sincronizará después.
-        </div>
-      ) : null}
-
-      <form onSubmit={onSubmit}>
-        <div
-          style={{
-            marginTop: 12,
-            maxWidth: 900,
-            marginInline: "auto",
-            background: "#fff",
-            border: "1px solid #d1d5db",
-            borderRadius: 14,
-            padding: 20,
-            display: "grid",
-            gap: 14,
-          }}
-        >
-          {logo ? (
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{ width: "100%", maxWidth: 420, textAlign: "center" }}>
-                {renderField(logo)}
-              </div>
-            </div>
-          ) : null}
-
           <div
             style={{
-              display: "grid",
-              gap: 6,
-              justifyItems: "end",
-              textAlign: "left",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 14,
+              alignItems: "flex-start",
+              flexWrap: "wrap",
             }}
           >
-            {headerLines.map((line) => (
+            <div style={{ display: "grid", gap: isMobile ? 8 : 8 }}>
               <div
-                key={line.id}
                 style={{
-                  width: "100%",
-                  fontWeight: line.id === "header_line_3" ? 800 : 700,
-                  fontSize:
-                    line.id === "header_line_1"
-                      ? 18
-                      : line.id === "header_line_2"
-                      ? 15
-                      : 14,
-                  color: "#111827",
-                  textAlign: "left",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: readOnly ? "#7c3aed" : "#2563eb",
+                  background: readOnly ? "#f5f3ff" : "#eff6ff",
+                  border: `1px solid ${readOnly ? "#ddd6fe" : "#bfdbfe"}`,
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  width: "fit-content",
                 }}
               >
-                {line.text}
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: readOnly ? "#7c3aed" : "#2563eb",
+                    display: "inline-block",
+                  }}
+                />
+                {readOnly ? "Modo lectura" : "Captura de formulario"}
               </div>
-            ))}
+
+              <div>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: isMobile ? 18 : 24,
+                    lineHeight: isMobile ? 1.25 : 1.15,
+                    color: "#0f172a",
+                  }}
+                >
+                  {readOnly ? "Ver respuesta" : form?.title || "Formulario"}
+                </h2>
+
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: isMobile ? 13 : 13,
+                    color: "#64748b",
+                    lineHeight: 1.6,
+                    maxWidth: 760,
+                  }}
+                >
+                  {readOnly
+                    ? "Consulta la información registrada en este formulario."
+                    : "Completa la información solicitada y guarda el registro cuando termines."}
+                </div>
+
+                {readOnly && responseMeta ? (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 12,
+                      color: "#64748b",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    Respuesta #{responseMeta.id || "—"} • Usuario:{" "}
+                    {responseMeta.user_id || "—"} • Fecha:{" "}
+                    {responseMeta.created_at
+                      ? new Date(responseMeta.created_at).toLocaleString()
+                      : "—"}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button type="button" onClick={onBack} style={topButtonStyle}>
+                ← Volver
+              </button>
+            </div>
           </div>
 
-          {taller ? (
-            <div style={{ display: "grid", gap: 6 }}>
-              <label>
-                <b>{taller.label}</b> {taller.required ? <span style={{ color: "crimson" }}>*</span> : null}
-              </label>
-              {renderField(taller)}
-            </div>
-          ) : null}
-
-          {nombreInspector ? (
-            <div style={{ display: "grid", gap: 6 }}>
-              <label>
-                <b>{nombreInspector.label}</b> {nombreInspector.required ? <span style={{ color: "crimson" }}>*</span> : null}
-              </label>
-              {renderField(nombreInspector)}
-            </div>
-          ) : null}
-
-          {firmaInspector ? (
-            <div style={{ display: "grid", gap: 6 }}>
-              <label>
-                <b>{firmaInspector.label}</b> {firmaInspector.required ? <span style={{ color: "crimson" }}>*</span> : null}
-              </label>
-              {renderField(firmaInspector)}
-            </div>
-          ) : null}
-
-          {indicacionesToggle ? (
+          {msg ? (
             <div
               style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: 12,
-                overflow: "hidden",
+                marginTop: 14,
+                borderRadius: 14,
+                border: "1px solid #fde68a",
+                background: "#fffbeb",
+                color: "#92400e",
+                padding: isMobile ? "12px 14px" : "12px 14px",
+                whiteSpace: "pre-line",
+                fontSize: isMobile ? 13 : 13,
+                lineHeight: 1.6,
               }}
             >
-              <button
-                type="button"
-                onClick={() => toggleSection(indicacionesToggle.id)}
+              {msg}
+            </div>
+          ) : null}
+
+          {!isOnline && !readOnly ? (
+            <div
+              style={{
+                marginTop: 14,
+                borderRadius: 14,
+                border: "1px solid #fed7aa",
+                background: "#fff7ed",
+                color: "#9a3412",
+                padding: isMobile ? "12px 14px" : "12px 14px",
+                fontSize: isMobile ? 13 : 13,
+                lineHeight: 1.6,
+              }}
+            >
+              Estás en <b>modo offline</b>. Al enviar, el registro se guardará en el
+              dispositivo y se sincronizará automáticamente después.
+            </div>
+          ) : null}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div
+            style={{
+              maxWidth: isMobile ? "100%" : 900,
+              marginInline: "auto",
+              background: "#fff",
+              border: "1px solid #dbe4ee",
+              borderRadius: isMobile ? 16 : 18,
+              padding: isMobile ? 16 : 22,
+              display: "grid",
+              gap: isMobile ? 16 : 16,
+              boxShadow: "0 8px 28px rgba(15,23,42,0.06)",
+            }}
+          >
+            {logo ? (
+              <div
                 style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  paddingBottom: isMobile ? 4 : 0,
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: isMobile ? 250 : 420,
+                    textAlign: "center",
+                  }}
+                >
+                  {renderField(logo)}
+                </div>
+              </div>
+            ) : null}
+
+            <div
+              style={{
+                display: "grid",
+                gap: isMobile ? 10 : 6,
+                textAlign: "left",
+              }}
+            >
+              {headerLines.map((line) => (
+                <div
+                  key={line.id}
+                  style={{
+                    width: "100%",
+                    fontWeight: line.id === "header_line_3" ? 800 : 700,
+                    fontSize:
+                      line.id === "header_line_1"
+                        ? isMobile
+                          ? 14
+                          : 18
+                        : line.id === "header_line_2"
+                        ? isMobile
+                          ? 13
+                          : 15
+                        : isMobile
+                        ? 12
+                        : 14,
+                    color: "#111827",
+                    textAlign: "left",
+                    lineHeight: isMobile ? 1.45 : 1.35,
+                  }}
+                >
+                  {line.text}
+                </div>
+              ))}
+            </div>
+
+            {taller ? (
+              <div style={fieldBlockStyle}>
+                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
+                  <b>{taller.label}</b>{" "}
+                  <span style={{ color: "crimson" }}>*</span>
+                </label>
+                {renderField(taller)}
+              </div>
+            ) : null}
+
+            {nombreInspector ? (
+              <div style={fieldBlockStyle}>
+                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
+                  <b>{nombreInspector.label}</b>{" "}
+                  <span style={{ color: "crimson" }}>*</span>
+                </label>
+                {renderField(nombreInspector)}
+              </div>
+            ) : null}
+
+            {firmaInspector ? (
+              <div style={fieldBlockStyle}>
+                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
+                  <b>{firmaInspector.label}</b>{" "}
+                  <span style={{ color: "crimson" }}>*</span>
+                </label>
+                {renderField(firmaInspector)}
+              </div>
+            ) : null}
+
+            {indicacionesToggle ? (
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 14,
+                  overflow: "hidden",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleSection(indicacionesToggle.id)}
+                  style={{
+                    width: "100%",
+                    padding: isMobile ? "14px 14px" : "14px 16px",
+                    background: "#f8fafc",
+                    border: "none",
+                    borderBottom: isCollapsed ? "none" : "1px solid #e5e7eb",
+                    textAlign: "left",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    color: "#0f172a",
+                    fontSize: isMobile ? 14 : 14,
+                  }}
+                >
+                  <span>{indicacionesToggle.text || indicacionesToggle.label}</span>
+                  <span>{isCollapsed ? "＋" : "－"}</span>
+                </button>
+
+                {!isCollapsed ? (
+                  <div
+                    style={{
+                      padding: isMobile ? 14 : 16,
+                      display: "grid",
+                      gap: isMobile ? 14 : 14,
+                      background: "#fff",
+                    }}
+                  >
+                    {indicacion1 ? (
+                      <div
+                        style={{
+                          color: "#111827",
+                          lineHeight: 1.7,
+                          fontSize: isMobile ? 14 : 14,
+                        }}
+                      >
+                        {indicacion1.text}
+                      </div>
+                    ) : null}
+
+                    {indicacion2 ? (
+                      <div
+                        style={{
+                          color: "#111827",
+                          lineHeight: 1.7,
+                          fontSize: isMobile ? 14 : 14,
+                        }}
+                      >
+                        {indicacion2.text}
+                      </div>
+                    ) : null}
+
+                    {tablaHerramientas ? (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            color: "#0f172a",
+                            fontSize: isMobile ? 14 : 14,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          Criterios a inspeccionar
+                        </div>
+                        {renderField(tablaHerramientas)}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {!readOnly ? (
+            <div
+              style={{
+                position: "sticky",
+                bottom: isMobile ? 8 : 12,
+                zIndex: 20,
+                marginTop: isMobile ? 16 : 18,
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: isMobile ? "100%" : 900,
                   width: "100%",
-                  padding: "12px 14px",
-                  background: "#f8fafc",
-                  border: "none",
-                  borderBottom: isCollapsed ? "none" : "1px solid #e5e7eb",
-                  textAlign: "left",
-                  fontWeight: 800,
-                  cursor: "pointer",
+                  marginInline: "auto",
+                  background: "rgba(255,255,255,0.92)",
+                  backdropFilter: "blur(10px)",
+                  border: "1px solid #dbe4ee",
+                  borderRadius: isMobile ? 16 : 18,
+                  padding: isMobile ? 14 : 14,
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  gap: 14,
+                  flexWrap: "wrap",
+                  boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
                 }}
               >
-                <span>{indicacionesToggle.text || indicacionesToggle.label}</span>
-                <span>{isCollapsed ? "＋" : "－"}</span>
-              </button>
-
-              {!isCollapsed ? (
-                <div style={{ padding: 14, display: "grid", gap: 12, background: "#fff" }}>
-                  {indicacion1 ? <div style={{ color: "#111827", lineHeight: 1.5 }}>{indicacion1.text}</div> : null}
-                  {indicacion2 ? <div style={{ color: "#111827", lineHeight: 1.5 }}>{indicacion2.text}</div> : null}
-
-                  {tablaHerramientas ? (
-                    <div style={{ display: "grid", gap: 8 }}>
-                      <div style={{ fontWeight: 800 }}>Criterios a inspeccionar</div>
-                      {renderField(tablaHerramientas)}
-                    </div>
-                  ) : null}
+                <div style={{ display: "grid", gap: 5 }}>
+                  <div
+                    style={{
+                      fontSize: isMobile ? 13 : 13,
+                      fontWeight: 800,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {saving
+                      ? "Guardando registro..."
+                      : isOnline
+                      ? "Listo para enviar"
+                      : "Listo para guardar offline"}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: isMobile ? 12 : 12,
+                      color: "#64748b",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Revisa la información antes de continuar.
+                  </div>
                 </div>
-              ) : null}
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    style={topButtonStyle}
+                  >
+                    Volver
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    style={{
+                      ...primaryButtonStyle,
+                      opacity: saving ? 0.7 : 1,
+                      cursor: saving ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {saving
+                      ? "Guardando..."
+                      : isOnline
+                      ? "Enviar formulario"
+                      : "Guardar offline"}
+                  </button>
+                </div>
+              </div>
             </div>
           ) : null}
-        </div>
-
-        {!readOnly ? (
-          <div
-            style={{
-              marginTop: 16,
-              maxWidth: 900,
-              marginInline: "auto",
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 10,
-            }}
-          >
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                borderRadius: 10,
-                border: "1px solid #e4e4e7",
-                background: "#fff",
-                padding: "10px 14px",
-                cursor: saving ? "not-allowed" : "pointer",
-                fontWeight: 800,
-              }}
-            >
-              {saving ? "Guardando..." : isOnline ? "Enviar" : "Guardar offline"}
-            </button>
-          </div>
-        ) : null}
-      </form>
+        </form>
+      </div>
 
       {!readOnly && tableModal.open && tableModal.field ? (
         <div
@@ -1005,11 +1414,17 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
               </button>
             </div>
 
-            <div style={{ padding: 16, display: "grid", gap: 12 }}>
-              {(Array.isArray(tableModal.field.row_schema) ? tableModal.field.row_schema : []).map((col) => (
-                <div key={col.id} style={{ display: "grid", gap: 6 }}>
-                  <label>
-                    <b>{col.label}</b> {col.required ? <span style={{ color: "crimson" }}>*</span> : null}
+            <div style={{ padding: 16, display: "grid", gap: 14 }}>
+              {(Array.isArray(tableModal.field.row_schema)
+                ? tableModal.field.row_schema
+                : []
+              ).map((col) => (
+                <div key={col.id} style={{ display: "grid", gap: 8 }}>
+                  <label style={{ fontSize: isMobile ? 14 : 14, lineHeight: 1.4 }}>
+                    <b>{col.label}</b>{" "}
+                    {!isObservationColumn(col) ? (
+                      <span style={{ color: "crimson" }}>*</span>
+                    ) : null}
                   </label>
                   {renderTableModalField(col)}
                 </div>
@@ -1116,7 +1531,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             </div>
 
             <div style={{ padding: 16, display: "grid", gap: 12 }}>
-              <div style={{ fontSize: 13, color: "#475569" }}>
+              <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
                 Firma dentro del recuadro. Si te equivocas puedes limpiar y volver a firmar.
               </div>
 

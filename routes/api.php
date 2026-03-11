@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Admin\EmpresasController;
 use App\Http\Controllers\Api\Admin\GruposController;
 use App\Http\Controllers\Api\FormsController;
 use App\Http\Controllers\Api\FormSubmissionsController;
+use App\Http\Controllers\Api\FormSubmissionPdfController;
 
 /*
 |--------------------------------------------------------------------------
@@ -46,6 +47,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Ver respuestas del formulario (tabla submissions)
     Route::get('/forms/{form}/submissions', [FormSubmissionsController::class, 'index'])
+        ->middleware('perm:formularios.submissions.view');
+
+    // PDF de un registro/respuesta
+    Route::get('/forms/{form}/submissions/{submission}/pdf', [FormSubmissionPdfController::class, 'show'])
         ->middleware('perm:formularios.submissions.view');
 });
 
