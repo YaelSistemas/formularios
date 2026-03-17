@@ -49,6 +49,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/forms/{form}/submissions', [FormSubmissionsController::class, 'index'])
         ->middleware('perm:formularios.submissions.view');
 
+    // Editar / actualizar una respuesta existente
+    Route::put('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'update'])
+        ->middleware('perm:formularios.submissions.view');
+
+    Route::patch('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'update'])
+        ->middleware('perm:formularios.submissions.view');
+
     // PDF de un registro/respuesta
     Route::get('/forms/{form}/submissions/{submission}/pdf', [FormSubmissionPdfController::class, 'show'])
         ->middleware('perm:formularios.submissions.view');

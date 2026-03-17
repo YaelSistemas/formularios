@@ -251,6 +251,14 @@ export default function FormsIndex() {
     window.history.pushState(state, "");
   };
 
+  const clearSearch = () => {
+    setSearch("");
+    if (searchInputRef.current) {
+      searchInputRef.current.value = "";
+    }
+    setMobileSearchResetKey((k) => k + 1);
+  };
+
   const goToTable = () => {
     const nextState = {
       page: "forms-index",
@@ -386,7 +394,6 @@ export default function FormsIndex() {
       await loadForms();
       setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -438,7 +445,6 @@ export default function FormsIndex() {
 
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onFill = async (id) => {
@@ -470,12 +476,28 @@ export default function FormsIndex() {
 
   const onOpenSavedResponse = async (submission) => {
     pushFormsState("response_view", {
-      selectedId: selectedId,
+      selectedId,
       selectedSub: submission,
     });
 
     setSelectedSub(submission);
     setMode("response_view");
+    setMobileSubmissionActions({ open: false, submission: null });
+    setErr("");
+
+    if (!detail && selectedId) {
+      await loadDetail(selectedId);
+    }
+  };
+
+  const onEditSavedResponse = async (submission) => {
+    pushFormsState("response_edit", {
+      selectedId,
+      selectedSub: submission,
+    });
+
+    setSelectedSub(submission);
+    setMode("response_edit");
     setMobileSubmissionActions({ open: false, submission: null });
     setErr("");
 
@@ -605,14 +627,6 @@ export default function FormsIndex() {
     });
   };
 
-  const clearSearch = () => {
-    setSearch("");
-    if (searchInputRef.current) {
-      searchInputRef.current.value = "";
-    }
-    setMobileSearchResetKey((k) => k + 1);
-  };
-
   const filteredForms = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return forms;
@@ -706,6 +720,25 @@ export default function FormsIndex() {
     );
   }
 
+  if (mode === "response_edit" && detail && selectedSub) {
+    return (
+      <FormFill
+        form={detail}
+        onBack={goToResponses}
+        readOnly={false}
+        initialAnswers={selectedSub.answers || {}}
+        responseMeta={{
+          id: selectedSub.id,
+          user_id: selectedSub.user_id,
+          created_at: selectedSub.created_at,
+        }}
+        editSubmissionId={selectedSub.id}
+        isEditing={true}
+        onSaved={goToResponses}
+      />
+    );
+  }
+
   return (
     <div>
       <Card style={{ marginBottom: 14 }}>
@@ -748,7 +781,10 @@ export default function FormsIndex() {
                 onClick={() => {
                   if (mode === "responses") {
                     goToTable();
-                  } else if (mode === "response_view") {
+                  } else if (
+                    mode === "response_view" ||
+                    mode === "response_edit"
+                  ) {
                     goToResponses();
                   } else if (mode === "fill") {
                     goToTable();
@@ -870,12 +906,7 @@ export default function FormsIndex() {
                           {f.title}
                         </div>
 
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "#64748b",
-                          }}
-                        >
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
                           Toca para ver opciones
                         </div>
                       </div>
@@ -901,12 +932,7 @@ export default function FormsIndex() {
               ))
             ) : (
               <Card>
-                <div
-                  style={{
-                    padding: "4px 0",
-                    color: "#64748b",
-                  }}
-                >
+                <div style={{ padding: "4px 0", color: "#64748b" }}>
                   {search.trim()
                     ? "No se encontraron formularios con esa búsqueda."
                     : "Sin formularios."}
@@ -980,12 +1006,7 @@ export default function FormsIndex() {
               ))
             ) : (
               <Card>
-                <div
-                  style={{
-                    padding: "4px 0",
-                    color: "#64748b",
-                  }}
-                >
+                <div style={{ padding: "4px 0", color: "#64748b" }}>
                   {search.trim()
                     ? "No se encontraron formularios con esa búsqueda."
                     : "Sin formularios."}
@@ -1086,7 +1107,7 @@ export default function FormsIndex() {
                   style={{
                     borderCollapse: "collapse",
                     width: "100%",
-                    minWidth: 920,
+                    minWidth: 1020,
                   }}
                 >
                   <thead>
@@ -1142,7 +1163,7 @@ export default function FormsIndex() {
                           borderBottom: "1px solid #e4e7eb",
                           fontSize: 12,
                           color: "#475569",
-                          width: 130,
+                          width: 180,
                         }}
                       >
                         Acciones
@@ -1210,6 +1231,15 @@ export default function FormsIndex() {
                               variant="primary"
                             >
                               <i className="fa-solid fa-eye" />
+                            </IconBtn>
+
+                            <IconBtn
+                              type="button"
+                              title="Editar registro"
+                              onClick={() => onEditSavedResponse(s)}
+                              variant="success"
+                            >
+                              <i className="fa-solid fa-pen" />
                             </IconBtn>
 
                             <IconBtn
@@ -1392,6 +1422,18 @@ export default function FormsIndex() {
               >
                 <i className="fa-solid fa-eye" />
                 Ver registro
+              </Btn>
+
+              <Btn
+                type="button"
+                variant="success"
+                onClick={() =>
+                  onEditSavedResponse(mobileSubmissionActions.submission)
+                }
+                style={{ justifyContent: "center", width: "100%" }}
+              >
+                <i className="fa-solid fa-pen" />
+                Editar registro
               </Btn>
 
               <Btn

@@ -13,6 +13,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   setMsg,
   readOnly = false,
   responseMeta = null,
+  isEditing = false,
 }) {
   const [collapsedSections, setCollapsedSections] = useState({
     indicaciones_toggle: false,
@@ -21,6 +22,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const [tableModal, setTableModal] = useState({
     open: false,
     field: null,
+    editIndex: null,
   });
 
   const [tableRowDraft, setTableRowDraft] = useState({});
@@ -62,21 +64,45 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     }));
   };
 
-  const openTableModal = (field) => {
-    if (readOnly) return;
-
+  const buildRowDraft = (field, preload = null) => {
     const rowSchema = Array.isArray(field?.row_schema) ? field.row_schema : [];
     const init = {};
 
     rowSchema.forEach((col) => {
-      if (col.type === "checkbox") init[col.id] = false;
-      else init[col.id] = "";
+      if (preload && preload[col.id] !== undefined) {
+        init[col.id] = preload[col.id];
+      } else if (col.type === "checkbox") {
+        init[col.id] = false;
+      } else {
+        init[col.id] = "";
+      }
     });
 
-    setTableRowDraft(init);
+    return init;
+  };
+
+  const openTableModal = (field) => {
+    if (readOnly) return;
+
+    setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
       field,
+      editIndex: null,
+    });
+  };
+
+  const openEditTableModal = (field, rowIndex) => {
+    if (readOnly) return;
+
+    const rows = Array.isArray(answers[field.id]) ? answers[field.id] : [];
+    const currentRow = rows[rowIndex] || {};
+
+    setTableRowDraft(buildRowDraft(field, currentRow));
+    setTableModal({
+      open: true,
+      field,
+      editIndex: rowIndex,
     });
   };
 
@@ -84,6 +110,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     setTableModal({
       open: false,
       field: null,
+      editIndex: null,
     });
     setTableRowDraft({});
   };
@@ -106,7 +133,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     return value === null || value === undefined || String(value).trim() === "";
   };
 
-  const addTableRow = () => {
+  const saveTableRow = () => {
     const field = tableModal.field;
     if (!field) return;
 
@@ -134,10 +161,17 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       }
     }
 
-    setVal(field.id, [
-      ...(Array.isArray(answers[field.id]) ? answers[field.id] : []),
-      { ...tableRowDraft },
-    ]);
+    const currentRows = Array.isArray(answers[field.id]) ? answers[field.id] : [];
+
+    if (tableModal.editIndex === null || tableModal.editIndex === undefined) {
+      setVal(field.id, [...currentRows, { ...tableRowDraft }]);
+    } else {
+      const nextRows = currentRows.map((row, idx) =>
+        idx === tableModal.editIndex ? { ...tableRowDraft } : row
+      );
+      setVal(field.id, nextRows);
+    }
+
     setMsg("");
     closeTableModal();
   };
@@ -685,7 +719,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                         background: "#f8fafc",
                         textAlign: "center",
                         fontSize: isMobile ? 11 : 12,
-                        width: 90,
+                        width: 170,
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -720,22 +754,48 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                             verticalAlign: "top",
                           }}
                         >
-                          <button
-                            type="button"
-                            onClick={() => removeTableRow(f.id, rowIndex)}
+                          <div
                             style={{
-                              borderRadius: 8,
-                              border: "1px solid #fecaca",
-                              background: "#fef2f2",
-                              color: "#b91c1c",
-                              padding: "6px 10px",
-                              cursor: "pointer",
-                              fontWeight: 700,
-                              fontSize: isMobile ? 12 : 13,
+                              display: "inline-flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              justifyContent: "center",
                             }}
                           >
-                            Quitar
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => openEditTableModal(f, rowIndex)}
+                              style={{
+                                borderRadius: 8,
+                                border: "1px solid #bfdbfe",
+                                background: "#eff6ff",
+                                color: "#1d4ed8",
+                                padding: "6px 10px",
+                                cursor: "pointer",
+                                fontWeight: 700,
+                                fontSize: isMobile ? 12 : 13,
+                              }}
+                            >
+                              Editar
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => removeTableRow(f.id, rowIndex)}
+                              style={{
+                                borderRadius: 8,
+                                border: "1px solid #fecaca",
+                                background: "#fef2f2",
+                                color: "#b91c1c",
+                                padding: "6px 10px",
+                                cursor: "pointer",
+                                fontWeight: 700,
+                                fontSize: isMobile ? 12 : 13,
+                              }}
+                            >
+                              Quitar
+                            </button>
+                          </div>
                         </td>
                       ) : null}
                     </tr>
@@ -853,10 +913,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       return false;
     }
 
-    if (
-      !nombreInspector ||
-      String(answers[nombreInspector.id] ?? "").trim() === ""
-    ) {
+    if (!nombreInspector || String(answers[nombreInspector.id] ?? "").trim() === "") {
       setMsg("Debes capturar el Nombre del inspector.");
       scrollToTopSafe();
       return false;
@@ -910,7 +967,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
         if (col.type === "select" || col.type === "radio") {
           const opts = Array.isArray(col.options) ? col.options : [];
           if (opts.length && !opts.includes(value)) {
-            setMsg(`En la fila ${i + 1} selecciona una opción válida para: ${col.label}`);
+            setMsg(
+              `En la fila ${i + 1} selecciona una opción válida para: ${col.label}`
+            );
             scrollToTopSafe();
             return false;
           }
@@ -935,6 +994,54 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     }
 
     onSubmit?.(e);
+  };
+
+  const getModeBadge = () => {
+    if (readOnly) return "Modo lectura";
+    if (isEditing) return "Edición de registro";
+    return "Captura de formulario";
+  };
+
+  const getModeTitle = () => {
+    if (readOnly) return "Ver respuesta";
+    if (isEditing) return `Editar: ${form?.title || "Formulario"}`;
+    return form?.title || "Formulario";
+  };
+
+  const getModeDescription = () => {
+    if (readOnly) {
+      return "Consulta la información registrada en este formulario.";
+    }
+
+    if (isEditing) {
+      return "Modifica la información necesaria y actualiza el registro cuando termines.";
+    }
+
+    return "Completa la información solicitada y guarda el registro cuando termines.";
+  };
+
+  const getFooterStateText = () => {
+    if (saving) {
+      return isEditing ? "Actualizando registro..." : "Guardando registro...";
+    }
+
+    if (isEditing) {
+      return isOnline ? "Listo para actualizar" : "Sin conexión para actualizar";
+    }
+
+    return isOnline ? "Listo para enviar" : "Listo para guardar offline";
+  };
+
+  const getSubmitText = () => {
+    if (saving) {
+      return isEditing ? "Actualizando..." : "Guardando...";
+    }
+
+    if (isEditing) {
+      return "Actualizar registro";
+    }
+
+    return isOnline ? "Enviar formulario" : "Guardar offline";
   };
 
   return (
@@ -980,9 +1087,11 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                   gap: 8,
                   fontSize: 12,
                   fontWeight: 800,
-                  color: readOnly ? "#7c3aed" : "#2563eb",
-                  background: readOnly ? "#f5f3ff" : "#eff6ff",
-                  border: `1px solid ${readOnly ? "#ddd6fe" : "#bfdbfe"}`,
+                  color: readOnly ? "#7c3aed" : isEditing ? "#166534" : "#2563eb",
+                  background: readOnly ? "#f5f3ff" : isEditing ? "#ecfdf5" : "#eff6ff",
+                  border: `1px solid ${
+                    readOnly ? "#ddd6fe" : isEditing ? "#86efac" : "#bfdbfe"
+                  }`,
                   borderRadius: 999,
                   padding: "6px 10px",
                   width: "fit-content",
@@ -993,11 +1102,11 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                     width: 8,
                     height: 8,
                     borderRadius: 999,
-                    background: readOnly ? "#7c3aed" : "#2563eb",
+                    background: readOnly ? "#7c3aed" : isEditing ? "#16a34a" : "#2563eb",
                     display: "inline-block",
                   }}
                 />
-                {readOnly ? "Modo lectura" : "Captura de formulario"}
+                {getModeBadge()}
               </div>
 
               <div>
@@ -1009,7 +1118,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                     color: "#0f172a",
                   }}
                 >
-                  {readOnly ? "Ver respuesta" : form?.title || "Formulario"}
+                  {getModeTitle()}
                 </h2>
 
                 <div
@@ -1021,9 +1130,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                     maxWidth: 760,
                   }}
                 >
-                  {readOnly
-                    ? "Consulta la información registrada en este formulario."
-                    : "Completa la información solicitada y guarda el registro cuando termines."}
+                  {getModeDescription()}
                 </div>
 
                 {readOnly && responseMeta ? (
@@ -1035,8 +1142,8 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                       lineHeight: 1.6,
                     }}
                   >
-                    Respuesta #{responseMeta.id || "—"} • Usuario:{" "}
-                    {responseMeta.user_id || "—"} • Fecha:{" "}
+                    Respuesta #{responseMeta.id || "—"} • Usuario: {responseMeta.user_id || "—"} •
+                    Fecha:{" "}
                     {responseMeta.created_at
                       ? new Date(responseMeta.created_at).toLocaleString()
                       : "—"}
@@ -1070,7 +1177,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             </div>
           ) : null}
 
-          {!isOnline && !readOnly ? (
+          {!isOnline && !readOnly && !isEditing ? (
             <div
               style={{
                 marginTop: 14,
@@ -1085,6 +1192,23 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             >
               Estás en <b>modo offline</b>. Al enviar, el registro se guardará en el
               dispositivo y se sincronizará automáticamente después.
+            </div>
+          ) : null}
+
+          {!isOnline && isEditing ? (
+            <div
+              style={{
+                marginTop: 14,
+                borderRadius: 14,
+                border: "1px solid #fecaca",
+                background: "#fff7ed",
+                color: "#9a3412",
+                padding: isMobile ? "12px 14px" : "12px 14px",
+                fontSize: isMobile ? 13 : 13,
+                lineHeight: 1.6,
+              }}
+            >
+              Estás sin conexión. La edición de registros existentes requiere internet para guardar cambios.
             </div>
           ) : null}
         </div>
@@ -1161,8 +1285,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             {taller ? (
               <div style={fieldBlockStyle}>
                 <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{taller.label}</b>{" "}
-                  <span style={{ color: "crimson" }}>*</span>
+                  <b>{taller.label}</b> <span style={{ color: "crimson" }}>*</span>
                 </label>
                 {renderField(taller)}
               </div>
@@ -1171,8 +1294,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             {nombreInspector ? (
               <div style={fieldBlockStyle}>
                 <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{nombreInspector.label}</b>{" "}
-                  <span style={{ color: "crimson" }}>*</span>
+                  <b>{nombreInspector.label}</b> <span style={{ color: "crimson" }}>*</span>
                 </label>
                 {renderField(nombreInspector)}
               </div>
@@ -1181,8 +1303,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             {firmaInspector ? (
               <div style={fieldBlockStyle}>
                 <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{firmaInspector.label}</b>{" "}
-                  <span style={{ color: "crimson" }}>*</span>
+                  <b>{firmaInspector.label}</b> <span style={{ color: "crimson" }}>*</span>
                 </label>
                 {renderField(firmaInspector)}
               </div>
@@ -1308,11 +1429,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                       color: "#0f172a",
                     }}
                   >
-                    {saving
-                      ? "Guardando registro..."
-                      : isOnline
-                      ? "Listo para enviar"
-                      : "Listo para guardar offline"}
+                    {getFooterStateText()}
                   </div>
                   <div
                     style={{
@@ -1326,28 +1443,20 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 </div>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={onBack}
-                    style={topButtonStyle}
-                  >
+                  <button type="button" onClick={onBack} style={topButtonStyle}>
                     Volver
                   </button>
 
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || (isEditing && !isOnline)}
                     style={{
                       ...primaryButtonStyle,
-                      opacity: saving ? 0.7 : 1,
-                      cursor: saving ? "not-allowed" : "pointer",
+                      opacity: saving || (isEditing && !isOnline) ? 0.7 : 1,
+                      cursor: saving || (isEditing && !isOnline) ? "not-allowed" : "pointer",
                     }}
                   >
-                    {saving
-                      ? "Guardando..."
-                      : isOnline
-                      ? "Enviar formulario"
-                      : "Guardar offline"}
+                    {getSubmitText()}
                   </button>
                 </div>
               </div>
@@ -1397,7 +1506,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 zIndex: 1,
               }}
             >
-              <h3 style={{ margin: 0 }}>Agregar registro</h3>
+              <h3 style={{ margin: 0 }}>
+                {tableModal.editIndex === null ? "Agregar registro" : "Editar registro"}
+              </h3>
               <button
                 type="button"
                 onClick={closeTableModal}
@@ -1460,7 +1571,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
               <button
                 type="button"
-                onClick={addTableRow}
+                onClick={saveTableRow}
                 style={{
                   borderRadius: 10,
                   border: "1px solid #c7d2fe",
@@ -1471,7 +1582,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                   fontWeight: 800,
                 }}
               >
-                Guardar fila
+                {tableModal.editIndex === null ? "Guardar fila" : "Actualizar fila"}
               </button>
             </div>
           </div>

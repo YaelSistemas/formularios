@@ -15,6 +15,10 @@ class FormSubmissionsController extends Controller
     {
         $user = $request->user();
 
+        if (!$user) {
+            return response()->json(['message' => 'No autorizado.'], 401);
+        }
+
         // usuario normal solo puede responder PUBLICADOS
         if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
             return response()->json(['message' => 'No encontrado.'], 404);
@@ -24,11 +28,121 @@ class FormSubmissionsController extends Controller
             'answers' => ['required', 'array'],
         ]);
 
-        $answers = $data['answers'];
+        $cleanAnswers = $this->validateAndCleanAnswers(
+            form: $form,
+            userId: $user?->id,
+            answers: $data['answers']
+        );
 
+        if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
+            return $cleanAnswers;
+        }
+
+        $submission = FormSubmission::create([
+            'form_id' => $form->id,
+            'user_id' => $user?->id,
+            'answers' => $cleanAnswers,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Registro creado correctamente.',
+            'submission' => $submission,
+        ], 201);
+    }
+
+    public function index(Request $request, Form $form)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'No autorizado.'], 401);
+        }
+
+        if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
+            return response()->json(['message' => 'No encontrado.'], 404);
+        }
+
+        $subs = FormSubmission::query()
+            ->with(['user:id,name'])
+            ->where('form_id', $form->id)
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get(['id', 'form_id', 'user_id', 'answers', 'created_at'])
+            ->map(function ($sub) {
+                return [
+                    'id' => $sub->id,
+                    'form_id' => $sub->form_id,
+                    'user_id' => $sub->user_id,
+                    'user_name' => $sub->user?->name,
+                    'answers' => $sub->answers,
+                    'created_at' => $sub->created_at,
+                ];
+            })
+            ->values();
+
+        return response()->json(['submissions' => $subs]);
+    }
+
+    public function update(Request $request, Form $form, FormSubmission $submission)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'No autorizado.'], 401);
+        }
+
+        if ((int) $submission->form_id !== (int) $form->id) {
+            return response()->json(['message' => 'Registro no encontrado para este formulario.'], 404);
+        }
+
+        // usuario normal solo puede editar PUBLICADOS
+        if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
+            return response()->json(['message' => 'No encontrado.'], 404);
+        }
+
+        $data = $request->validate([
+            'answers' => ['required', 'array'],
+        ]);
+
+        $cleanAnswers = $this->validateAndCleanAnswers(
+            form: $form,
+            userId: $user?->id,
+            answers: $data['answers'],
+            previousAnswers: is_array($submission->answers) ? $submission->answers : []
+        );
+
+        if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
+            return $cleanAnswers;
+        }
+
+        $submission->answers = $cleanAnswers;
+        $submission->save();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Registro actualizado correctamente.',
+            'submission' => $submission,
+        ]);
+    }
+
+    /**
+     * Valida y limpia respuestas del formulario.
+     * Retorna array limpio o JsonResponse en caso de error.
+     */
+    private function validateAndCleanAnswers(
+        Form $form,
+        ?int $userId,
+        array $answers,
+        array $previousAnswers = []
+    ) {
         // payload estándar esperado
         $fields = [];
-        if (is_array($form->payload) && isset($form->payload['fields']) && is_array($form->payload['fields'])) {
+        if (
+            is_array($form->payload) &&
+            isset($form->payload['fields']) &&
+            is_array($form->payload['fields'])
+        ) {
             $fields = $form->payload['fields'];
         }
 
@@ -42,17 +156,34 @@ class FormSubmissionsController extends Controller
 
         // Tipos soportados
         $inputTypes = array_merge(
-            ['text', 'textarea', 'number', 'date', 'datetime', 'checkbox', 'contact', 'address', 'table', 'photo', 'file', 'signature'],
+            [
+                'text',
+                'textarea',
+                'number',
+                'date',
+                'datetime',
+                'checkbox',
+                'contact',
+                'address',
+                'table',
+                'photo',
+                'file',
+                'signature',
+            ],
             $choiceTypes
         );
 
         $cleanAnswers = [];
 
         foreach ($fields as $f) {
-            if (!is_array($f)) continue;
+            if (!is_array($f)) {
+                continue;
+            }
 
             $id = $f['id'] ?? null;
-            if (!$id) continue;
+            if (!$id) {
+                continue;
+            }
 
             $label = $f['label'] ?? $id;
             $type = (string) ($f['type'] ?? 'text');
@@ -90,7 +221,9 @@ class FormSubmissionsController extends Controller
             // required general
             if ($required) {
                 $isEmpty = is_null($val) || (is_string($val) && trim($val) === '');
-                if (is_array($val) && count($val) === 0) $isEmpty = true;
+                if (is_array($val) && count($val) === 0) {
+                    $isEmpty = true;
+                }
 
                 if ($isEmpty) {
                     return response()->json(['message' => "Falta responder: {$label}"], 422);
@@ -98,7 +231,9 @@ class FormSubmissionsController extends Controller
             }
 
             $isEmpty = is_null($val) || (is_string($val) && trim($val) === '');
-            if (is_array($val) && count($val) === 0) $isEmpty = true;
+            if (is_array($val) && count($val) === 0) {
+                $isEmpty = true;
+            }
 
             if ($isEmpty) {
                 continue;
@@ -109,6 +244,7 @@ class FormSubmissionsController extends Controller
                 if (!is_numeric($val)) {
                     return response()->json(['message' => "El campo {$label} debe ser numérico."], 422);
                 }
+
                 $cleanAnswers[$id] = 0 + $val;
                 continue;
             }
@@ -119,6 +255,7 @@ class FormSubmissionsController extends Controller
                 if ($ts === false) {
                     return response()->json(['message' => "El campo {$label} debe ser una fecha válida."], 422);
                 }
+
                 $cleanAnswers[$id] = date('Y-m-d', $ts);
                 continue;
             }
@@ -129,6 +266,7 @@ class FormSubmissionsController extends Controller
                 if ($ts === false) {
                     return response()->json(['message' => "El campo {$label} debe ser fecha y hora válida."], 422);
                 }
+
                 $cleanAnswers[$id] = date('Y-m-d H:i:s', $ts);
                 continue;
             }
@@ -136,7 +274,9 @@ class FormSubmissionsController extends Controller
             // choice
             if (in_array($type, $choiceTypes, true)) {
                 $opts = $f['options'] ?? [];
-                if (!is_array($opts)) $opts = [];
+                if (!is_array($opts)) {
+                    $opts = [];
+                }
 
                 $valStr = trim((string) $val);
 
@@ -165,14 +305,25 @@ class FormSubmissionsController extends Controller
             // table
             if ($type === 'table') {
                 if (!is_array($val)) {
-                    return response()->json(['message' => "El campo {$label} (tabla) debe ser un arreglo de filas."], 422);
+                    return response()->json([
+                        'message' => "El campo {$label} (tabla) debe ser un arreglo de filas."
+                    ], 422);
                 }
 
-                $cols = $f['columns'] ?? [];
-                if (!is_array($cols)) $cols = [];
+                $rowSchema = $f['row_schema'] ?? [];
+                if (!is_array($rowSchema)) {
+                    $rowSchema = [];
+                }
+
+                $allowedKeys = array_values(array_filter(array_map(function ($col) {
+                    return is_array($col) ? ($col['id'] ?? null) : null;
+                }, $rowSchema)));
 
                 $rows = array_values(array_filter($val, function ($row) {
-                    if (is_array($row)) return count($row) > 0;
+                    if (is_array($row)) {
+                        return count($row) > 0;
+                    }
+
                     return $row !== null && $row !== '';
                 }));
 
@@ -180,24 +331,29 @@ class FormSubmissionsController extends Controller
                     return response()->json(['message' => "Falta responder: {$label}"], 422);
                 }
 
-                if (count($cols) > 0) {
-                    foreach ($rows as $row) {
-                        if (!is_array($row)) {
-                            return response()->json(['message' => "El campo {$label} (tabla) tiene filas inválidas."], 422);
-                        }
+                $normalizedRows = [];
 
-                        $isAssoc = array_keys($row) !== range(0, count($row) - 1);
-                        if ($isAssoc) {
-                            foreach ($cols as $c) {
-                                if (!array_key_exists($c, $row)) {
-                                    $row[$c] = $row[$c] ?? '';
-                                }
-                            }
-                        }
+                foreach ($rows as $row) {
+                    if (!is_array($row)) {
+                        return response()->json([
+                            'message' => "El campo {$label} (tabla) tiene filas inválidas."
+                        ], 422);
                     }
+
+                    $cleanRow = [];
+
+                    if (count($allowedKeys) > 0) {
+                        foreach ($allowedKeys as $key) {
+                            $cleanRow[$key] = $row[$key] ?? '';
+                        }
+                    } else {
+                        $cleanRow = $row;
+                    }
+
+                    $normalizedRows[] = $cleanRow;
                 }
 
-                $cleanAnswers[$id] = $rows;
+                $cleanAnswers[$id] = $normalizedRows;
                 continue;
             }
 
@@ -219,15 +375,23 @@ class FormSubmissionsController extends Controller
                         continue;
                     }
 
-                    // ✅ guardar PNG físico solo para este formulario
+                    // Si ya es una ruta existente, conservarla
+                    if (!str_starts_with($v, 'data:image/')) {
+                        $cleanAnswers[$id] = $v;
+                        continue;
+                    }
+
+                    // Guardar PNG físico solo para este formulario
                     if (
                         $formCodeKey === 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil' &&
                         str_starts_with($v, 'data:image/')
                     ) {
-                        $storedPath = $this->storeSignatureForChecklistHerramienta($v, $user?->id, $id);
+                        $storedPath = $this->storeSignatureForChecklistHerramienta($v, $userId, $id);
 
                         if (!$storedPath) {
-                            return response()->json(['message' => "No se pudo guardar la firma del campo {$label}."], 422);
+                            return response()->json([
+                                'message' => "No se pudo guardar la firma del campo {$label}."
+                            ], 422);
                         }
 
                         $cleanAnswers[$id] = $storedPath;
@@ -250,6 +414,7 @@ class FormSubmissionsController extends Controller
 
                     $cleanAnswers[$id] = $v;
                 }
+
                 continue;
             }
 
@@ -257,42 +422,14 @@ class FormSubmissionsController extends Controller
             $cleanAnswers[$id] = is_string($val) ? trim($val) : (string) $val;
         }
 
-        $submission = FormSubmission::create([
-            'form_id' => $form->id,
-            'user_id' => $user?->id,
-            'answers' => $cleanAnswers,
-        ]);
-
-        return response()->json(['ok' => true, 'submission' => $submission], 201);
-    }
-
-    public function index(Request $request, Form $form)
-    {
-        $user = $request->user();
-
-        if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
-            return response()->json(['message' => 'No encontrado.'], 404);
+        // En update, conservar respuestas previas de campos que ya no vengan si existen
+        foreach ($previousAnswers as $prevKey => $prevValue) {
+            if (!array_key_exists($prevKey, $cleanAnswers) && !array_key_exists($prevKey, $answers)) {
+                $cleanAnswers[$prevKey] = $prevValue;
+            }
         }
 
-        $subs = FormSubmission::query()
-            ->with(['user:id,name'])
-            ->where('form_id', $form->id)
-            ->orderByDesc('id')
-            ->limit(10)
-            ->get(['id', 'form_id', 'user_id', 'answers', 'created_at'])
-            ->map(function ($sub) {
-                return [
-                    'id' => $sub->id,
-                    'form_id' => $sub->form_id,
-                    'user_id' => $sub->user_id,
-                    'user_name' => $sub->user?->name,
-                    'answers' => $sub->answers,
-                    'created_at' => $sub->created_at,
-                ];
-            })
-            ->values();
-
-        return response()->json(['submissions' => $subs]);
+        return $cleanAnswers;
     }
 
     /**

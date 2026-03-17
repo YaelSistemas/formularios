@@ -5,7 +5,12 @@ import { enqueue, syncNow } from "../../offline/sync";
 import DefaultFormLayout from "./forms/layouts/DefaultFormLayout";
 import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "./forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
 
-const NON_INPUT_TYPES = new Set(["static_text", "separator", "fixed_image", "fixed_file"]);
+const NON_INPUT_TYPES = new Set([
+  "static_text",
+  "separator",
+  "fixed_image",
+  "fixed_file",
+]);
 
 export default function FormFill({
   form,
@@ -13,6 +18,9 @@ export default function FormFill({
   readOnly = false,
   initialAnswers = null,
   responseMeta = null,
+  isEditing = false,
+  editSubmissionId = null,
+  onSaved = null,
 }) {
   const token = useMemo(() => localStorage.getItem("token") || "", []);
   const fields = Array.isArray(form?.payload?.fields) ? form.payload.fields : [];
@@ -55,12 +63,17 @@ export default function FormFill({
       text,
     });
 
-    successTimerRef.current = setTimeout(() => {
+    successTimerRef.current = setTimeout(async () => {
       setSuccessModal({
         open: false,
         title: "",
         text: "",
       });
+
+      if (typeof onSaved === "function") {
+        await onSaved();
+        return;
+      }
 
       if (typeof onBack === "function") {
         onBack();
@@ -111,7 +124,9 @@ export default function FormFill({
     return init;
   };
 
-  const [answers, setAnswers] = useState(() => buildInitAnswers(null, initialAnswers));
+  const [answers, setAnswers] = useState(() =>
+    buildInitAnswers(null, initialAnswers)
+  );
 
   useEffect(() => {
     setAnswers((prev) => buildInitAnswers(prev, initialAnswers));
@@ -121,20 +136,23 @@ export default function FormFill({
   useEffect(() => {
     const onOnline = () => {
       setIsOnline(true);
-      if (!readOnly) syncNow().catch(() => null);
+      if (!readOnly && !isEditing) syncNow().catch(() => null);
     };
+
     const onOffline = () => setIsOnline(false);
 
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
 
-    if (navigator.onLine && !readOnly) syncNow().catch(() => null);
+    if (navigator.onLine && !readOnly && !isEditing) {
+      syncNow().catch(() => null);
+    }
 
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [readOnly]);
+  }, [readOnly, isEditing]);
 
   const setVal = (id, value) => {
     if (readOnly) return;
@@ -180,8 +198,17 @@ export default function FormFill({
   };
 
   const toFriendlyMessage = (e2) => {
-    const m = e2?.response?.data?.message || e2?.message || "Error guardando respuestas.";
-    return String(m);
+    if (e2?.response?.data?.message) {
+      return String(e2.response.data.message);
+    }
+
+    if (e2?.message) {
+      return String(e2.message);
+    }
+
+    return isEditing
+      ? "Error actualizando respuestas."
+      : "Error guardando respuestas.";
   };
 
   const shouldQueueOffline = (e2) => {
@@ -203,6 +230,51 @@ export default function FormFill({
 
   const resetForm = () => {
     setAnswers(buildInitAnswers(null, null));
+  };
+
+  const updateSubmission = async () => {
+    if (!form?.id || !editSubmissionId) {
+      throw new Error("No se encontró el registro a editar.");
+    }
+
+    const response = await fetch(
+      `/api/forms/${form.id}/submissions/${editSubmissionId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          answers,
+        }),
+      }
+    );
+
+    let data = null;
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      data = text ? { message: text } : null;
+    }
+
+    if (response.status === 401) {
+      throw new Error("401 No autorizado");
+    }
+
+    if (response.status === 403) {
+      throw new Error(data?.message || "No tienes permisos para editar este registro.");
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.message || "No se pudo actualizar el registro.");
+    }
+
+    return data;
   };
 
   const onSubmit = async (e) => {
@@ -235,19 +307,37 @@ export default function FormFill({
     };
 
     try {
-      await apiPost(`/forms/${form.id}/submit`, { answers });
+      if (isEditing) {
+        await updateSubmission();
 
-      setMsg("");
-      resetForm();
+        setMsg("");
 
-      if (navigator.onLine) syncNow().catch(() => null);
+        openSuccessModalAndBack(
+          "Registro actualizado correctamente",
+          "Las respuestas se actualizaron exitosamente."
+        );
+      } else {
+        await apiPost(`/forms/${form.id}/submit`, { answers });
 
-      openSuccessModalAndBack(
-        "Registro creado correctamente",
-        "Las respuestas se guardaron exitosamente."
-      );
+        setMsg("");
+        resetForm();
+
+        if (navigator.onLine) syncNow().catch(() => null);
+
+        openSuccessModalAndBack(
+          "Registro creado correctamente",
+          "Las respuestas se guardaron exitosamente."
+        );
+      }
     } catch (e2) {
-      if (shouldQueueOffline(e2)) {
+      if (String(e2?.message || "").includes("401")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+        return;
+      }
+
+      if (!isEditing && shouldQueueOffline(e2)) {
         try {
           await enqueue("form_submission", offlinePayload);
 
@@ -284,12 +374,18 @@ export default function FormFill({
     setMsg,
     readOnly,
     responseMeta,
+    isEditing,
+    editSubmissionId,
   };
 
   const renderLayout = () => {
     switch (layout) {
       case "checklist_herramienta_electrica_portatil":
-        return <SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil {...sharedProps} />;
+        return (
+          <SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil
+            {...sharedProps}
+          />
+        );
 
       default:
         return <DefaultFormLayout {...sharedProps} />;
@@ -389,8 +485,14 @@ export default function FormFill({
             >
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   closeSuccessModal();
+
+                  if (typeof onSaved === "function") {
+                    await onSaved();
+                    return;
+                  }
+
                   if (typeof onBack === "function") {
                     onBack();
                   }
