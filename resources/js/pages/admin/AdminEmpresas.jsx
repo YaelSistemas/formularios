@@ -1,12 +1,10 @@
-// resources/js/pages/admin/AdminEmpresas.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 
 export default function AdminEmpresas() {
   const [err, setErr] = useState("");
 
-  // ✅ toast (3s)
-  const [toast, setToast] = useState(null); // { type: 'success'|'info'|'danger', text: string }
+  const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
   const showToast = (type, text) => {
@@ -21,15 +19,12 @@ export default function AdminEmpresas() {
     };
   }, []);
 
-  // -------- DATA --------
-  const [rows, setRows] = useState([]); // {id,nombre,razon_social,activo}
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ buscador: draft + debounce + fix foco
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
 
-  // ✅ siempre 20
   const perPage = 20;
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ last_page: 1, total: 0 });
@@ -54,13 +49,12 @@ export default function AdminEmpresas() {
       const len = el.value?.length ?? 0;
       el.setSelectionRange(len, len);
     } catch {
-      // ignore
+      //
     }
   };
 
-  // -------- MODAL --------
   const [openForm, setOpenForm] = useState(false);
-  const [formMode, setFormMode] = useState("create"); // create | edit
+  const [formMode, setFormMode] = useState("create");
   const [editingId, setEditingId] = useState(null);
 
   const [fNombre, setFNombre] = useState("");
@@ -69,6 +63,7 @@ export default function AdminEmpresas() {
 
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const load = async () => {
     setErr("");
@@ -93,7 +88,6 @@ export default function AdminEmpresas() {
     }
   };
 
-  // debounce
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
@@ -130,7 +124,7 @@ export default function AdminEmpresas() {
       const len = el.value?.length ?? 0;
       el.setSelectionRange(len, len);
     } catch {
-      // ignore
+      //
     }
   }, [loading, rows, meta.last_page, meta.total, openForm]);
 
@@ -139,6 +133,8 @@ export default function AdminEmpresas() {
     setFNombre("");
     setFRazon("");
     setFActivo(true);
+    setFieldErrors({});
+    setErr("");
   };
 
   const openCreate = () => {
@@ -161,11 +157,33 @@ export default function AdminEmpresas() {
     setOpenForm(false);
     setSaving(false);
     setErr("");
+    setFieldErrors({});
+  };
+
+  const validateForm = () => {
+    const actionText = formMode === "create" ? "crear" : "actualizar";
+    const errors = {};
+
+    if (!fNombre.trim()) {
+      errors.nombre = `No se puede ${actionText} la empresa porque falta el nombre.`;
+    }
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setErr(Object.values(errors)[0]);
+      return false;
+    }
+
+    return true;
   };
 
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
+
+    if (!validateForm()) return;
+
     setSaving(true);
 
     try {
@@ -174,11 +192,6 @@ export default function AdminEmpresas() {
         razon_social: fRazon.trim() || null,
         activo: !!fActivo,
       };
-
-      if (!payload.nombre) {
-        setErr("Escribe el nombre de la empresa.");
-        return;
-      }
 
       if (formMode === "create") {
         await apiPost("/admin/empresas", payload);
@@ -214,14 +227,14 @@ export default function AdminEmpresas() {
     }
   };
 
-  // UI
   const Card = ({ children, style }) => (
     <div
       style={{
         background: "#fff",
-        border: "1px solid #e4e4e7",
-        borderRadius: 14,
-        padding: 14,
+        border: "1px solid #e2e8f0",
+        borderRadius: 18,
+        padding: 16,
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
         ...style,
       }}
     >
@@ -231,8 +244,8 @@ export default function AdminEmpresas() {
 
   const Btn = ({ children, style, variant = "default", ...props }) => {
     const variants = {
-      default: { border: "#e4e4e7", bg: "#fff", fg: "#0f172a" },
-      primary: { border: "#c7d2fe", bg: "#eef2ff", fg: "#1e40af" },
+      default: { border: "#cbd5e1", bg: "#fff", fg: "#0f172a" },
+      primary: { border: "#bfdbfe", bg: "#eff6ff", fg: "#1d4ed8" },
       danger: { border: "#fecaca", bg: "#fef2f2", fg: "#b91c1c" },
     };
     const v = variants[variant] || variants.default;
@@ -241,17 +254,19 @@ export default function AdminEmpresas() {
       <button
         {...props}
         style={{
-          borderRadius: 10,
+          borderRadius: 12,
           border: `1px solid ${v.border}`,
           background: v.bg,
           color: v.fg,
-          padding: "10px 12px",
+          padding: "10px 14px",
           cursor: props.disabled ? "not-allowed" : "pointer",
-          fontWeight: 900,
+          fontWeight: 800,
           opacity: props.disabled ? 0.7 : 1,
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           gap: 8,
+          transition: "0.2s ease",
           ...style,
         }}
       >
@@ -262,8 +277,8 @@ export default function AdminEmpresas() {
 
   const IconBtn = ({ children, variant = "default", title, style, ...props }) => {
     const variants = {
-      default: { border: "#e4e4e7", bg: "#fff", fg: "#0f172a" },
-      primary: { border: "#c7d2fe", bg: "#eef2ff", fg: "#1e40af" },
+      default: { border: "#e2e8f0", bg: "#fff", fg: "#0f172a" },
+      primary: { border: "#bfdbfe", bg: "#eff6ff", fg: "#1d4ed8" },
       danger: { border: "#fecaca", bg: "#fef2f2", fg: "#b91c1c" },
     };
     const v = variants[variant] || variants.default;
@@ -276,7 +291,7 @@ export default function AdminEmpresas() {
         style={{
           width: 38,
           height: 38,
-          borderRadius: 10,
+          borderRadius: 12,
           border: `1px solid ${v.border}`,
           background: v.bg,
           color: v.fg,
@@ -299,10 +314,10 @@ export default function AdminEmpresas() {
         alignItems: "center",
         padding: "6px 10px",
         borderRadius: 999,
-        border: "1px solid " + (active ? "#bbf7d0" : "#fecaca"),
+        border: `1px solid ${active ? "#86efac" : "#fecaca"}`,
         background: active ? "#ecfdf5" : "#fef2f2",
         fontSize: 12,
-        fontWeight: 900,
+        fontWeight: 800,
         color: active ? "#166534" : "#b91c1c",
       }}
     >
@@ -321,191 +336,329 @@ export default function AdminEmpresas() {
   })();
 
   const S = {
-    toolbar: {
+    page: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+    },
+    headerTop: {
       display: "flex",
       justifyContent: "space-between",
       gap: 12,
       flexWrap: "wrap",
-      alignItems: "flex-end",
+      alignItems: "center",
     },
-    inputsRow: {
+    titleBlock: {
       display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      alignItems: "flex-end",
+      flexDirection: "column",
+      gap: 4,
     },
-    label: { fontSize: 12, color: "#64748b", fontWeight: 900 },
+    filterRow: {
+      display: "grid",
+      gridTemplateColumns: "minmax(220px, 1fr) auto",
+      gap: 12,
+      alignItems: "end",
+      marginTop: 14,
+    },
+    label: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 800,
+      marginBottom: 6,
+    },
     input: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid #e4e4e7",
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
       background: "#f8fafc",
-      minWidth: 220,
       outline: "none",
+      minHeight: 44,
     },
-    tableOuter: { display: "flex", justifyContent: "center" },
-    tableWrap: { overflowX: "auto", width: "100%", maxWidth: 980 },
-    table: { borderCollapse: "separate", borderSpacing: 0, width: "100%", minWidth: 720 },
+    helper: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 700,
+    },
+    tableWrap: {
+      width: "100%",
+      overflowX: "auto",
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+    },
+    table: {
+      width: "100%",
+      minWidth: 760,
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      background: "#fff",
+    },
     th: {
       textAlign: "left",
       fontSize: 12,
       color: "#475569",
-      padding: "12px 10px",
-      borderBottom: "1px solid #e4e4e7",
-      background: "#fff",
+      padding: "14px 12px",
+      borderBottom: "1px solid #e2e8f0",
+      background: "#f8fafc",
       position: "sticky",
       top: 0,
       zIndex: 1,
+      fontWeight: 800,
     },
     td: {
-      padding: "12px 10px",
+      padding: "14px 12px",
       borderBottom: "1px solid #f1f5f9",
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
     },
-
+    pagination: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+      marginTop: 14,
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+    },
     modalOverlay: {
       position: "fixed",
       inset: 0,
-      background: "rgba(2,6,23,0.45)",
+      background: "rgba(2, 6, 23, 0.55)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: 16,
+      padding: 14,
       zIndex: 100,
     },
     modal: {
       width: "100%",
-      maxWidth: 560,
+      maxWidth: 760,
+      maxHeight: "90vh",
+      overflowY: "auto",
       background: "#fff",
-      borderRadius: 16,
-      border: "1px solid #e4e4e7",
-      boxShadow: "0 20px 45px rgba(0,0,0,.18)",
-      overflow: "hidden",
+      borderRadius: 18,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 25px 60px rgba(0,0,0,.18)",
     },
     modalHeader: {
-      padding: "14px 16px",
-      borderBottom: "1px solid #e4e4e7",
+      padding: "16px 18px",
+      borderBottom: "1px solid #e2e8f0",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       gap: 12,
+      position: "sticky",
+      top: 0,
+      background: "#fff",
+      zIndex: 1,
     },
-    modalTitle: { margin: 0, fontSize: 16 },
-    modalBody: { padding: 16, display: "flex", flexDirection: "column", gap: 12 },
+    modalTitle: {
+      margin: 0,
+      fontSize: 18,
+      fontWeight: 800,
+      color: "#0f172a",
+    },
+    modalBody: {
+      padding: 18,
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+    },
     modalFooter: {
-      padding: 16,
-      borderTop: "1px solid #e4e4e7",
+      padding: 18,
+      borderTop: "1px solid #e2e8f0",
       display: "flex",
       gap: 10,
       justifyContent: "flex-end",
       flexWrap: "wrap",
+      position: "sticky",
+      bottom: 0,
+      background: "#fff",
+    },
+    formGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 14,
+    },
+    fieldWrap: {
+      display: "flex",
+      flexDirection: "column",
     },
     inputFull: {
       width: "100%",
-      padding: "10px 12px",
+      padding: "12px 13px",
       borderRadius: 12,
-      border: "1px solid #e4e4e7",
+      border: "1px solid #dbeafe",
       background: "#fff",
       outline: "none",
+      minHeight: 46,
+      boxSizing: "border-box",
     },
-    helper: { fontSize: 12, color: "#64748b" },
+    errorText: {
+      color: "#b91c1c",
+      fontSize: 12,
+      fontWeight: 700,
+      marginTop: 6,
+    },
     xBtn: {
-      border: "1px solid #e4e4e7",
+      border: "1px solid #e2e8f0",
       background: "#fff",
       borderRadius: 10,
-      width: 36,
-      height: 36,
+      width: 38,
+      height: 38,
       display: "grid",
       placeItems: "center",
       cursor: "pointer",
       fontWeight: 900,
     },
-    formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+    toggleWrap: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      minHeight: 46,
+      padding: "10px 0",
+    },
+    toggleButton: {
+      position: "relative",
+      width: 58,
+      height: 32,
+      border: "none",
+      borderRadius: 999,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      padding: 0,
+      flexShrink: 0,
+    },
+    toggleThumb: {
+      position: "absolute",
+      top: 4,
+      width: 24,
+      height: 24,
+      borderRadius: "50%",
+      background: "#fff",
+      boxShadow: "0 1px 3px rgba(0,0,0,.22)",
+      transition: "all 0.2s ease",
+    },
     responsiveStyleTag: `
-      @media (max-width: 520px) {
-        .emp-toolbar-input { min-width: 100% !important; width: 100% !important; }
-        .emp-form-grid { grid-template-columns: 1fr !important; }
+      @media (max-width: 860px) {
+        .emp-filter-row {
+          grid-template-columns: 1fr !important;
+        }
+        .emp-form-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .emp-modal-full {
+          max-width: 100% !important;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .emp-header-mobile {
+          align-items: stretch !important;
+        }
+        .emp-header-mobile button {
+          width: 100%;
+        }
+        .emp-pagination-mobile {
+          justify-content: center !important;
+        }
       }
     `,
   };
 
   return (
-    <div>
+    <div style={S.page}>
       <style>{S.responsiveStyleTag}</style>
 
-      <Card style={{ marginBottom: 14 }}>
-        <div style={S.toolbar}>
-          <div>
-            <h2 style={{ margin: 0 }}>Empresas</h2>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-              Total: <b>{meta.total}</b>
+      <Card>
+        <div style={S.headerTop} className="emp-header-mobile">
+          <div style={S.titleBlock}>
+            <h2 style={{ margin: 0, fontSize: 24, color: "#0f172a" }}>Empresas</h2>
+            <div style={{ fontSize: 13, color: "#64748b" }}>
+              Administra empresas y su disponibilidad dentro del sistema.
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
+              Total registradas: <b>{meta.total}</b>
             </div>
           </div>
 
-          <div style={S.inputsRow}>
-            <div style={{ minWidth: 260 }} className="emp-toolbar-input">
-              <div style={S.label}>Buscar</div>
-              <input
-                ref={searchRef}
-                value={qDraft}
-                onFocus={rememberFocus}
-                onClick={rememberFocus}
-                onBlur={() => (searchWasFocusedRef.current = false)}
-                onChange={(e) => {
-                  rememberFocus();
-                  setQDraft(e.target.value);
-                }}
-                placeholder="Nombre o razón social"
-                style={{ ...S.input, width: "100%" }}
-                className="emp-toolbar-input"
-              />
+          <Btn variant="primary" onClick={openCreate}>
+            <i className="fa-solid fa-plus" />
+            Nueva empresa
+          </Btn>
+        </div>
+
+        <div style={S.filterRow} className="emp-filter-row">
+          <div>
+            <div style={S.label}>Buscar empresa</div>
+            <input
+              ref={searchRef}
+              value={qDraft}
+              onFocus={rememberFocus}
+              onClick={rememberFocus}
+              onBlur={() => (searchWasFocusedRef.current = false)}
+              onChange={(e) => {
+                rememberFocus();
+                setQDraft(e.target.value);
+              }}
+              placeholder="Buscar por nombre o razón social"
+              style={S.input}
+            />
+          </div>
+
+          <div>
+            <div style={S.label}>Página actual</div>
+            <div
+              style={{
+                ...S.input,
+                display: "flex",
+                alignItems: "center",
+                background: "#fff",
+                color: "#334155",
+                fontWeight: 700,
+              }}
+            >
+              {page} de {meta.last_page}
             </div>
-
-            <Btn variant="primary" onClick={openCreate}>
-              <i className="fa-solid fa-plus" />
-              Nueva empresa
-            </Btn>
-
-            <Btn type="button" onClick={load} disabled={loading}>
-              {loading ? "Actualizando..." : "Refrescar"}
-            </Btn>
           </div>
         </div>
 
         {toast ? (
           <div
             style={{
-              marginTop: 12,
+              marginTop: 14,
               padding: "10px 12px",
               borderRadius: 12,
               border: `1px solid ${toastStyle.border}`,
               background: toastStyle.bg,
               color: toastStyle.fg,
-              fontWeight: 900,
+              fontWeight: 800,
             }}
           >
             {toast.text}
           </div>
         ) : null}
 
-        {err ? <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 900 }}>{err}</div> : null}
+        {err ? (
+          <div style={{ marginTop: 12, color: "#b91c1c", fontWeight: 800 }}>
+            {err}
+          </div>
+        ) : null}
       </Card>
 
       <Card>
         {loading ? (
-          <div>Cargando empresas...</div>
+          <div style={{ color: "#475569", fontWeight: 700 }}>Cargando empresas...</div>
         ) : (
-          <div style={S.tableOuter}>
+          <>
             <div style={S.tableWrap}>
               <table style={S.table}>
                 <thead>
                   <tr>
                     <th style={S.th}>Nombre</th>
                     <th style={S.th}>Razón social</th>
-                    <th style={S.th}>Activo</th>
-                    <th style={{ ...S.th, width: 160, textAlign: "right" }}>Acciones</th>
+                    <th style={S.th}>Estado</th>
+                    <th style={{ ...S.th, width: 140, textAlign: "right" }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -513,17 +666,23 @@ export default function AdminEmpresas() {
                     rows.map((r) => (
                       <tr key={r.id}>
                         <td style={S.td}>
-                          <div style={{ fontWeight: 900 }}>{r.nombre}</div>
+                          <div style={{ fontWeight: 800 }}>{r.nombre}</div>
                         </td>
                         <td style={S.td}>
                           <div style={{ color: "#334155" }}>{r.razon_social || "—"}</div>
                         </td>
                         <td style={S.td}>
-                          <Badge active={!!r.activo}>{r.activo ? "Activo" : "Inactivo"}</Badge>
+                          <Badge active={!!r.activo}>
+                            {r.activo ? "Activa" : "Inactiva"}
+                          </Badge>
                         </td>
                         <td style={{ ...S.td, textAlign: "right" }}>
                           <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
-                            <IconBtn onClick={() => openEdit(r)} title="Editar">
+                            <IconBtn
+                              onClick={() => openEdit(r)}
+                              title="Editar"
+                              variant="primary"
+                            >
                               <i className="fa-solid fa-pen" />
                             </IconBtn>
 
@@ -542,44 +701,48 @@ export default function AdminEmpresas() {
                   ) : (
                     <tr>
                       <td style={S.td} colSpan={4}>
-                        Sin empresas
+                        Sin empresas registradas.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
 
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            marginTop: 12,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          <Btn disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))} style={{ padding: "8px 10px" }}>
-            Anterior
-          </Btn>
-          <div style={{ fontSize: 12 }}>
-            Página <b>{page}</b> de <b>{meta.last_page}</b>
-          </div>
-          <Btn disabled={!canNext} onClick={() => setPage((p) => p + 1)} style={{ padding: "8px 10px" }}>
-            Siguiente
-          </Btn>
-        </div>
+            <div style={S.pagination} className="emp-pagination-mobile">
+              <Btn
+                disabled={!canPrev}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Btn>
+
+              <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>
+                Mostrando página <b>{page}</b> de <b>{meta.last_page}</b>
+              </div>
+
+              <Btn
+                disabled={!canNext}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Siguiente
+              </Btn>
+            </div>
+          </>
+        )}
       </Card>
 
-      {/* ✅ Modal Empresas */}
       {openForm && (
         <div style={S.modalOverlay} onClick={closeModal}>
-          <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+          <div
+            style={S.modal}
+            className="emp-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={S.modalHeader}>
-              <h3 style={S.modalTitle}>{formMode === "create" ? "Crear empresa" : "Editar empresa"}</h3>
+              <h3 style={S.modalTitle}>
+                {formMode === "create" ? "Crear empresa" : "Editar empresa"}
+              </h3>
               <button type="button" style={S.xBtn} onClick={closeModal} aria-label="Cerrar">
                 ✕
               </button>
@@ -588,18 +751,26 @@ export default function AdminEmpresas() {
             <form onSubmit={submit}>
               <div style={S.modalBody}>
                 <div className="emp-form-grid" style={S.formGrid}>
-                  <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
                     <div style={S.label}>Nombre</div>
                     <input
                       value={fNombre}
-                      onChange={(e) => setFNombre(e.target.value)}
-                      required
-                      style={S.inputFull}
+                      onChange={(e) => {
+                        setFNombre(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, nombre: "" }));
+                      }}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.nombre ? "#fecaca" : "#dbeafe",
+                      }}
                       placeholder="Ej. VYSISA"
                     />
+                    {fieldErrors.nombre ? (
+                      <div style={S.errorText}>{fieldErrors.nombre}</div>
+                    ) : null}
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
                     <div style={S.label}>Razón social</div>
                     <input
                       value={fRazon}
@@ -610,16 +781,43 @@ export default function AdminEmpresas() {
                     <div style={S.helper}>Opcional</div>
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={{ display: "inline-flex", gap: 8, alignItems: "center", fontWeight: 900 }}>
-                      <input type="checkbox" checked={!!fActivo} onChange={(e) => setFActivo(e.target.checked)} />
-                      Activo
-                    </label>
-                    <div style={S.helper}>Si está inactiva, puedes ocultarla para asignaciones nuevas.</div>
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                    <div style={S.label}>Estado</div>
+                    <div style={S.toggleWrap}>
+                      <button
+                        type="button"
+                        onClick={() => setFActivo((prev) => !prev)}
+                        aria-pressed={fActivo}
+                        style={{
+                          ...S.toggleButton,
+                          background: fActivo ? "#22c55e" : "#cbd5e1",
+                        }}
+                      >
+                        <span
+                          style={{
+                            ...S.toggleThumb,
+                            left: fActivo ? 30 : 4,
+                          }}
+                        />
+                      </button>
+
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: fActivo ? "#166534" : "#64748b",
+                        }}
+                      >
+                        {fActivo ? "Activa" : "Inactiva"}
+                      </span>
+                    </div>
+                    <div style={S.helper}>
+                      Si está inactiva, puedes ocultarla para asignaciones nuevas.
+                    </div>
                   </div>
                 </div>
 
-                {err ? <div style={{ color: "#b91c1c", fontWeight: 900 }}>{err}</div> : null}
+                {err ? <div style={{ color: "#b91c1c", fontWeight: 800 }}>{err}</div> : null}
               </div>
 
               <div style={S.modalFooter}>

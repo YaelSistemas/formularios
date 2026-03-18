@@ -18,6 +18,7 @@ class FormsController extends Controller
      * LISTA (Usuario autenticado)
      * - Admin: ve todos los formularios de código
      * - Usuario normal: solo PUBLICADO
+     * - Si un formulario tiene asignaciones, solo lo ve el usuario asignado
      */
     public function index(Request $request)
     {
@@ -27,10 +28,17 @@ class FormsController extends Controller
 
         $query = Form::query()
             ->withCount('submissions')
+            ->withCount(['assignedUsers as assignments_count'])
             ->orderByDesc('id');
 
         if (!($user && $user->hasRole('Administrador'))) {
-            $query->where('status', 'PUBLICADO');
+            $query->where('status', 'PUBLICADO')
+                ->where(function ($q) use ($user) {
+                    $q->whereDoesntHave('assignedUsers')
+                        ->orWhereHas('assignedUsers', function ($sub) use ($user) {
+                            $sub->where('users.id', $user->id);
+                        });
+                });
         }
 
         $forms = $query
@@ -58,11 +66,19 @@ class FormsController extends Controller
             if ($form->status !== 'PUBLICADO') {
                 return response()->json(['message' => 'No encontrado.'], 404);
             }
+
+            if (!$this->userCanAccessForm($user->id, $form)) {
+                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+            }
         }
 
         $payload = $this->normalizePayload($form->payload ?? []);
 
-        $resp = $form->toArray();
+        $resp = $form->loadCount([
+            'submissions',
+            'assignedUsers as assignments_count',
+        ])->toArray();
+
         $resp['payload'] = $payload;
 
         return response()->json(['form' => $resp]);
@@ -153,12 +169,31 @@ class FormsController extends Controller
 
         $forms = Form::query()
             ->withCount('submissions')
+            ->withCount(['assignedUsers as assignments_count'])
             ->orderByDesc('id')
             ->get(['id', 'title', 'status', 'created_at', 'payload'])
             ->filter(fn ($form) => filled(data_get($form->payload, '_code_key')))
             ->values();
 
         return response()->json(['forms' => $forms]);
+    }
+
+    /**
+     * Determina si el usuario puede acceder al formulario.
+     * - Si no hay asignaciones, cualquiera puede acceder
+     * - Si hay asignaciones, solo usuarios asignados
+     */
+    private function userCanAccessForm(int $userId, Form $form): bool
+    {
+        $hasAssignments = $form->assignedUsers()->exists();
+
+        if (!$hasAssignments) {
+            return true;
+        }
+
+        return $form->assignedUsers()
+            ->where('users.id', $userId)
+            ->exists();
     }
 
     /**

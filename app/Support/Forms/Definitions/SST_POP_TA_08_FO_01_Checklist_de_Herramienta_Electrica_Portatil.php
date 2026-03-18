@@ -80,7 +80,8 @@ class SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil implements
                     'label' => 'Taller',
                     'type' => 'select',
                     'required' => true,
-                    'options' => ['Aztecas', 'Morelos'],
+                    'options' => ['Apaxco','Aztecas', 'Cedis Pachuca', 'Cedis Pachuca Calidad/PTS', 'Cedis Pachuca Tip Top', 'Colima', 'Huichapan', 'Monterrey',
+                                  'Peñasquito', 'San Luis Potosi', 'Tamuin', 'Tepeaca', 'Torreon', 'Xoxtla', 'Zacatecas'],
                 ],
                 [
                     'id' => 'nombre_inspector',

@@ -36,6 +36,28 @@ export default function FormFill({
     text: "",
   });
 
+  const [me] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  });
+
+  const permissionSet = useMemo(() => {
+    const raw = me?.permissions;
+    if (!Array.isArray(raw)) return new Set();
+
+    return new Set(
+      raw
+        .map((p) => (typeof p === "string" ? p : p?.name))
+        .filter(Boolean)
+    );
+  }, [me]);
+
+  const canSubmit = permissionSet.has("formularios.submit");
+  const canEdit = permissionSet.has("formularios.edit");
+
   const successTimerRef = useRef(null);
 
   const clearSuccessTimer = () => {
@@ -267,7 +289,10 @@ export default function FormFill({
     }
 
     if (response.status === 403) {
-      throw new Error(data?.message || "No tienes permisos para editar este registro.");
+      throw new Error(
+        data?.message ||
+          "No cuentas con los permisos necesarios para editar este registro. Contacta a tu administrador o al equipo de Sistemas."
+      );
     }
 
     if (!response.ok) {
@@ -285,6 +310,20 @@ export default function FormFill({
 
     if (!form?.id) {
       setMsg("Formulario inválido (sin id).");
+      return;
+    }
+
+    if (isEditing && !canEdit) {
+      setMsg(
+        "No cuentas con los permisos necesarios para editar este registro. Contacta a tu administrador o al equipo de Sistemas."
+      );
+      return;
+    }
+
+    if (!isEditing && !canSubmit) {
+      setMsg(
+        "No cuentas con los permisos necesarios para guardar este registro. Contacta a tu administrador o al equipo de Sistemas."
+      );
       return;
     }
 

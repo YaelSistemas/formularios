@@ -1,12 +1,10 @@
-// resources/js/pages/admin/AdminRoles.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 
 export default function AdminRoles() {
   const [err, setErr] = useState("");
 
-  // ✅ toast (3s)
-  const [toast, setToast] = useState(null); // { type: 'success'|'info'|'danger', text: string }
+  const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
   const showToast = (type, text) => {
@@ -21,15 +19,12 @@ export default function AdminRoles() {
     };
   }, []);
 
-  // -------- ROLES --------
-  const [rolesList, setRolesList] = useState([]); // {id,name}
+  const [rolesList, setRolesList] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
 
-  // ✅ buscador: draft + debounce (mismo fix que Users)
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
 
-  // ✅ siempre 20
   const perPage = 20;
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ last_page: 1, total: 0 });
@@ -37,7 +32,6 @@ export default function AdminRoles() {
   const canPrev = useMemo(() => page > 1, [page]);
   const canNext = useMemo(() => page < (meta.last_page || 1), [page, meta.last_page]);
 
-  // ✅ Focus keeper (soluciona el "letra por letra")
   const searchRef = useRef(null);
   const searchWasFocusedRef = useRef(false);
 
@@ -55,36 +49,31 @@ export default function AdminRoles() {
       const len = el.value?.length ?? 0;
       el.setSelectionRange(len, len);
     } catch {
-      // ignore
+      //
     }
   };
 
-  // modal editar/crear rol
   const [openRoleModal, setOpenRoleModal] = useState(false);
-  const [roleMode, setRoleMode] = useState("create"); // create | edit
+  const [roleMode, setRoleMode] = useState("create");
   const [editingRoleId, setEditingRoleId] = useState(null);
-  const [roleName, setRoleName] = useState("");
-  const [savingRoleModal, setSavingRoleModal] = useState(false);
 
-  // eliminar
+  const [roleName, setRoleName] = useState("");
+  const [roleDisplayName, setRoleDisplayName] = useState("");
+  const [roleDescription, setRoleDescription] = useState("");
+  const [allPermissions, setAllPermissions] = useState([]);
+  const [selectedPermissions, setSelectedPermissions] = useState([]);
+  const [roleIsAdmin, setRoleIsAdmin] = useState(false);
+
+  const [savingRoleModal, setSavingRoleModal] = useState(false);
+  const [loadingRoleDetail, setLoadingRoleDetail] = useState(false);
   const [deletingRoleId, setDeletingRoleId] = useState(null);
 
-  // modal asignar permisos a rol
-  const [openRolePermModal, setOpenRolePermModal] = useState(false);
-  const [rolePermLoading, setRolePermLoading] = useState(false);
-  const [rolePermSaving, setRolePermSaving] = useState(false);
-  const [rolePermRole, setRolePermRole] = useState(null); // {id,name}
-  const [rolePermIsAdminRole, setRolePermIsAdminRole] = useState(false);
-  const [rolePermAll, setRolePermAll] = useState([]); // nombres
-  const [rolePermSelected, setRolePermSelected] = useState([]); // seleccionados
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const loadRolesList = async () => {
     setErr("");
     setLoadingRoles(true);
     try {
-      // ✅ soporta ambos formatos:
-      // 1) backend paginado: { data, last_page, total }
-      // 2) backend simple: { roles: [...] }
       const data = await apiGet(
         `/admin/roles-list?q=${encodeURIComponent(q)}&per_page=${perPage}&page=${page}`
       );
@@ -107,7 +96,21 @@ export default function AdminRoles() {
     }
   };
 
-  // ✅ debounce del buscador
+  const loadPermissionsCatalog = async () => {
+    try {
+      const data = await apiGet("/admin/permissions");
+      if (Array.isArray(data?.permissions)) {
+        return data.permissions;
+      }
+      if (Array.isArray(data?.data)) {
+        return data.data;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
@@ -126,15 +129,13 @@ export default function AdminRoles() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, page]);
 
-  // ✅ cada vez que escribes, si algo te tumba el foco, lo recuperamos
   useEffect(() => {
     restoreFocusIfNeeded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qDraft]);
 
   useEffect(() => {
-    // ✅ si el usuario estaba escribiendo y el render lo "tumbó", lo recuperamos
-    if (openRoleModal || openRolePermModal) return;
+    if (openRoleModal) return;
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
@@ -146,50 +147,131 @@ export default function AdminRoles() {
       const len = el.value?.length ?? 0;
       el.setSelectionRange(len, len);
     } catch {
-      // ignore
+      //
     }
-  }, [loadingRoles, rolesList, meta.last_page, meta.total, openRoleModal, openRolePermModal]);
+  }, [loadingRoles, rolesList, meta.last_page, meta.total, openRoleModal]);
 
-  // helpers roles
-  const openCreateRoleModal = () => {
-    setErr("");
-    setRoleMode("create");
+  const resetRoleForm = () => {
     setEditingRoleId(null);
     setRoleName("");
-    setOpenRoleModal(true);
+    setRoleDisplayName("");
+    setRoleDescription("");
+    setAllPermissions([]);
+    setSelectedPermissions([]);
+    setRoleIsAdmin(false);
+    setFieldErrors({});
+    setErr("");
   };
 
-  const openEditRoleModal = (r) => {
-    setErr("");
+  const openCreateRoleModal = async () => {
+    resetRoleForm();
+    setRoleMode("create");
+    setOpenRoleModal(true);
+    setLoadingRoleDetail(true);
+
+    try {
+      const perms = await loadPermissionsCatalog();
+      const normalized = perms.map((p) => (typeof p === "string" ? p : p?.name)).filter(Boolean);
+      setAllPermissions(normalized);
+    } finally {
+      setLoadingRoleDetail(false);
+    }
+  };
+
+  const openEditRoleModal = async (r) => {
+    resetRoleForm();
     setRoleMode("edit");
     setEditingRoleId(r.id);
-    setRoleName(r.name || "");
     setOpenRoleModal(true);
+    setLoadingRoleDetail(true);
+
+    try {
+      const data = await apiGet(`/admin/roles-list/${r.id}`);
+
+      const role = data?.role || {};
+      const perms = Array.isArray(data?.all_permissions) ? data.all_permissions : [];
+      const selected = Array.isArray(role?.permissions) ? role.permissions : [];
+
+      setRoleName(role.name || "");
+      setRoleDisplayName(role.nombre_mostrar || "");
+      setRoleDescription(role.descripcion || "");
+      setAllPermissions(perms);
+      setSelectedPermissions(selected);
+      setRoleIsAdmin(!!data?.is_admin_role);
+    } catch (e) {
+      setErr(e?.message || "Error cargando el rol");
+      setOpenRoleModal(false);
+    } finally {
+      setLoadingRoleDetail(false);
+    }
   };
 
   const closeRoleModal = () => {
     setOpenRoleModal(false);
     setSavingRoleModal(false);
+    setLoadingRoleDetail(false);
     setErr("");
+    setFieldErrors({});
+  };
+
+  const togglePermission = (permName) => {
+    if (roleIsAdmin) return;
+
+    setSelectedPermissions((prev) => {
+      if (prev.includes(permName)) {
+        return prev.filter((p) => p !== permName);
+      }
+      return [...prev, permName];
+    });
+  };
+
+  const validateRoleForm = () => {
+    const actionText = roleMode === "create" ? "crear" : "actualizar";
+    const errors = {};
+
+    if (!roleName.trim()) {
+      errors.name = `No se puede ${actionText} el rol porque falta el nombre interno.`;
+    }
+
+    if (!roleDisplayName.trim()) {
+      errors.nombre_mostrar = `No se puede ${actionText} el rol porque falta el nombre a mostrar.`;
+    }
+
+    if (!roleDescription.trim()) {
+      errors.descripcion = `No se puede ${actionText} el rol porque falta la descripción.`;
+    }
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setErr(Object.values(errors)[0]);
+      return false;
+    }
+
+    return true;
   };
 
   const submitRoleModal = async (e) => {
     e.preventDefault();
     setErr("");
+
+    if (!validateRoleForm()) return;
+
     setSavingRoleModal(true);
 
     try {
-      const name = roleName.trim();
-      if (!name) {
-        setErr("Escribe un nombre de rol.");
-        return;
-      }
+      const payload = {
+        name: roleName.trim(),
+        nombre_mostrar: roleDisplayName.trim(),
+        descripcion: roleDescription.trim(),
+        permissions: roleIsAdmin ? [] : selectedPermissions,
+      };
 
       if (roleMode === "create") {
-        await apiPost("/admin/roles-list", { name });
+        await apiPost("/admin/roles-list", payload);
         showToast("success", "✅ Rol creado correctamente");
       } else {
-        await apiPut(`/admin/roles-list/${editingRoleId}`, { name });
+        await apiPut(`/admin/roles-list/${editingRoleId}`, payload);
         showToast("info", "✏️ Rol actualizado");
       }
 
@@ -208,7 +290,7 @@ export default function AdminRoles() {
       return;
     }
 
-    const ok = window.confirm(`¿Eliminar el rol "${r.name}"?`);
+    const ok = window.confirm(`¿Eliminar el rol "${r.nombre_mostrar || r.name}"?`);
     if (!ok) return;
 
     setErr("");
@@ -225,80 +307,14 @@ export default function AdminRoles() {
     }
   };
 
-  // role permissions
-  const openRolePermissions = async (r) => {
-    setErr("");
-    setOpenRolePermModal(true);
-    setRolePermLoading(true);
-    setRolePermSaving(false);
-    setRolePermRole({ id: r.id, name: r.name });
-    setRolePermAll([]);
-    setRolePermSelected([]);
-    setRolePermIsAdminRole(false);
-
-    try {
-      const data = await apiGet(`/admin/roles/${r.id}/permissions`);
-
-      setRolePermRole(data.role || { id: r.id, name: r.name });
-      setRolePermIsAdminRole(!!data.is_admin_role);
-
-      const all = Array.isArray(data.all_permissions) ? data.all_permissions : [];
-      const selected = Array.isArray(data.permissions) ? data.permissions : [];
-
-      setRolePermAll(all);
-      setRolePermSelected(selected.includes("*") ? [] : selected);
-    } catch (e) {
-      setErr(e?.message || "Error cargando permisos del rol");
-      setOpenRolePermModal(false);
-    } finally {
-      setRolePermLoading(false);
-    }
-  };
-
-  const closeRolePermModal = () => {
-    setOpenRolePermModal(false);
-    setRolePermLoading(false);
-    setRolePermSaving(false);
-    setErr("");
-  };
-
-  const toggleRolePerm = (permName) => {
-    setRolePermSelected((prev) => {
-      if (prev.includes(permName)) return prev.filter((p) => p !== permName);
-      return [...prev, permName];
-    });
-  };
-
-  const saveRolePermissions = async () => {
-    if (!rolePermRole?.id) return;
-    if (rolePermIsAdminRole) return;
-
-    setErr("");
-    setRolePermSaving(true);
-
-    try {
-      await apiPut(`/admin/roles/${rolePermRole.id}/permissions`, {
-        permissions: rolePermSelected,
-      });
-
-      showToast("info", "✅ Permisos guardados");
-      closeRolePermModal();
-      await loadRolesList();
-    } catch (e) {
-      setErr(e?.message || "Error guardando permisos del rol");
-    } finally {
-      setRolePermSaving(false);
-    }
-  };
-
-  // UI
   const Card = ({ children, style }) => (
     <div
       style={{
         background: "#fff",
-        border: "1px solid #e4e4e7",
-        borderRadius: 14,
-        padding: 14,
+        border: "1px solid #e2e8f0",
+        borderRadius: 18,
+        padding: 16,
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
         ...style,
       }}
     >
@@ -308,8 +324,8 @@ export default function AdminRoles() {
 
   const Btn = ({ children, style, variant = "default", ...props }) => {
     const variants = {
-      default: { border: "#e4e4e7", bg: "#fff", fg: "#0f172a" },
-      primary: { border: "#c7d2fe", bg: "#eef2ff", fg: "#1e40af" },
+      default: { border: "#cbd5e1", bg: "#fff", fg: "#0f172a" },
+      primary: { border: "#bfdbfe", bg: "#eff6ff", fg: "#1d4ed8" },
       danger: { border: "#fecaca", bg: "#fef2f2", fg: "#b91c1c" },
     };
     const v = variants[variant] || variants.default;
@@ -318,17 +334,19 @@ export default function AdminRoles() {
       <button
         {...props}
         style={{
-          borderRadius: 10,
+          borderRadius: 12,
           border: `1px solid ${v.border}`,
           background: v.bg,
           color: v.fg,
-          padding: "10px 12px",
+          padding: "10px 14px",
           cursor: props.disabled ? "not-allowed" : "pointer",
-          fontWeight: 900,
+          fontWeight: 800,
           opacity: props.disabled ? 0.7 : 1,
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           gap: 8,
+          transition: "0.2s ease",
           ...style,
         }}
       >
@@ -339,8 +357,8 @@ export default function AdminRoles() {
 
   const IconBtn = ({ children, variant = "default", title, style, ...props }) => {
     const variants = {
-      default: { border: "#e4e4e7", bg: "#fff", fg: "#0f172a" },
-      primary: { border: "#c7d2fe", bg: "#eef2ff", fg: "#1e40af" },
+      default: { border: "#e2e8f0", bg: "#fff", fg: "#0f172a" },
+      primary: { border: "#bfdbfe", bg: "#eff6ff", fg: "#1d4ed8" },
       danger: { border: "#fecaca", bg: "#fef2f2", fg: "#b91c1c" },
     };
     const v = variants[variant] || variants.default;
@@ -353,7 +371,7 @@ export default function AdminRoles() {
         style={{
           width: 38,
           height: 38,
-          borderRadius: 10,
+          borderRadius: 12,
           border: `1px solid ${v.border}`,
           background: v.bg,
           color: v.fg,
@@ -369,23 +387,33 @@ export default function AdminRoles() {
     );
   };
 
-  const Badge = ({ children }) => (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "6px 10px",
-        borderRadius: 999,
-        border: "1px solid #e4e4e7",
-        background: "#f8fafc",
-        fontSize: 12,
-        fontWeight: 900,
-        color: "#0f172a",
-      }}
-    >
-      {children}
-    </span>
-  );
+  const Badge = ({ children, tone = "default" }) => {
+    const tones = {
+      default: { bg: "#f8fafc", border: "#e2e8f0", fg: "#0f172a" },
+      role: { bg: "#f1f5f9", border: "#cbd5e1", fg: "#334155" },
+      system: { bg: "#eff6ff", border: "#bfdbfe", fg: "#1d4ed8" },
+    };
+
+    const t = tones[tone] || tones.default;
+
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "6px 10px",
+          borderRadius: 999,
+          border: `1px solid ${t.border}`,
+          background: t.bg,
+          color: t.fg,
+          fontSize: 12,
+          fontWeight: 800,
+        }}
+      >
+        {children}
+      </span>
+    );
+  };
 
   const toastStyle = (() => {
     if (!toast) return {};
@@ -398,234 +426,385 @@ export default function AdminRoles() {
   })();
 
   const S = {
-    toolbar: {
+    page: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+    },
+    headerTop: {
       display: "flex",
       justifyContent: "space-between",
       gap: 12,
       flexWrap: "wrap",
-      alignItems: "flex-end",
+      alignItems: "center",
     },
-    inputsRow: {
+    titleBlock: {
       display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      alignItems: "flex-end",
+      flexDirection: "column",
+      gap: 4,
     },
-    label: { fontSize: 12, color: "#64748b", fontWeight: 900 },
+    filterRow: {
+      display: "grid",
+      gridTemplateColumns: "minmax(220px, 1fr) auto",
+      gap: 12,
+      alignItems: "end",
+      marginTop: 14,
+    },
+    label: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 800,
+      marginBottom: 6,
+    },
     input: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid #e4e4e7",
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
       background: "#f8fafc",
-      minWidth: 220,
       outline: "none",
+      minHeight: 44,
     },
-
-    // ✅ tabla centrada
-    tableOuter: { display: "flex", justifyContent: "center" },
-    tableWrap: { overflowX: "auto", width: "100%", maxWidth: 980 },
-    table: { borderCollapse: "separate", borderSpacing: 0, width: "100%", minWidth: 640 },
+    textarea: {
+      width: "100%",
+      padding: "12px 13px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#fff",
+      outline: "none",
+      minHeight: 110,
+      boxSizing: "border-box",
+      resize: "vertical",
+      fontFamily: "inherit",
+    },
+    tableWrap: {
+      width: "100%",
+      overflowX: "auto",
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+    },
+    table: {
+      width: "100%",
+      minWidth: 900,
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      background: "#fff",
+    },
     th: {
       textAlign: "left",
       fontSize: 12,
       color: "#475569",
-      padding: "12px 10px",
-      borderBottom: "1px solid #e4e4e7",
-      background: "#fff",
+      padding: "14px 12px",
+      borderBottom: "1px solid #e2e8f0",
+      background: "#f8fafc",
       position: "sticky",
       top: 0,
       zIndex: 1,
+      fontWeight: 800,
     },
     td: {
-      padding: "12px 10px",
+      padding: "14px 12px",
       borderBottom: "1px solid #f1f5f9",
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
     },
-
-    // ✅ modal
+    pagination: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+      marginTop: 14,
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+    },
     modalOverlay: {
       position: "fixed",
       inset: 0,
-      background: "rgba(2,6,23,0.45)",
+      background: "rgba(2, 6, 23, 0.55)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: 16,
+      padding: 14,
       zIndex: 100,
     },
     modal: {
       width: "100%",
-      maxWidth: 560,
+      maxWidth: 980,
+      maxHeight: "90vh",
+      overflowY: "auto",
       background: "#fff",
-      borderRadius: 16,
-      border: "1px solid #e4e4e7",
-      boxShadow: "0 20px 45px rgba(0,0,0,.18)",
-      overflow: "hidden",
+      borderRadius: 18,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 25px 60px rgba(0,0,0,.18)",
     },
     modalHeader: {
-      padding: "14px 16px",
-      borderBottom: "1px solid #e4e4e7",
+      padding: "16px 18px",
+      borderBottom: "1px solid #e2e8f0",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       gap: 12,
+      position: "sticky",
+      top: 0,
+      background: "#fff",
+      zIndex: 1,
     },
-    modalTitle: { margin: 0, fontSize: 16 },
-    modalBody: { padding: 16, display: "flex", flexDirection: "column", gap: 12 },
+    modalTitle: {
+      margin: 0,
+      fontSize: 18,
+      fontWeight: 800,
+      color: "#0f172a",
+    },
+    modalBody: {
+      padding: 18,
+      display: "flex",
+      flexDirection: "column",
+      gap: 16,
+    },
     modalFooter: {
-      padding: 16,
-      borderTop: "1px solid #e4e4e7",
+      padding: 18,
+      borderTop: "1px solid #e2e8f0",
       display: "flex",
       gap: 10,
       justifyContent: "flex-end",
       flexWrap: "wrap",
+      position: "sticky",
+      bottom: 0,
+      background: "#fff",
+    },
+    formGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 14,
+    },
+    fieldWrap: {
+      display: "flex",
+      flexDirection: "column",
     },
     inputFull: {
       width: "100%",
-      padding: "10px 12px",
+      padding: "12px 13px",
       borderRadius: 12,
-      border: "1px solid #e4e4e7",
+      border: "1px solid #dbeafe",
       background: "#fff",
       outline: "none",
+      minHeight: 46,
+      boxSizing: "border-box",
     },
-    helper: { fontSize: 12, color: "#64748b" },
-    rolesBox: {
-      border: "1px solid #e4e4e7",
-      background: "#f8fafc",
-      borderRadius: 12,
-      padding: 10,
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 10,
+    errorText: {
+      color: "#b91c1c",
+      fontSize: 12,
+      fontWeight: 700,
+      marginTop: 6,
+    },
+    helper: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 700,
     },
     xBtn: {
-      border: "1px solid #e4e4e7",
+      border: "1px solid #e2e8f0",
       background: "#fff",
       borderRadius: 10,
-      width: 36,
-      height: 36,
+      width: 38,
+      height: 38,
       display: "grid",
       placeItems: "center",
       cursor: "pointer",
       fontWeight: 900,
     },
-
+    permsSection: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    permsBox: {
+      maxHeight: 360,
+      overflow: "auto",
+      border: "1px solid #e2e8f0",
+      padding: 12,
+      borderRadius: 14,
+      background: "#f8fafc",
+    },
+    permsGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+      gap: 10,
+    },
+    permItem: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #e2e8f0",
+      background: "#fff",
+      fontWeight: 700,
+      color: "#0f172a",
+    },
     responsiveStyleTag: `
-      @media (max-width: 520px) {
-        .roles-toolbar-input { min-width: 100% !important; width: 100% !important; }
+      @media (max-width: 860px) {
+        .roles-filter-row {
+          grid-template-columns: 1fr !important;
+        }
+        .roles-form-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .roles-modal-full {
+          max-width: 100% !important;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .roles-header-mobile {
+          align-items: stretch !important;
+        }
+        .roles-header-mobile button {
+          width: 100%;
+        }
+        .roles-pagination-mobile {
+          justify-content: center !important;
+        }
       }
     `,
   };
 
+  const roleTypeBadge = (r) => {
+    const isAdmin = r.name === "Administrador";
+    return (
+      <Badge tone={isAdmin ? "system" : "role"}>
+        {isAdmin ? "Sistema" : "Normal"}
+      </Badge>
+    );
+  };
+
   return (
-    <div>
+    <div style={S.page}>
       <style>{S.responsiveStyleTag}</style>
 
-      <Card style={{ marginBottom: 14 }}>
-        <div style={S.toolbar}>
-          <div>
-            <h2 style={{ margin: 0 }}>Roles</h2>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-              Total: <b>{meta.total}</b>
+      <Card>
+        <div style={S.headerTop} className="roles-header-mobile">
+          <div style={S.titleBlock}>
+            <h2 style={{ margin: 0, fontSize: 24, color: "#0f172a" }}>Roles</h2>
+            <div style={{ fontSize: 13, color: "#64748b" }}>
+              Administra roles, descripción y permisos dentro del sistema.
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
+              Total registrados: <b>{meta.total}</b>
             </div>
           </div>
 
-          <div style={S.inputsRow}>
-            <div style={{ minWidth: 260 }} className="roles-toolbar-input">
-              <div style={S.label}>Buscar</div>
-              <input
-                ref={searchRef}
-                value={qDraft}
-                onFocus={rememberFocus}
-                onClick={rememberFocus}
-                onBlur={() => (searchWasFocusedRef.current = false)}
-                onChange={(e) => {
-                  rememberFocus();
-                  setQDraft(e.target.value);
-                }}
-                placeholder="Nombre del rol"
-                style={{ ...S.input, width: "100%" }}
-                className="roles-toolbar-input"
-              />
+          <Btn variant="primary" onClick={openCreateRoleModal}>
+            <i className="fa-solid fa-plus" />
+            Nuevo rol
+          </Btn>
+        </div>
+
+        <div style={S.filterRow} className="roles-filter-row">
+          <div>
+            <div style={S.label}>Buscar rol</div>
+            <input
+              ref={searchRef}
+              value={qDraft}
+              onFocus={rememberFocus}
+              onClick={rememberFocus}
+              onBlur={() => (searchWasFocusedRef.current = false)}
+              onChange={(e) => {
+                rememberFocus();
+                setQDraft(e.target.value);
+              }}
+              placeholder="Buscar por nombre, nombre a mostrar o descripción"
+              style={S.input}
+            />
+          </div>
+
+          <div>
+            <div style={S.label}>Página actual</div>
+            <div
+              style={{
+                ...S.input,
+                display: "flex",
+                alignItems: "center",
+                background: "#fff",
+                color: "#334155",
+                fontWeight: 700,
+              }}
+            >
+              {page} de {meta.last_page}
             </div>
-
-            <Btn variant="primary" onClick={openCreateRoleModal}>
-              <i className="fa-solid fa-plus" />
-              Nuevo rol
-            </Btn>
-
-            <Btn type="button" onClick={loadRolesList} disabled={loadingRoles}>
-              {loadingRoles ? "Actualizando..." : "Refrescar"}
-            </Btn>
           </div>
         </div>
 
         {toast ? (
           <div
             style={{
-              marginTop: 12,
+              marginTop: 14,
               padding: "10px 12px",
               borderRadius: 12,
               border: `1px solid ${toastStyle.border}`,
               background: toastStyle.bg,
               color: toastStyle.fg,
-              fontWeight: 900,
+              fontWeight: 800,
             }}
           >
             {toast.text}
           </div>
         ) : null}
 
-        {err ? <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 900 }}>{err}</div> : null}
+        {err ? (
+          <div style={{ marginTop: 12, color: "#b91c1c", fontWeight: 800 }}>
+            {err}
+          </div>
+        ) : null}
       </Card>
 
       <Card>
         {loadingRoles ? (
-          <div>Cargando roles...</div>
+          <div style={{ color: "#475569", fontWeight: 700 }}>Cargando roles...</div>
         ) : (
-          <div style={S.tableOuter}>
+          <>
             <div style={S.tableWrap}>
               <table style={S.table}>
                 <thead>
                   <tr>
                     <th style={S.th}>ID</th>
-                    <th style={S.th}>Rol</th>
-                    <th style={S.th}>Estado</th>
-                    <th style={{ ...S.th, width: 220, textAlign: "right" }}>Acciones</th>
+                    <th style={S.th}>Nombre interno</th>
+                    <th style={S.th}>Nombre a mostrar</th>
+                    <th style={S.th}>Descripción</th>
+                    <th style={S.th}>Tipo</th>
+                    <th style={{ ...S.th, width: 120, textAlign: "right" }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rolesList.length ? (
                     rolesList.map((r) => {
                       const isAdmin = r.name === "Administrador";
+
                       return (
                         <tr key={r.id}>
                           <td style={S.td}>{r.id}</td>
                           <td style={S.td}>
-                            <div style={{ fontWeight: 900 }}>{r.name}</div>
-                            {isAdmin ? (
-                              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                                Este rol no se puede editar ni eliminar.
-                              </div>
-                            ) : null}
+                            <div style={{ fontWeight: 800 }}>{r.name}</div>
                           </td>
                           <td style={S.td}>
-                            <Badge>{isAdmin ? "Sistema" : "Normal"}</Badge>
+                            <div style={{ fontWeight: 700 }}>
+                              {r.nombre_mostrar || "—"}
+                            </div>
                           </td>
+                          <td style={S.td}>
+                            <div style={{ color: "#475569", maxWidth: 280 }}>
+                              {r.descripcion || "—"}
+                            </div>
+                          </td>
+                          <td style={S.td}>{roleTypeBadge(r)}</td>
                           <td style={{ ...S.td, textAlign: "right" }}>
                             <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
                               <IconBtn
                                 onClick={() => openEditRoleModal(r)}
-                                disabled={isAdmin}
-                                title={isAdmin ? "No se puede editar" : "Editar"}
+                                title="Editar"
+                                variant="primary"
                               >
                                 <i className="fa-solid fa-pen" />
-                              </IconBtn>
-
-                              <IconBtn onClick={() => openRolePermissions(r)} title="Permisos" variant="primary">
-                                <i className="fa-solid fa-key" />
                               </IconBtn>
 
                               <IconBtn
@@ -643,45 +822,49 @@ export default function AdminRoles() {
                     })
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={4}>
-                        Sin roles
+                      <td style={S.td} colSpan={6}>
+                        Sin roles registrados.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
 
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            marginTop: 12,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          <Btn disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))} style={{ padding: "8px 10px" }}>
-            Anterior
-          </Btn>
-          <div style={{ fontSize: 12 }}>
-            Página <b>{page}</b> de <b>{meta.last_page}</b>
-          </div>
-          <Btn disabled={!canNext} onClick={() => setPage((p) => p + 1)} style={{ padding: "8px 10px" }}>
-            Siguiente
-          </Btn>
-        </div>
+            <div style={S.pagination} className="roles-pagination-mobile">
+              <Btn
+                disabled={!canPrev}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Btn>
+
+              <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>
+                Mostrando página <b>{page}</b> de <b>{meta.last_page}</b>
+              </div>
+
+              <Btn
+                disabled={!canNext}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Siguiente
+              </Btn>
+            </div>
+          </>
+        )}
       </Card>
 
-      {/* ✅ Modal Rol (mismo estilo que Users) */}
       {openRoleModal && (
         <div style={S.modalOverlay} onClick={closeRoleModal}>
-          <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+          <div
+            style={S.modal}
+            className="roles-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={S.modalHeader}>
-              <h3 style={S.modalTitle}>{roleMode === "create" ? "Crear rol" : "Editar rol"}</h3>
+              <h3 style={S.modalTitle}>
+                {roleMode === "create" ? "Crear rol" : "Editar rol"}
+              </h3>
               <button type="button" style={S.xBtn} onClick={closeRoleModal} aria-label="Cerrar">
                 ✕
               </button>
@@ -689,94 +872,128 @@ export default function AdminRoles() {
 
             <form onSubmit={submitRoleModal}>
               <div style={S.modalBody}>
-                <div>
-                  <div style={S.label}>Nombre del rol</div>
-                  <input
-                    value={roleName}
-                    onChange={(e) => setRoleName(e.target.value)}
-                    required
-                    style={S.inputFull}
-                    placeholder="Ej. Supervisor"
-                  />
-                </div>
+                {loadingRoleDetail ? (
+                  <div style={{ color: "#475569", fontWeight: 700 }}>Cargando datos del rol...</div>
+                ) : (
+                  <>
+                    <div className="roles-form-grid" style={S.formGrid}>
+                      <div style={S.fieldWrap}>
+                        <div style={S.label}>Nombre interno</div>
+                        <input
+                          value={roleName}
+                          onChange={(e) => {
+                            setRoleName(e.target.value);
+                            setFieldErrors((prev) => ({ ...prev, name: "" }));
+                          }}
+                          style={{
+                            ...S.inputFull,
+                            borderColor: fieldErrors.name ? "#fecaca" : "#dbeafe",
+                          }}
+                          placeholder="Ej. supervisor"
+                          disabled={roleIsAdmin}
+                        />
+                        {fieldErrors.name ? <div style={S.errorText}>{fieldErrors.name}</div> : null}
+                      </div>
 
-                {err ? <div style={{ color: "#b91c1c", fontWeight: 900 }}>{err}</div> : null}
+                      <div style={S.fieldWrap}>
+                        <div style={S.label}>Nombre a mostrar</div>
+                        <input
+                          value={roleDisplayName}
+                          onChange={(e) => {
+                            setRoleDisplayName(e.target.value);
+                            setFieldErrors((prev) => ({ ...prev, nombre_mostrar: "" }));
+                          }}
+                          style={{
+                            ...S.inputFull,
+                            borderColor: fieldErrors.nombre_mostrar ? "#fecaca" : "#dbeafe",
+                          }}
+                          placeholder="Ej. Supervisor"
+                          disabled={roleIsAdmin}
+                        />
+                        {fieldErrors.nombre_mostrar ? (
+                          <div style={S.errorText}>{fieldErrors.nombre_mostrar}</div>
+                        ) : null}
+                      </div>
+
+                      <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                        <div style={S.label}>Descripción</div>
+                        <textarea
+                          value={roleDescription}
+                          onChange={(e) => {
+                            setRoleDescription(e.target.value);
+                            setFieldErrors((prev) => ({ ...prev, descripcion: "" }));
+                          }}
+                          style={{
+                            ...S.textarea,
+                            borderColor: fieldErrors.descripcion ? "#fecaca" : "#dbeafe",
+                          }}
+                          placeholder="Describe para qué sirve este rol"
+                          disabled={roleIsAdmin}
+                        />
+                        {fieldErrors.descripcion ? (
+                          <div style={S.errorText}>{fieldErrors.descripcion}</div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div style={S.permsSection}>
+                      <div style={S.label}>Permisos</div>
+
+                      {roleIsAdmin ? (
+                        <div
+                          style={{
+                            padding: "12px 14px",
+                            borderRadius: 12,
+                            border: "1px solid #bfdbfe",
+                            background: "#eff6ff",
+                            color: "#1d4ed8",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Este rol tiene acceso total por sistema. No requiere permisos específicos.
+                        </div>
+                      ) : (
+                        <div style={S.permsBox}>
+                          {allPermissions.length ? (
+                            <div style={S.permsGrid}>
+                              {allPermissions.map((p) => (
+                                <label key={p} style={S.permItem}>
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedPermissions.includes(p)}
+                                    onChange={() => togglePermission(p)}
+                                  />
+                                  <span>{p}</span>
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 12, color: "#64748b" }}>
+                              No hay permisos creados. Ve a “Permisos” y crea algunos.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {err ? <div style={{ color: "#b91c1c", fontWeight: 800 }}>{err}</div> : null}
+                  </>
+                )}
               </div>
 
               <div style={S.modalFooter}>
                 <Btn type="button" onClick={closeRoleModal}>
                   Cancelar
                 </Btn>
-                <Btn type="submit" disabled={savingRoleModal} variant="primary">
+                <Btn
+                  type="submit"
+                  disabled={savingRoleModal || loadingRoleDetail || roleIsAdmin}
+                  variant="primary"
+                >
                   {savingRoleModal ? "Guardando..." : "Guardar"}
                 </Btn>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ✅ Modal Permisos por Rol (con el mismo overlay/box) */}
-      {openRolePermModal && (
-        <div style={S.modalOverlay} onClick={closeRolePermModal}>
-          <div style={{ ...S.modal, maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
-            <div style={S.modalHeader}>
-              <h3 style={S.modalTitle}>
-                Permisos del rol: <span style={{ fontWeight: 900 }}>{rolePermRole?.name || "—"}</span>
-              </h3>
-              <button type="button" style={S.xBtn} onClick={closeRolePermModal} aria-label="Cerrar">
-                ✕
-              </button>
-            </div>
-
-            <div style={S.modalBody}>
-              {rolePermLoading ? (
-                <div>Cargando...</div>
-              ) : rolePermIsAdminRole ? (
-                <div style={{ fontSize: 14 }}>
-                  <p style={{ marginTop: 0 }}>
-                    Este rol tiene <b>acceso total por rol</b>. No requiere permisos.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>
-                    Marca los permisos que tendrá el rol.
-                  </div>
-
-                  <div style={{ maxHeight: 360, overflow: "auto", border: "1px solid #e4e4e7", padding: 10, borderRadius: 12 }}>
-                    {rolePermAll.length ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                        {rolePermAll.map((p) => (
-                          <label key={p} style={{ display: "inline-flex", gap: 8, alignItems: "center", fontWeight: 900 }}>
-                            <input type="checkbox" checked={rolePermSelected.includes(p)} onChange={() => toggleRolePerm(p)} />
-                            {p}
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: "#64748b" }}>No hay permisos creados. Ve a “Permisos” y crea algunos.</div>
-                    )}
-                  </div>
-
-                  {err ? <div style={{ color: "#b91c1c", fontWeight: 900 }}>{err}</div> : null}
-                </>
-              )}
-            </div>
-
-            <div style={S.modalFooter}>
-              <Btn type="button" onClick={closeRolePermModal}>
-                Cancelar
-              </Btn>
-              <Btn
-                type="button"
-                onClick={saveRolePermissions}
-                disabled={rolePermSaving || rolePermLoading || rolePermIsAdminRole}
-                variant="primary"
-              >
-                {rolePermSaving ? "Guardando..." : "Guardar"}
-              </Btn>
-            </div>
           </div>
         </div>
       )}

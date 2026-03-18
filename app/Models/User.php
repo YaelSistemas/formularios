@@ -82,4 +82,19 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(\App\Models\Grupo::class, 'grupo_user')->withTimestamps();
     }
+
+    public function unidadesServicio()
+    {
+        return $this->belongsToMany(
+            \App\Models\UnidadServicio::class,
+            'unidad_servicio_user',
+            'user_id',
+            'unidad_servicio_id'
+        );
+    }
+
+    public function assignedForms()
+    {
+        return $this->belongsToMany(Form::class, 'form_user')->withTimestamps();
+    }
 }

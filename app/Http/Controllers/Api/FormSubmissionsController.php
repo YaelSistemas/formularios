@@ -20,8 +20,14 @@ class FormSubmissionsController extends Controller
         }
 
         // usuario normal solo puede responder PUBLICADOS
-        if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
-            return response()->json(['message' => 'No encontrado.'], 404);
+        if (!$user->hasRole('Administrador')) {
+            if ($form->status !== 'PUBLICADO') {
+                return response()->json(['message' => 'No encontrado.'], 404);
+            }
+
+            if (!$this->userCanAccessForm($user->id, $form)) {
+                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+            }
         }
 
         $data = $request->validate([
@@ -54,18 +60,38 @@ class FormSubmissionsController extends Controller
     public function index(Request $request, Form $form)
     {
         $user = $request->user();
-
+    
         if (!$user) {
             return response()->json(['message' => 'No autorizado.'], 401);
         }
-
-        if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
-            return response()->json(['message' => 'No encontrado.'], 404);
+    
+        if (!$user->hasRole('Administrador')) {
+            if ($form->status !== 'PUBLICADO') {
+                return response()->json(['message' => 'No encontrado.'], 404);
+            }
+    
+            if (!$this->userCanAccessForm($user->id, $form)) {
+                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+            }
         }
-
-        $subs = FormSubmission::query()
+    
+        $query = FormSubmission::query()
             ->with(['user:id,name'])
-            ->where('form_id', $form->id)
+            ->where('form_id', $form->id);
+    
+        if (!$user->hasRole('Administrador')) {
+            $unidadIds = $user->unidadesServicio()->pluck('unidades_servicio.id');
+    
+            if ($unidadIds->isEmpty()) {
+                return response()->json(['submissions' => []]);
+            }
+    
+            $query->whereHas('user.unidadesServicio', function ($q) use ($unidadIds) {
+                $q->whereIn('unidades_servicio.id', $unidadIds);
+            });
+        }
+    
+        $subs = $query
             ->orderByDesc('id')
             ->limit(100)
             ->get(['id', 'form_id', 'user_id', 'answers', 'created_at'])
@@ -80,7 +106,7 @@ class FormSubmissionsController extends Controller
                 ];
             })
             ->values();
-
+    
         return response()->json(['submissions' => $subs]);
     }
 
@@ -97,8 +123,14 @@ class FormSubmissionsController extends Controller
         }
 
         // usuario normal solo puede editar PUBLICADOS
-        if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
-            return response()->json(['message' => 'No encontrado.'], 404);
+        if (!$user->hasRole('Administrador')) {
+            if ($form->status !== 'PUBLICADO') {
+                return response()->json(['message' => 'No encontrado.'], 404);
+            }
+
+            if (!$this->userCanAccessForm($user->id, $form)) {
+                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+            }
         }
 
         $data = $request->validate([
@@ -124,6 +156,24 @@ class FormSubmissionsController extends Controller
             'message' => 'Registro actualizado correctamente.',
             'submission' => $submission,
         ]);
+    }
+
+    /**
+     * Determina si el usuario puede acceder al formulario.
+     * - Si no hay asignaciones, cualquiera puede acceder
+     * - Si hay asignaciones, solo usuarios asignados
+     */
+    private function userCanAccessForm(int $userId, Form $form): bool
+    {
+        $hasAssignments = $form->assignedUsers()->exists();
+
+        if (!$hasAssignments) {
+            return true;
+        }
+
+        return $form->assignedUsers()
+            ->where('users.id', $userId)
+            ->exists();
     }
 
     /**
@@ -459,5 +509,35 @@ class FormSubmissionsController extends Controller
         Storage::disk('public')->put($relativePath, $binary);
 
         return $relativePath;
+    }
+
+    public function destroy(Request $request, Form $form, FormSubmission $submission)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'No autorizado.'], 401);
+        }
+
+        if ((int) $submission->form_id !== (int) $form->id) {
+            return response()->json(['message' => 'Registro no encontrado para este formulario.'], 404);
+        }
+
+        if (!$user->hasRole('Administrador')) {
+            if ($form->status !== 'PUBLICADO') {
+                return response()->json(['message' => 'No encontrado.'], 404);
+            }
+
+            if (!$this->userCanAccessForm($user->id, $form)) {
+                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+            }
+        }
+
+        $submission->delete();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Registro eliminado correctamente.',
+        ]);
     }
 }

@@ -312,11 +312,12 @@
         $inspectorValor = data_get($answers, 'nombre_inspector', '') ?: '';
 
         $tableRows = is_array(data_get($answers, 'tabla_herramientas')) ? data_get($answers, 'tabla_herramientas') : [];
-        $maxRows = 7;
 
-        $rowsToRender = array_slice($tableRows, 0, $maxRows);
-
-        while (count($rowsToRender) < $maxRows) {
+        $minRows = 7;
+        
+        $rowsToRender = $tableRows;
+        
+        while (count($rowsToRender) < $minRows) {
             $rowsToRender[] = [
                 'tipo_herramienta' => '',
                 'serie' => '',

@@ -1044,6 +1044,8 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     return isOnline ? "Enviar formulario" : "Guardar offline";
   };
 
+  const desktopContentWidth = 900;
+
   return (
     <div
       ref={topRef}
@@ -1055,7 +1057,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     >
       <div
         style={{
-          maxWidth: isMobile ? 980 : 1040,
+          maxWidth: isMobile ? 980 : desktopContentWidth,
           width: isMobile ? "95%" : "100%",
           margin: "0 auto",
         }}
@@ -1216,7 +1218,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
         <form onSubmit={handleSubmit}>
           <div
             style={{
-              maxWidth: isMobile ? "100%" : 900,
+              maxWidth: isMobile ? "100%" : desktopContentWidth,
               marginInline: "auto",
               background: "#fff",
               border: "1px solid #dbe4ee",
@@ -1405,7 +1407,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             >
               <div
                 style={{
-                  maxWidth: isMobile ? "100%" : 900,
+                  maxWidth: isMobile ? "100%" : desktopContentWidth,
                   width: "100%",
                   marginInline: "auto",
                   background: "rgba(255,255,255,0.92)",

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 
-export default function AdminPermissions() {
+export default function AdminUnidadesServicio() {
   const [err, setErr] = useState("");
 
   const [toast, setToast] = useState(null);
@@ -19,8 +19,8 @@ export default function AdminPermissions() {
     };
   }, []);
 
-  const [permissions, setPermissions] = useState([]);
-  const [loadingPerms, setLoadingPerms] = useState(false);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
@@ -53,37 +53,38 @@ export default function AdminPermissions() {
     }
   };
 
-  const [openPermModal, setOpenPermModal] = useState(false);
-  const [permMode, setPermMode] = useState("create");
-  const [editingPermId, setEditingPermId] = useState(null);
-  const [permName, setPermName] = useState("");
-  const [savingPermModal, setSavingPermModal] = useState(false);
-  const [deletingPermId, setDeletingPermId] = useState(null);
+  const [openForm, setOpenForm] = useState(false);
+  const [formMode, setFormMode] = useState("create");
+  const [editingId, setEditingId] = useState(null);
+
+  const [fNombre, setFNombre] = useState("");
+  const [fDesc, setFDesc] = useState("");
+  const [fActivo, setFActivo] = useState(true);
+
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  const loadPermissions = async () => {
+  const load = async () => {
     setErr("");
-    setLoadingPerms(true);
+    setLoading(true);
     try {
       const data = await apiGet(
-        `/admin/permissions?q=${encodeURIComponent(q)}&per_page=${perPage}&page=${page}`
+        `/admin/unidades-servicio?q=${encodeURIComponent(q)}&per_page=${perPage}&page=${page}`
       );
 
       if (Array.isArray(data?.data)) {
-        setPermissions(data.data || []);
-        setMeta({
-          last_page: data.last_page || 1,
-          total: data.total || 0,
-        });
+        setRows(data.data || []);
+        setMeta({ last_page: data.last_page || 1, total: data.total || 0 });
       } else {
-        const arr = Array.isArray(data?.permissions) ? data.permissions : [];
-        setPermissions(arr);
+        const arr = Array.isArray(data?.unidades_servicio) ? data.unidades_servicio : [];
+        setRows(arr);
         setMeta({ last_page: 1, total: arr.length });
       }
     } catch (e) {
-      setErr(e?.message || "Error cargando permisos");
+      setErr(e?.message || "Error cargando unidades de servicio");
     } finally {
-      setLoadingPerms(false);
+      setLoading(false);
     }
   };
 
@@ -96,12 +97,12 @@ export default function AdminPermissions() {
   }, [qDraft]);
 
   useEffect(() => {
-    loadPermissions();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    loadPermissions();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, page]);
 
@@ -111,7 +112,7 @@ export default function AdminPermissions() {
   }, [qDraft]);
 
   useEffect(() => {
-    if (openPermModal) return;
+    if (openForm) return;
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
@@ -125,42 +126,46 @@ export default function AdminPermissions() {
     } catch {
       //
     }
-  }, [loadingPerms, permissions, meta.last_page, meta.total, openPermModal]);
+  }, [loading, rows, meta.last_page, meta.total, openForm]);
 
-  const resetPermForm = () => {
-    setEditingPermId(null);
-    setPermName("");
+  const resetForm = () => {
+    setEditingId(null);
+    setFNombre("");
+    setFDesc("");
+    setFActivo(true);
     setFieldErrors({});
     setErr("");
   };
 
-  const openCreatePermModal = () => {
-    resetPermForm();
-    setPermMode("create");
-    setOpenPermModal(true);
+  const openCreate = () => {
+    resetForm();
+    setFormMode("create");
+    setOpenForm(true);
   };
 
-  const openEditPermModal = (p) => {
-    resetPermForm();
-    setPermMode("edit");
-    setEditingPermId(p.id);
-    setPermName(p.name || "");
-    setOpenPermModal(true);
+  const openEdit = (r) => {
+    resetForm();
+    setFormMode("edit");
+    setEditingId(r.id);
+    setFNombre(r.nombre || "");
+    setFDesc(r.descripcion || "");
+    setFActivo(!!r.activo);
+    setOpenForm(true);
   };
 
-  const closePermModal = () => {
-    setOpenPermModal(false);
-    setSavingPermModal(false);
+  const closeModal = () => {
+    setOpenForm(false);
+    setSaving(false);
     setErr("");
     setFieldErrors({});
   };
 
-  const validatePermForm = () => {
-    const actionText = permMode === "create" ? "crear" : "actualizar";
+  const validateForm = () => {
+    const actionText = formMode === "create" ? "crear" : "actualizar";
     const errors = {};
 
-    if (!permName.trim()) {
-      errors.name = `No se puede ${actionText} el permiso porque falta el nombre.`;
+    if (!fNombre.trim()) {
+      errors.nombre = `No se puede ${actionText} la unidad de servicio porque falta el nombre.`;
     }
 
     setFieldErrors(errors);
@@ -173,49 +178,52 @@ export default function AdminPermissions() {
     return true;
   };
 
-  const submitPermModal = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     setErr("");
 
-    if (!validatePermForm()) return;
+    if (!validateForm()) return;
 
-    setSavingPermModal(true);
+    setSaving(true);
 
     try {
-      const payload = { name: permName.trim() };
+      const payload = {
+        nombre: fNombre.trim(),
+        descripcion: fDesc.trim() || null,
+        activo: !!fActivo,
+      };
 
-      if (permMode === "create") {
-        await apiPost("/admin/permissions", payload);
-        showToast("success", "✅ Permiso creado correctamente");
+      if (formMode === "create") {
+        await apiPost("/admin/unidades-servicio", payload);
+        showToast("success", "✅ Unidad de servicio creada correctamente");
       } else {
-        await apiPut(`/admin/permissions/${editingPermId}`, payload);
-        showToast("info", "✏️ Permiso actualizado");
+        await apiPut(`/admin/unidades-servicio/${editingId}`, payload);
+        showToast("info", "✏️ Unidad de servicio actualizada");
       }
 
-      closePermModal();
-      await loadPermissions();
+      closeModal();
+      await load();
     } catch (e2) {
-      setErr(e2?.message || "Error guardando permiso");
+      setErr(e2?.message || "Error guardando unidad de servicio");
     } finally {
-      setSavingPermModal(false);
+      setSaving(false);
     }
   };
 
-  const deletePermission = async (p) => {
-    const ok = window.confirm(`¿Eliminar el permiso "${p.name}"?`);
+  const remove = async (r) => {
+    const ok = window.confirm(`¿Eliminar la unidad de servicio "${r.nombre}"?`);
     if (!ok) return;
 
     setErr("");
-    setDeletingPermId(p.id);
-
+    setDeletingId(r.id);
     try {
-      await apiDelete(`/admin/permissions/${p.id}`);
-      showToast("danger", "🗑️ Permiso eliminado");
-      await loadPermissions();
-    } catch (e2) {
-      setErr(e2?.message || "Error eliminando permiso");
+      await apiDelete(`/admin/unidades-servicio/${r.id}`);
+      showToast("danger", "🗑️ Unidad de servicio eliminada");
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Error eliminando unidad de servicio");
     } finally {
-      setDeletingPermId(null);
+      setDeletingId(null);
     }
   };
 
@@ -299,34 +307,23 @@ export default function AdminPermissions() {
     );
   };
 
-  const Badge = ({ children, tone = "default" }) => {
-    const tones = {
-      default: { bg: "#f8fafc", border: "#e2e8f0", fg: "#0f172a" },
-      role: { bg: "#f1f5f9", border: "#cbd5e1", fg: "#334155" },
-      formatOk: { bg: "#ecfdf5", border: "#86efac", fg: "#166534" },
-      formatWarn: { bg: "#fff7ed", border: "#fdba74", fg: "#c2410c" },
-    };
-
-    const t = tones[tone] || tones.default;
-
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          padding: "6px 10px",
-          borderRadius: 999,
-          border: `1px solid ${t.border}`,
-          background: t.bg,
-          color: t.fg,
-          fontSize: 12,
-          fontWeight: 800,
-        }}
-      >
-        {children}
-      </span>
-    );
-  };
+  const Badge = ({ children, active = true }) => (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "6px 10px",
+        borderRadius: 999,
+        border: `1px solid ${active ? "#86efac" : "#fecaca"}`,
+        background: active ? "#ecfdf5" : "#fef2f2",
+        fontSize: 12,
+        fontWeight: 800,
+        color: active ? "#166534" : "#b91c1c",
+      }}
+    >
+      {children}
+    </span>
+  );
 
   const toastStyle = (() => {
     if (!toast) return {};
@@ -383,6 +380,18 @@ export default function AdminPermissions() {
       color: "#64748b",
       fontWeight: 700,
     },
+    textarea: {
+      width: "100%",
+      padding: "12px 13px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#fff",
+      outline: "none",
+      minHeight: 100,
+      boxSizing: "border-box",
+      resize: "vertical",
+      fontFamily: "inherit",
+    },
     tableWrap: {
       width: "100%",
       overflowX: "auto",
@@ -435,7 +444,7 @@ export default function AdminPermissions() {
     },
     modal: {
       width: "100%",
-      maxWidth: 760,
+      maxWidth: 820,
       maxHeight: "90vh",
       overflowY: "auto",
       background: "#fff",
@@ -478,6 +487,11 @@ export default function AdminPermissions() {
       bottom: 0,
       background: "#fff",
     },
+    formGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 14,
+    },
     fieldWrap: {
       display: "flex",
       flexDirection: "column",
@@ -509,24 +523,55 @@ export default function AdminPermissions() {
       cursor: "pointer",
       fontWeight: 900,
     },
+    toggleWrap: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      minHeight: 46,
+      padding: "10px 0",
+    },
+    toggleButton: {
+      position: "relative",
+      width: 58,
+      height: 32,
+      border: "none",
+      borderRadius: 999,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      padding: 0,
+      flexShrink: 0,
+    },
+    toggleThumb: {
+      position: "absolute",
+      top: 4,
+      width: 24,
+      height: 24,
+      borderRadius: "50%",
+      background: "#fff",
+      boxShadow: "0 1px 3px rgba(0,0,0,.22)",
+      transition: "all 0.2s ease",
+    },
     responsiveStyleTag: `
       @media (max-width: 860px) {
-        .perms-filter-row {
+        .us-filter-row {
           grid-template-columns: 1fr !important;
         }
-        .perms-modal-full {
+        .us-form-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .us-modal-full {
           max-width: 100% !important;
         }
       }
 
       @media (max-width: 560px) {
-        .perms-header-mobile {
+        .us-header-mobile {
           align-items: stretch !important;
         }
-        .perms-header-mobile button {
+        .us-header-mobile button {
           width: 100%;
         }
-        .perms-pagination-mobile {
+        .us-pagination-mobile {
           justify-content: center !important;
         }
       }
@@ -538,26 +583,26 @@ export default function AdminPermissions() {
       <style>{S.responsiveStyleTag}</style>
 
       <Card>
-        <div style={S.headerTop} className="perms-header-mobile">
+        <div style={S.headerTop} className="us-header-mobile">
           <div style={S.titleBlock}>
-            <h2 style={{ margin: 0, fontSize: 24, color: "#0f172a" }}>Permisos</h2>
+            <h2 style={{ margin: 0, fontSize: 24, color: "#0f172a" }}>Unidades de servicio</h2>
             <div style={{ fontSize: 13, color: "#64748b" }}>
-              Administra permisos del sistema y su nomenclatura.
+              Administra unidades de servicio y su disponibilidad dentro del sistema.
             </div>
             <div style={{ fontSize: 12, color: "#64748b" }}>
-              Total registrados: <b>{meta.total}</b>
+              Total registradas: <b>{meta.total}</b>
             </div>
           </div>
 
-          <Btn variant="primary" onClick={openCreatePermModal}>
+          <Btn variant="primary" onClick={openCreate}>
             <i className="fa-solid fa-plus" />
-            Nuevo permiso
+            Nueva unidad
           </Btn>
         </div>
 
-        <div style={S.filterRow} className="perms-filter-row">
+        <div style={S.filterRow} className="us-filter-row">
           <div>
-            <div style={S.label}>Buscar permiso</div>
+            <div style={S.label}>Buscar unidad de servicio</div>
             <input
               ref={searchRef}
               value={qDraft}
@@ -568,7 +613,7 @@ export default function AdminPermissions() {
                 rememberFocus();
                 setQDraft(e.target.value);
               }}
-              placeholder="Buscar por nombre del permiso"
+              placeholder="Buscar por nombre o descripción"
               style={S.input}
             />
           </div>
@@ -606,71 +651,63 @@ export default function AdminPermissions() {
           </div>
         ) : null}
 
-        {err ? (
-          <div style={{ marginTop: 12, color: "#b91c1c", fontWeight: 800 }}>
-            {err}
-          </div>
-        ) : null}
+        {err ? <div style={{ marginTop: 12, color: "#b91c1c", fontWeight: 800 }}>{err}</div> : null}
       </Card>
 
       <Card>
-        {loadingPerms ? (
-          <div style={{ color: "#475569", fontWeight: 700 }}>Cargando permisos...</div>
+        {loading ? (
+          <div style={{ color: "#475569", fontWeight: 700 }}>Cargando unidades de servicio...</div>
         ) : (
           <>
             <div style={S.tableWrap}>
               <table style={S.table}>
                 <thead>
                   <tr>
-                    <th style={S.th}>ID</th>
-                    <th style={S.th}>Permiso</th>
-                    <th style={S.th}>Formato</th>
+                    <th style={S.th}>Nombre</th>
+                    <th style={S.th}>Descripción</th>
+                    <th style={S.th}>Estado</th>
                     <th style={{ ...S.th, width: 140, textAlign: "right" }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {permissions.length ? (
-                    permissions.map((p) => {
-                      const okFormat = String(p.name || "").includes(".");
+                  {rows.length ? (
+                    rows.map((r) => (
+                      <tr key={r.id}>
+                        <td style={S.td}>
+                          <div style={{ fontWeight: 800 }}>{r.nombre}</div>
+                        </td>
+                        <td style={S.td}>
+                          <div style={{ color: "#475569", maxWidth: 320 }}>
+                            {r.descripcion || "—"}
+                          </div>
+                        </td>
+                        <td style={S.td}>
+                          <Badge active={!!r.activo}>
+                            {r.activo ? "Activo" : "Inactivo"}
+                          </Badge>
+                        </td>
+                        <td style={{ ...S.td, textAlign: "right" }}>
+                          <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
+                            <IconBtn onClick={() => openEdit(r)} title="Editar" variant="primary">
+                              <i className="fa-solid fa-pen" />
+                            </IconBtn>
 
-                      return (
-                        <tr key={p.id}>
-                          <td style={S.td}>{p.id}</td>
-                          <td style={S.td}>
-                            <div style={{ fontWeight: 800 }}>{p.name}</div>
-                          </td>
-                          <td style={S.td}>
-                            <Badge tone={okFormat ? "formatOk" : "formatWarn"}>
-                              {okFormat ? "modulo.accion" : "sin punto"}
-                            </Badge>
-                          </td>
-                          <td style={{ ...S.td, textAlign: "right" }}>
-                            <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
-                              <IconBtn
-                                onClick={() => openEditPermModal(p)}
-                                title="Editar"
-                                variant="primary"
-                              >
-                                <i className="fa-solid fa-pen" />
-                              </IconBtn>
-
-                              <IconBtn
-                                onClick={() => deletePermission(p)}
-                                disabled={deletingPermId === p.id}
-                                variant="danger"
-                                title="Eliminar"
-                              >
-                                <i className="fa-solid fa-trash" />
-                              </IconBtn>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                            <IconBtn
+                              disabled={deletingId === r.id}
+                              onClick={() => remove(r)}
+                              variant="danger"
+                              title="Eliminar"
+                            >
+                              <i className="fa-solid fa-trash" />
+                            </IconBtn>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                   ) : (
                     <tr>
                       <td style={S.td} colSpan={4}>
-                        Sin permisos registrados.
+                        Sin unidades de servicio registradas.
                       </td>
                     </tr>
                   )}
@@ -678,16 +715,8 @@ export default function AdminPermissions() {
               </table>
             </div>
 
-            <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
-              Sugerencia: usa formato <b>modulo.accion</b>, por ejemplo{" "}
-              <b>tickets.view</b>, <b>tickets.edit</b>, <b>roles.create</b>.
-            </div>
-
-            <div style={S.pagination} className="perms-pagination-mobile">
-              <Btn
-                disabled={!canPrev}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
+            <div style={S.pagination} className="us-pagination-mobile">
+              <Btn disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                 Anterior
               </Btn>
 
@@ -695,10 +724,7 @@ export default function AdminPermissions() {
                 Mostrando página <b>{page}</b> de <b>{meta.last_page}</b>
               </div>
 
-              <Btn
-                disabled={!canNext}
-                onClick={() => setPage((p) => p + 1)}
-              >
+              <Btn disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
                 Siguiente
               </Btn>
             </div>
@@ -706,56 +732,94 @@ export default function AdminPermissions() {
         )}
       </Card>
 
-      {openPermModal && (
-        <div style={S.modalOverlay} onClick={closePermModal}>
-          <div
-            style={S.modal}
-            className="perms-modal-full"
-            onClick={(e) => e.stopPropagation()}
-          >
+      {openForm && (
+        <div style={S.modalOverlay} onClick={closeModal}>
+          <div style={S.modal} className="us-modal-full" onClick={(e) => e.stopPropagation()}>
             <div style={S.modalHeader}>
               <h3 style={S.modalTitle}>
-                {permMode === "create" ? "Crear permiso" : "Editar permiso"}
+                {formMode === "create" ? "Crear unidad de servicio" : "Editar unidad de servicio"}
               </h3>
-              <button type="button" style={S.xBtn} onClick={closePermModal} aria-label="Cerrar">
+              <button type="button" style={S.xBtn} onClick={closeModal} aria-label="Cerrar">
                 ✕
               </button>
             </div>
 
-            <form onSubmit={submitPermModal}>
+            <form onSubmit={submit}>
               <div style={S.modalBody}>
-                <div style={S.fieldWrap}>
-                  <div style={S.label}>Nombre del permiso</div>
-                  <input
-                    value={permName}
-                    onChange={(e) => {
-                      setPermName(e.target.value);
-                      setFieldErrors((prev) => ({ ...prev, name: "" }));
-                    }}
-                    style={{
-                      ...S.inputFull,
-                      borderColor: fieldErrors.name ? "#fecaca" : "#dbeafe",
-                    }}
-                    placeholder="Ej. tickets.view"
-                  />
-                  {fieldErrors.name ? (
-                    <div style={S.errorText}>{fieldErrors.name}</div>
-                  ) : (
-                    <div style={{ ...S.helper, marginTop: 6 }}>
-                      Tip: usa formato <b>modulo.accion</b>
+                <div className="us-form-grid" style={S.formGrid}>
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                    <div style={S.label}>Nombre</div>
+                    <input
+                      value={fNombre}
+                      onChange={(e) => {
+                        setFNombre(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, nombre: "" }));
+                      }}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.nombre ? "#fecaca" : "#dbeafe",
+                      }}
+                      placeholder="Ej. Mesa de ayuda"
+                    />
+                    {fieldErrors.nombre ? <div style={S.errorText}>{fieldErrors.nombre}</div> : null}
+                  </div>
+
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                    <div style={S.label}>Descripción</div>
+                    <textarea
+                      value={fDesc}
+                      onChange={(e) => setFDesc(e.target.value)}
+                      style={S.textarea}
+                      placeholder="Opcional"
+                    />
+                    <div style={S.helper}>Opcional</div>
+                  </div>
+
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                    <div style={S.label}>Estado</div>
+                    <div style={S.toggleWrap}>
+                      <button
+                        type="button"
+                        onClick={() => setFActivo((prev) => !prev)}
+                        aria-pressed={fActivo}
+                        style={{
+                          ...S.toggleButton,
+                          background: fActivo ? "#22c55e" : "#cbd5e1",
+                        }}
+                      >
+                        <span
+                          style={{
+                            ...S.toggleThumb,
+                            left: fActivo ? 30 : 4,
+                          }}
+                        />
+                      </button>
+
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: fActivo ? "#166534" : "#64748b",
+                        }}
+                      >
+                        {fActivo ? "Activo" : "Inactivo"}
+                      </span>
                     </div>
-                  )}
+                    <div style={S.helper}>
+                      Si está inactiva, puedes ocultarla para asignaciones nuevas.
+                    </div>
+                  </div>
                 </div>
 
                 {err ? <div style={{ color: "#b91c1c", fontWeight: 800 }}>{err}</div> : null}
               </div>
 
               <div style={S.modalFooter}>
-                <Btn type="button" onClick={closePermModal}>
+                <Btn type="button" onClick={closeModal}>
                   Cancelar
                 </Btn>
-                <Btn type="submit" disabled={savingPermModal} variant="primary">
-                  {savingPermModal ? "Guardando..." : "Guardar"}
+                <Btn type="submit" disabled={saving} variant="primary">
+                  {saving ? "Guardando..." : "Guardar"}
                 </Btn>
               </div>
             </form>

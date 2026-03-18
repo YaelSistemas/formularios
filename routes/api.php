@@ -10,9 +10,11 @@ use App\Http\Controllers\Api\Admin\PermissionsController;
 use App\Http\Controllers\Api\Admin\RolePermissionsController;
 use App\Http\Controllers\Api\Admin\EmpresasController;
 use App\Http\Controllers\Api\Admin\GruposController;
+use App\Http\Controllers\Api\Admin\UnidadesServicioController;
 use App\Http\Controllers\Api\FormsController;
 use App\Http\Controllers\Api\FormSubmissionsController;
 use App\Http\Controllers\Api\FormSubmissionPdfController;
+use App\Http\Controllers\Api\AdminFormAssignmentsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,16 +49,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Ver respuestas del formulario (tabla submissions)
     Route::get('/forms/{form}/submissions', [FormSubmissionsController::class, 'index'])
-        ->middleware('perm:formularios.submissions.view');
+    ->middleware('perm:formularios.submissions.view');
 
-    // Editar / actualizar una respuesta existente
     Route::put('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'update'])
-        ->middleware('perm:formularios.submissions.view');
-
+        ->middleware('perm:formularios.edit');
+    
     Route::patch('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'update'])
-        ->middleware('perm:formularios.submissions.view');
-
-    // PDF de un registro/respuesta
+        ->middleware('perm:formularios.edit');
+    
+    Route::delete('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'destroy'])
+        ->middleware('perm:formularios.delete');
+    
     Route::get('/forms/{form}/submissions/{submission}/pdf', [FormSubmissionPdfController::class, 'show'])
         ->middleware('perm:formularios.submissions.view');
 });
@@ -81,6 +84,7 @@ Route::middleware(['auth:sanctum', 'admin'])
 
         // Roles CRUD
         Route::get('/roles-list', [RolesController::class, 'index']);
+        Route::get('/roles-list/{role}', [RolesController::class, 'show']);
         Route::post('/roles-list', [RolesController::class, 'store']);
         Route::put('/roles-list/{role}', [RolesController::class, 'update']);
         Route::delete('/roles-list/{role}', [RolesController::class, 'destroy']);
@@ -105,12 +109,24 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::put('grupos/{grupo}', [GruposController::class, 'update']);
         Route::delete('grupos/{grupo}', [GruposController::class, 'destroy']);
 
+        Route::get('unidades-servicio', [UnidadesServicioController::class, 'index']);
+        Route::post('unidades-servicio', [UnidadesServicioController::class, 'store']);
+        Route::put('unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'update']);
+        Route::delete('unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'destroy']);
+
         // ---------------- FORMS (Admin solo lectura + publicar) ----------------
         Route::get('/forms', [FormsController::class, 'adminIndex'])
             ->middleware('perm:formularios.view');
 
         Route::get('/forms/{form}', [FormsController::class, 'show'])
             ->middleware('perm:formularios.view');
+
+        // Asignaciones de formularios
+        Route::get('/forms/{form}/assignments', [AdminFormAssignmentsController::class, 'index'])
+            ->middleware('perm:formularios.view');
+
+        Route::post('/forms/{form}/assignments', [AdminFormAssignmentsController::class, 'store'])
+            ->middleware('perm:formularios.publish');
 
         // Publicar / Despublicar
         Route::post('/forms/{form}/publish', [FormsController::class, 'publish'])

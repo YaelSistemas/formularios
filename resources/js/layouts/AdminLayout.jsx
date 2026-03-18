@@ -159,6 +159,7 @@ export default function AdminLayout() {
   const isUsersActive = location.pathname.startsWith("/admin/users");
   const isRolesActive = location.pathname.startsWith("/admin/roles");
   const isPermissionsActive = location.pathname.startsWith("/admin/permissions");
+  const isUnidadesServicioActive = location.pathname.startsWith("/admin/unidades-servicio");
   const isEmpresasActive = location.pathname.startsWith("/admin/empresas");
   const isGruposActive = location.pathname.startsWith("/admin/grupos");
   const isFormsActive = location.pathname.startsWith("/admin/forms");
@@ -534,6 +535,17 @@ export default function AdminLayout() {
               </NavLink>
 
               <NavLink
+                to="/admin/unidades-servicio"
+                title="Unidades de servicio"
+                style={({ isActive }) => navItemStyle(isActive)}
+              >
+                <span style={navIconWrapStyle}>
+                  <i className="fa-solid fa-layer-group" />
+                </span>
+                <span style={S.navLabel}>Unidades de servicio</span>
+              </NavLink>
+
+              <NavLink
                 to="/admin/empresas"
                 title="Empresas"
                 style={({ isActive }) => navItemStyle(isActive)}
@@ -712,6 +724,19 @@ export default function AdminLayout() {
                   <i className="fa-solid fa-lock" />
                 </span>
                 <span style={bottomLabelStyle(isPermissionsActive)}>Permisos</span>
+              </span>
+            </NavLink>
+
+            <NavLink
+              to="/admin/unidades-servicio"
+              style={() => bottomNavScrollItemStyle(isUnidadesServicioActive)}
+            >
+              <span style={bottomTopIndicatorStyle(isUnidadesServicioActive)} />
+              <span style={bottomNavInnerStyle(isUnidadesServicioActive)}>
+                <span style={bottomIconWrapStyle(isUnidadesServicioActive)}>
+                  <i className="fa-solid fa-layer-group" />
+                </span>
+                <span style={bottomLabelStyle(isUnidadesServicioActive)}>Unidades</span>
               </span>
             </NavLink>
 

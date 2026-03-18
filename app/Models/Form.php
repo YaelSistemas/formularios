@@ -16,4 +16,9 @@ class Form extends Model
     {
         return $this->hasMany(FormSubmission::class);
     }
+
+    public function assignedUsers()
+    {
+        return $this->belongsToMany(User::class, 'form_user')->withTimestamps();
+    }
 }

@@ -14,6 +14,7 @@ import AdminLayout from "./layouts/AdminLayout";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminRoles from "./pages/admin/AdminRoles";
 import AdminPermissions from "./pages/admin/AdminPermissions";
+import AdminUnidadesServicio from "./pages/admin/AdminUnidadesServicio";
 import AdminEmpresas from "./pages/admin/AdminEmpresas";
 import AdminGrupos from "./pages/admin/AdminGrupos";
 import AdminForms from "./pages/admin/AdminForms";
@@ -61,6 +62,7 @@ function App() {
           <Route path="users" element={<AdminUsers />} />
           <Route path="roles" element={<AdminRoles />} />
           <Route path="permissions" element={<AdminPermissions />} />
+          <Route path="unidades-servicio" element={<AdminUnidadesServicio />} />
           <Route path="empresas" element={<AdminEmpresas />} />
           <Route path="grupos" element={<AdminGrupos />} />
           <Route path="forms" element={<AdminForms />} />

@@ -4,8 +4,8 @@ import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 export default function AdminUsers() {
   const [err, setErr] = useState("");
 
-  // ✅ toast (3s)
-  const [toast, setToast] = useState(null); // { type: 'success'|'info'|'danger', text: string }
+  // toast
+  const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
   const showToast = (type, text) => {
@@ -20,46 +20,48 @@ export default function AdminUsers() {
     };
   }, []);
 
-  // -------- USERS --------
+  // users
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // ✅ Catalogos (Empresas y Grupos)
-  const [empresasAll, setEmpresasAll] = useState([]); // [{id,nombre,razon_social,activo}]
-  const [gruposAll, setGruposAll] = useState([]); // [{id,nombre,nombre_mostrar,activo}]
+  // catálogos
+  const [empresasAll, setEmpresasAll] = useState([]);
+  const [gruposAll, setGruposAll] = useState([]);
+  const [unidadesServicioAll, setUnidadesServicioAll] = useState([]);
   const [loadingCats, setLoadingCats] = useState(false);
 
-  // ✅ buscador: draft + debounce
+  // buscador
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
 
-  // ✅ default por página en 20 (y mantenemos que siempre arranque en 20)
   const [perPage, setPerPage] = useState(20);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ last_page: 1, total: 0 });
 
   const [openForm, setOpenForm] = useState(false);
-  const [formMode, setFormMode] = useState("create"); // create | edit
+  const [formMode, setFormMode] = useState("create");
   const [editingId, setEditingId] = useState(null);
 
+  // form
   const [fName, setFName] = useState("");
   const [fEmail, setFEmail] = useState("");
   const [fPassword, setFPassword] = useState("");
-  const [fRoles, setFRoles] = useState([]);
-
-  // ✅ nuevos campos
+  const [fRole, setFRole] = useState("");
   const [fActivo, setFActivo] = useState(true);
-  const [fEmpresas, setFEmpresas] = useState([]); // ids
-  const [fGrupos, setFGrupos] = useState([]); // ids
+  const [fEmpresa, setFEmpresa] = useState("");
+  const [fGrupo, setFGrupo] = useState("");
+  const [fUnidadServicio, setFUnidadServicio] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  const [fieldErrors, setFieldErrors] = useState({});
+
   const canPrev = useMemo(() => page > 1, [page]);
   const canNext = useMemo(() => page < (meta.last_page || 1), [page, meta.last_page]);
 
-  // ✅ Focus keeper (soluciona el "letra por letra")
+  // focus buscador
   const searchRef = useRef(null);
   const searchWasFocusedRef = useRef(false);
 
@@ -72,13 +74,12 @@ export default function AdminUsers() {
     if (!el) return;
     if (!searchWasFocusedRef.current) return;
 
-    // vuelve a enfocar y deja el cursor al final
     el.focus({ preventScroll: true });
     try {
       const len = el.value?.length ?? 0;
       el.setSelectionRange(len, len);
     } catch {
-      // ignore
+      //
     }
   };
 
@@ -90,15 +91,15 @@ export default function AdminUsers() {
   const loadCatalogs = async () => {
     setLoadingCats(true);
     try {
-      const [eData, gData] = await Promise.all([
+      const [eData, gData, usData] = await Promise.all([
         apiGet("/admin/empresas?per_page=1000&page=1&q="),
         apiGet("/admin/grupos?per_page=1000&page=1&q="),
+        apiGet("/admin/unidades-servicio?per_page=1000&page=1&q="),
       ]);
+
       setEmpresasAll(Array.isArray(eData?.data) ? eData.data : []);
       setGruposAll(Array.isArray(gData?.data) ? gData.data : []);
-    } catch (e) {
-      // no bloquea, pero avisamos si quieres
-      // setErr(e?.message || "Error cargando catálogos");
+      setUnidadesServicioAll(Array.isArray(usData?.data) ? usData.data : []);
     } finally {
       setLoadingCats(false);
     }
@@ -123,7 +124,6 @@ export default function AdminUsers() {
     }
   };
 
-  // ✅ debounce del buscador
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
@@ -136,14 +136,11 @@ export default function AdminUsers() {
     (async () => {
       try {
         await loadRolesNames();
+        await loadCatalogs();
+        await loadUsers();
       } catch {
-        // ignore
+        //
       }
-
-      // ✅ catálogos para selects (empresas/grupos)
-      await loadCatalogs();
-
-      await loadUsers();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -153,19 +150,17 @@ export default function AdminUsers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, perPage, page]);
 
-  // ✅ cada vez que escribes, si algo te tumba el foco, lo recuperamos
   useEffect(() => {
     restoreFocusIfNeeded();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qDraft]);
 
   useEffect(() => {
-    if (openForm) return; // si hay modal, no tocar foco
+    if (openForm) return;
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
     if (!el) return;
-
     if (document.activeElement === el) return;
 
     el.focus({ preventScroll: true });
@@ -173,7 +168,7 @@ export default function AdminUsers() {
       const len = el.value?.length ?? 0;
       el.setSelectionRange(len, len);
     } catch {
-      // ignore
+      //
     }
   }, [loadingUsers, users, meta.last_page, meta.total, openForm]);
 
@@ -182,12 +177,13 @@ export default function AdminUsers() {
     setFName("");
     setFEmail("");
     setFPassword("");
-    setFRoles([]);
-
-    // ✅ nuevos
+    setFRole("");
     setFActivo(true);
-    setFEmpresas([]);
-    setFGrupos([]);
+    setFEmpresa("");
+    setFGrupo("");
+    setFUnidadServicio("");
+    setFieldErrors({});
+    setErr("");
   };
 
   const openCreate = () => {
@@ -200,26 +196,36 @@ export default function AdminUsers() {
     resetUserForm();
     setFormMode("edit");
     setEditingId(u.id);
+
     setFName(u.name || "");
     setFEmail(u.email || "");
-    setFRoles(Array.isArray(u.roles) ? u.roles : []);
 
-    // ✅ precarga: activo / empresas / grupos
-    setFActivo(u.activo !== undefined ? !!u.activo : true);
+    const roleValue = Array.isArray(u.roles) && u.roles.length ? u.roles[0] : "";
+    setFRole(roleValue);
 
-    const empresasIds = Array.isArray(u.empresas)
-      ? u.empresas.map((x) => Number(x?.id)).filter((x) => Number.isFinite(x))
-      : Array.isArray(u.empresa_ids)
-      ? u.empresa_ids.map((x) => Number(x)).filter((x) => Number.isFinite(x))
-      : [];
-    const gruposIds = Array.isArray(u.grupos)
-      ? u.grupos.map((x) => Number(x?.id)).filter((x) => Number.isFinite(x))
-      : Array.isArray(u.grupo_ids)
-      ? u.grupo_ids.map((x) => Number(x)).filter((x) => Number.isFinite(x))
-      : [];
+    setFActivo(u.activo === true || u.activo === 1);
 
-    setFEmpresas(empresasIds);
-    setFGrupos(gruposIds);
+    const empresaId = Array.isArray(u.empresas) && u.empresas.length
+      ? String(u.empresas[0]?.id ?? "")
+      : Array.isArray(u.empresa_ids) && u.empresa_ids.length
+      ? String(u.empresa_ids[0] ?? "")
+      : "";
+
+    const grupoId = Array.isArray(u.grupos) && u.grupos.length
+      ? String(u.grupos[0]?.id ?? "")
+      : Array.isArray(u.grupo_ids) && u.grupo_ids.length
+      ? String(u.grupo_ids[0] ?? "")
+      : "";
+
+    const unidadServicioId = Array.isArray(u.unidades_servicio) && u.unidades_servicio.length
+      ? String(u.unidades_servicio[0]?.id ?? "")
+      : Array.isArray(u.unidad_servicio_ids) && u.unidad_servicio_ids.length
+      ? String(u.unidad_servicio_ids[0] ?? "")
+      : "";
+
+    setFEmpresa(empresaId);
+    setFGrupo(grupoId);
+    setFUnidadServicio(unidadServicioId);
 
     setOpenForm(true);
   };
@@ -228,46 +234,57 @@ export default function AdminUsers() {
     setOpenForm(false);
     setSaving(false);
     setErr("");
+    setFieldErrors({});
   };
 
-  const toggleRole = (roleName) => {
-    setFRoles((prev) => {
-      if (prev.includes(roleName)) return prev.filter((r) => r !== roleName);
-      return [...prev, roleName];
-    });
-  };
+  const validateForm = () => {
+    const actionText = formMode === "create" ? "crear" : "actualizar";
+    const errors = {};
 
-  const toggleEmpresa = (id) => {
-    const num = Number(id);
-    if (!Number.isFinite(num)) return;
-    setFEmpresas((prev) => (prev.includes(num) ? prev.filter((x) => x !== num) : [...prev, num]));
-  };
+    if (!fName.trim()) errors.name = `No se puede ${actionText} el usuario porque falta el nombre.`;
+    if (!fEmail.trim()) errors.email = `No se puede ${actionText} el usuario porque falta el correo.`;
+    if (formMode === "create" && !fPassword.trim()) {
+      errors.password = "No se puede crear el usuario porque falta la contraseña.";
+    }
+    if (!fRole) errors.role = `No se puede ${actionText} el usuario porque falta el rol.`;
+    if (!fUnidadServicio) {
+      errors.unidad_servicio = `No se puede ${actionText} el usuario porque falta la unidad de servicio.`;
+    }
+    if (!fEmpresa) errors.empresa = `No se puede ${actionText} el usuario porque falta la empresa.`;
+    if (!fGrupo) errors.grupo = `No se puede ${actionText} el usuario porque falta el grupo.`;
 
-  const toggleGrupo = (id) => {
-    const num = Number(id);
-    if (!Number.isFinite(num)) return;
-    setFGrupos((prev) => (prev.includes(num) ? prev.filter((x) => x !== num) : [...prev, num]));
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      const firstError = Object.values(errors)[0];
+      setErr(firstError);
+      return false;
+    }
+
+    return true;
   };
 
   const submitUserForm = async (e) => {
     e.preventDefault();
     setErr("");
+
+    if (!validateForm()) return;
+
     setSaving(true);
 
     try {
       const payload = {
         name: fName.trim(),
         email: fEmail.trim(),
-        roles: fRoles,
-
-        // ✅ nuevos
+        roles: [fRole],
         activo: !!fActivo,
-        empresa_ids: fEmpresas, // ids
-        grupo_ids: fGrupos, // ids
+        empresa_ids: [Number(fEmpresa)],
+        grupo_ids: [Number(fGrupo)],
+        unidad_servicio_ids: [Number(fUnidadServicio)],
       };
 
       if (formMode === "create") {
-        payload.password = fPassword;
+        payload.password = fPassword.trim();
         await apiPost("/admin/users", payload);
         showToast("success", "✅ Usuario creado correctamente");
       } else {
@@ -302,14 +319,14 @@ export default function AdminUsers() {
     }
   };
 
-  // UI helpers
   const Card = ({ children, style }) => (
     <div
       style={{
         background: "#fff",
-        border: "1px solid #e4e4e7",
-        borderRadius: 14,
-        padding: 14,
+        border: "1px solid #e2e8f0",
+        borderRadius: 18,
+        padding: 16,
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
         ...style,
       }}
     >
@@ -319,8 +336,8 @@ export default function AdminUsers() {
 
   const Btn = ({ children, style, variant = "default", ...props }) => {
     const variants = {
-      default: { border: "#e4e4e7", bg: "#fff", fg: "#0f172a" },
-      primary: { border: "#c7d2fe", bg: "#eef2ff", fg: "#1e40af" },
+      default: { border: "#cbd5e1", bg: "#fff", fg: "#0f172a" },
+      primary: { border: "#bfdbfe", bg: "#eff6ff", fg: "#1d4ed8" },
       danger: { border: "#fecaca", bg: "#fef2f2", fg: "#b91c1c" },
     };
     const v = variants[variant] || variants.default;
@@ -329,17 +346,19 @@ export default function AdminUsers() {
       <button
         {...props}
         style={{
-          borderRadius: 10,
+          borderRadius: 12,
           border: `1px solid ${v.border}`,
           background: v.bg,
           color: v.fg,
-          padding: "10px 12px",
+          padding: "10px 14px",
           cursor: props.disabled ? "not-allowed" : "pointer",
-          fontWeight: 900,
+          fontWeight: 800,
           opacity: props.disabled ? 0.7 : 1,
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           gap: 8,
+          transition: "0.2s ease",
           ...style,
         }}
       >
@@ -350,8 +369,8 @@ export default function AdminUsers() {
 
   const IconBtn = ({ children, variant = "default", title, style, ...props }) => {
     const variants = {
-      default: { border: "#e4e4e7", bg: "#fff", fg: "#0f172a" },
-      primary: { border: "#c7d2fe", bg: "#eef2ff", fg: "#1e40af" },
+      default: { border: "#e2e8f0", bg: "#fff", fg: "#0f172a" },
+      primary: { border: "#bfdbfe", bg: "#eff6ff", fg: "#1d4ed8" },
       danger: { border: "#fecaca", bg: "#fef2f2", fg: "#b91c1c" },
     };
     const v = variants[variant] || variants.default;
@@ -364,7 +383,7 @@ export default function AdminUsers() {
         style={{
           width: 38,
           height: 38,
-          borderRadius: 10,
+          borderRadius: 12,
           border: `1px solid ${v.border}`,
           background: v.bg,
           color: v.fg,
@@ -380,23 +399,32 @@ export default function AdminUsers() {
     );
   };
 
-  const Badge = ({ children }) => (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "6px 10px",
-        borderRadius: 999,
-        border: "1px solid #e4e4e7",
-        background: "#f8fafc",
-        fontSize: 12,
-        fontWeight: 900,
-        color: "#0f172a",
-      }}
-    >
-      {children}
-    </span>
-  );
+  const Badge = ({ children, tone = "default" }) => {
+    const tones = {
+      default: { bg: "#f8fafc", border: "#e2e8f0", fg: "#0f172a" },
+      role: { bg: "#f1f5f9", border: "#cbd5e1", fg: "#334155" },
+    };
+
+    const t = tones[tone] || tones.default;
+
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "6px 10px",
+          borderRadius: 999,
+          border: `1px solid ${t.border}`,
+          background: t.bg,
+          color: t.fg,
+          fontSize: 12,
+          fontWeight: 800,
+        }}
+      >
+        {children}
+      </span>
+    );
+  };
 
   const toastStyle = (() => {
     if (!toast) return {};
@@ -409,145 +437,241 @@ export default function AdminUsers() {
   })();
 
   const S = {
-    toolbar: {
+    page: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+    },
+    headerTop: {
       display: "flex",
       justifyContent: "space-between",
       gap: 12,
       flexWrap: "wrap",
-      alignItems: "flex-end",
+      alignItems: "center",
     },
-    inputsRow: {
+    titleBlock: {
       display: "flex",
-      gap: 10,
-      flexWrap: "wrap",
-      alignItems: "flex-end",
+      flexDirection: "column",
+      gap: 4,
     },
-    label: { fontSize: 12, color: "#64748b", fontWeight: 900 },
+    filterRow: {
+      display: "grid",
+      gridTemplateColumns: "minmax(220px, 1fr) auto auto",
+      gap: 12,
+      alignItems: "end",
+      marginTop: 14,
+    },
+    label: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 800,
+      marginBottom: 6,
+    },
     input: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid #e4e4e7",
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
       background: "#f8fafc",
-      minWidth: 220,
       outline: "none",
+      minHeight: 44,
     },
     select: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid #e4e4e7",
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
       background: "#f8fafc",
       outline: "none",
-      minWidth: 92,
+      minHeight: 44,
     },
-
-    tableOuter: { display: "flex", justifyContent: "center" },
-    tableWrap: { overflowX: "auto", width: "100%", maxWidth: 980 },
-    table: { borderCollapse: "separate", borderSpacing: 0, width: "100%", minWidth: 640 },
+    tableWrap: {
+      width: "100%",
+      overflowX: "auto",
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+    },
+    table: {
+      width: "100%",
+      minWidth: 920,
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      background: "#fff",
+    },
     th: {
       textAlign: "left",
       fontSize: 12,
       color: "#475569",
-      padding: "12px 10px",
-      borderBottom: "1px solid #e4e4e7",
-      background: "#fff",
+      padding: "14px 12px",
+      borderBottom: "1px solid #e2e8f0",
+      background: "#f8fafc",
       position: "sticky",
       top: 0,
       zIndex: 1,
+      fontWeight: 800,
     },
     td: {
-      padding: "12px 10px",
+      padding: "14px 12px",
       borderBottom: "1px solid #f1f5f9",
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
     },
-
+    pagination: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+      marginTop: 14,
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+    },
     modalOverlay: {
       position: "fixed",
       inset: 0,
-      background: "rgba(2,6,23,0.45)",
+      background: "rgba(2, 6, 23, 0.55)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: 16,
+      padding: 14,
       zIndex: 100,
     },
     modal: {
       width: "100%",
-      maxWidth: 560,
+      maxWidth: 760,
+      maxHeight: "90vh",
+      overflowY: "auto",
       background: "#fff",
-      borderRadius: 16,
-      border: "1px solid #e4e4e7",
-      boxShadow: "0 20px 45px rgba(0,0,0,.18)",
-      overflow: "hidden",
+      borderRadius: 18,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 25px 60px rgba(0,0,0,.18)",
     },
     modalHeader: {
-      padding: "14px 16px",
-      borderBottom: "1px solid #e4e4e7",
+      padding: "16px 18px",
+      borderBottom: "1px solid #e2e8f0",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       gap: 12,
+      position: "sticky",
+      top: 0,
+      background: "#fff",
+      zIndex: 1,
     },
-    modalTitle: { margin: 0, fontSize: 16 },
-    modalBody: { padding: 16, display: "flex", flexDirection: "column", gap: 12 },
+    modalTitle: {
+      margin: 0,
+      fontSize: 18,
+      fontWeight: 800,
+      color: "#0f172a",
+    },
+    modalBody: {
+      padding: 18,
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+    },
     modalFooter: {
-      padding: 16,
-      borderTop: "1px solid #e4e4e7",
+      padding: 18,
+      borderTop: "1px solid #e2e8f0",
       display: "flex",
       gap: 10,
       justifyContent: "flex-end",
       flexWrap: "wrap",
+      position: "sticky",
+      bottom: 0,
+      background: "#fff",
     },
-    formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+    formGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 14,
+    },
+    fieldWrap: {
+      display: "flex",
+      flexDirection: "column",
+    },
     inputFull: {
       width: "100%",
-      padding: "10px 12px",
+      padding: "12px 13px",
       borderRadius: 12,
-      border: "1px solid #e4e4e7",
+      border: "1px solid #dbeafe",
       background: "#fff",
       outline: "none",
+      minHeight: 46,
+      boxSizing: "border-box",
     },
-    helper: { fontSize: 12, color: "#64748b" },
-    rolesBox: {
-      border: "1px solid #e4e4e7",
-      background: "#f8fafc",
-      borderRadius: 12,
-      padding: 10,
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 10,
+    errorText: {
+      color: "#b91c1c",
+      fontSize: 12,
+      fontWeight: 700,
+      marginTop: 6,
+    },
+    helper: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 700,
     },
     xBtn: {
-      border: "1px solid #e4e4e7",
+      border: "1px solid #e2e8f0",
       background: "#fff",
       borderRadius: 10,
-      width: 36,
-      height: 36,
+      width: 38,
+      height: 38,
       display: "grid",
       placeItems: "center",
       cursor: "pointer",
       fontWeight: 900,
     },
-    sectionBox: {
-      border: "1px solid #e4e4e7",
-      background: "#f8fafc",
-      borderRadius: 12,
-      padding: 10,
+    toggleWrap: {
       display: "flex",
-      flexDirection: "column",
-      gap: 8,
-    },
-    chipsRow: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 10,
       alignItems: "center",
+      gap: 12,
+      minHeight: 46,
+      padding: "10px 0",
+    },
+    toggleButton: {
+      position: "relative",
+      width: 58,
+      height: 32,
+      border: "none",
+      borderRadius: 999,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      padding: 0,
+      flexShrink: 0,
+    },
+    toggleThumb: {
+      position: "absolute",
+      top: 4,
+      width: 24,
+      height: 24,
+      borderRadius: "50%",
+      background: "#fff",
+      boxShadow: "0 1px 3px rgba(0,0,0,.22)",
+      transition: "all 0.2s ease",
     },
     responsiveStyleTag: `
-      @media (max-width: 520px) {
-        .users-toolbar-input { min-width: 100% !important; width: 100% !important; }
-        .users-form-grid { grid-template-columns: 1fr !important; }
+      @media (max-width: 860px) {
+        .users-filter-row {
+          grid-template-columns: 1fr !important;
+        }
+        .users-form-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .users-modal-full {
+          max-width: 100% !important;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .users-header-mobile {
+          align-items: stretch !important;
+        }
+        .users-header-mobile button {
+          width: 100%;
+        }
+        .users-pagination-mobile {
+          justify-content: center !important;
+        }
       }
     `,
   };
@@ -555,6 +679,27 @@ export default function AdminUsers() {
   const roleLabel = (u) => {
     const rr = Array.isArray(u?.roles) ? u.roles : [];
     return rr.length ? rr[0] : "—";
+  };
+
+  const firstEmpresaLabel = (u) => {
+    if (Array.isArray(u?.empresas) && u.empresas.length) {
+      return u.empresas[0]?.nombre || "—";
+    }
+    return "—";
+  };
+
+  const firstGrupoLabel = (u) => {
+    if (Array.isArray(u?.grupos) && u.grupos.length) {
+      return u.grupos[0]?.nombre_mostrar || u.grupos[0]?.nombre || "—";
+    }
+    return "—";
+  };
+
+  const firstUnidadServicioLabel = (u) => {
+    if (Array.isArray(u?.unidades_servicio) && u.unidades_servicio.length) {
+      return u.unidades_servicio[0]?.nombre || "—";
+    }
+    return "—";
   };
 
   const activeBadge = (u) => {
@@ -571,7 +716,7 @@ export default function AdminUsers() {
           background: a ? "#ecfdf5" : "#fef2f2",
           color: a ? "#166534" : "#b91c1c",
           fontSize: 12,
-          fontWeight: 900,
+          fontWeight: 800,
         }}
       >
         {a ? "Activo" : "Inactivo"}
@@ -580,93 +725,106 @@ export default function AdminUsers() {
   };
 
   return (
-    <div>
+    <div style={S.page}>
       <style>{S.responsiveStyleTag}</style>
 
-      <Card style={{ marginBottom: 14 }}>
-        <div style={S.toolbar}>
-          <div>
-            <h2 style={{ margin: 0 }}>Usuarios</h2>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-              Total: <b>{meta.total}</b>
+      <Card>
+        <div style={S.headerTop} className="users-header-mobile">
+          <div style={S.titleBlock}>
+            <h2 style={{ margin: 0, fontSize: 24, color: "#0f172a" }}>Usuarios</h2>
+            <div style={{ fontSize: 13, color: "#64748b" }}>
+              Administra usuarios, roles, empresa, grupo, unidad de servicio y estado.
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
+              Total registrados: <b>{meta.total}</b>
             </div>
           </div>
 
-          <div style={S.inputsRow}>
-            <div style={{ minWidth: 260 }} className="users-toolbar-input">
-              <div style={S.label}>Buscar</div>
-              <input
-                ref={searchRef}
-                value={qDraft}
-                onFocus={rememberFocus}
-                onClick={rememberFocus}
-                onBlur={() => (searchWasFocusedRef.current = false)}
-                onChange={(e) => {
-                  rememberFocus();
-                  setQDraft(e.target.value);
-                }}
-                placeholder="Nombre o correo"
-                style={{ ...S.input, width: "100%" }}
-                className="users-toolbar-input"
-              />
-            </div>
+          <Btn variant="primary" onClick={openCreate}>
+            <i className="fa-solid fa-user-plus" />
+            Nuevo usuario
+          </Btn>
+        </div>
 
-            <div>
-              <div style={S.label}>Por página</div>
-              <select
-                value={perPage}
-                onChange={(e) => {
-                  setPage(1);
-                  setPerPage(Number(e.target.value));
-                }}
-                style={S.select}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
+        <div style={S.filterRow} className="users-filter-row">
+          <div>
+            <div style={S.label}>Buscar usuario</div>
+            <input
+              ref={searchRef}
+              value={qDraft}
+              onFocus={rememberFocus}
+              onClick={rememberFocus}
+              onBlur={() => (searchWasFocusedRef.current = false)}
+              onChange={(e) => {
+                rememberFocus();
+                setQDraft(e.target.value);
+              }}
+              placeholder="Buscar por nombre, correo, rol, unidad, empresa o grupo"
+              style={S.input}
+            />
+          </div>
 
-            <Btn
-              type="button"
-              onClick={loadUsers}
-              disabled={loadingUsers}
-              style={{ opacity: loadingUsers ? 0.7 : 1 }}
+          <div>
+            <div style={S.label}>Por página</div>
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPage(1);
+                setPerPage(Number(e.target.value));
+              }}
+              style={S.select}
             >
-              {loadingUsers ? "Actualizando..." : "Refrescar"}
-            </Btn>
+              <option value={10}>10 registros</option>
+              <option value={20}>20 registros</option>
+              <option value={50}>50 registros</option>
+            </select>
+          </div>
 
-            <Btn variant="primary" onClick={openCreate}>
-              <i className="fa-solid fa-user-plus" />
-              Nuevo usuario
-            </Btn>
+          <div>
+            <div style={S.label}>Página actual</div>
+            <div
+              style={{
+                ...S.input,
+                display: "flex",
+                alignItems: "center",
+                background: "#fff",
+                color: "#334155",
+                fontWeight: 700,
+              }}
+            >
+              {page} de {meta.last_page}
+            </div>
           </div>
         </div>
 
         {toast ? (
           <div
             style={{
-              marginTop: 12,
+              marginTop: 14,
               padding: "10px 12px",
               borderRadius: 12,
               border: `1px solid ${toastStyle.border}`,
               background: toastStyle.bg,
               color: toastStyle.fg,
-              fontWeight: 900,
+              fontWeight: 800,
             }}
           >
             {toast.text}
           </div>
         ) : null}
 
-        {err ? <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 900 }}>{err}</div> : null}
+        {err ? (
+          <div style={{ marginTop: 12, color: "#b91c1c", fontWeight: 800 }}>
+            {err}
+          </div>
+        ) : null}
       </Card>
 
       <Card>
         {loadingUsers ? (
-          <div>Cargando usuarios...</div>
+          <div style={{ color: "#475569", fontWeight: 700 }}>Cargando usuarios...</div>
         ) : (
-          <div style={S.tableOuter}>
+          <>
             <div style={S.tableWrap}>
               <table style={S.table}>
                 <thead>
@@ -674,6 +832,9 @@ export default function AdminUsers() {
                     <th style={S.th}>Nombre</th>
                     <th style={S.th}>Correo</th>
                     <th style={S.th}>Rol</th>
+                    <th style={S.th}>Unidad de servicio</th>
+                    <th style={S.th}>Empresa</th>
+                    <th style={S.th}>Grupo</th>
                     <th style={S.th}>Estado</th>
                     <th style={{ ...S.th, width: 120, textAlign: "right" }}>Acciones</th>
                   </tr>
@@ -683,18 +844,21 @@ export default function AdminUsers() {
                     users.map((u) => (
                       <tr key={u.id}>
                         <td style={S.td}>
-                          <div style={{ fontWeight: 900 }}>{u.name}</div>
+                          <div style={{ fontWeight: 800 }}>{u.name}</div>
                         </td>
                         <td style={S.td}>
                           <div style={{ color: "#334155" }}>{u.email}</div>
                         </td>
                         <td style={S.td}>
-                          <Badge>{roleLabel(u)}</Badge>
+                          <Badge tone="role">{roleLabel(u)}</Badge>
                         </td>
+                        <td style={S.td}>{firstUnidadServicioLabel(u)}</td>
+                        <td style={S.td}>{firstEmpresaLabel(u)}</td>
+                        <td style={S.td}>{firstGrupoLabel(u)}</td>
                         <td style={S.td}>{activeBadge(u)}</td>
                         <td style={{ ...S.td, textAlign: "right" }}>
-                          <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
-                            <IconBtn onClick={() => openEdit(u)} title="Editar">
+                          <div style={{ display: "inline-flex", gap: 8 }}>
+                            <IconBtn onClick={() => openEdit(u)} title="Editar" variant="primary">
                               <i className="fa-solid fa-pen" />
                             </IconBtn>
 
@@ -712,53 +876,50 @@ export default function AdminUsers() {
                     ))
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={5}>
-                        Sin usuarios
+                      <td style={S.td} colSpan={8}>
+                        Sin usuarios registrados.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
 
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            marginTop: 12,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          <Btn
-            disabled={!canPrev}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={{ padding: "8px 10px" }}
-          >
-            Anterior
-          </Btn>
-          <div style={{ fontSize: 12 }}>
-            Página <b>{page}</b> de <b>{meta.last_page}</b>
-          </div>
-          <Btn
-            disabled={!canNext}
-            onClick={() => setPage((p) => p + 1)}
-            style={{ padding: "8px 10px" }}
-          >
-            Siguiente
-          </Btn>
-        </div>
+            <div style={S.pagination} className="users-pagination-mobile">
+              <Btn
+                disabled={!canPrev}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Btn>
+
+              <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>
+                Mostrando página <b>{page}</b> de <b>{meta.last_page}</b>
+              </div>
+
+              <Btn
+                disabled={!canNext}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Siguiente
+              </Btn>
+            </div>
+          </>
+        )}
       </Card>
 
-      {/* ✅ Modal Usuarios */}
       {openForm && (
         <div style={S.modalOverlay} onClick={closeUserModal}>
-          <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+          <div
+            style={S.modal}
+            className="users-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={S.modalHeader}>
-              <h3 style={S.modalTitle}>{formMode === "create" ? "Crear usuario" : "Editar usuario"}</h3>
+              <h3 style={S.modalTitle}>
+                {formMode === "create" ? "Crear usuario" : "Editar usuario"}
+              </h3>
+
               <button type="button" style={S.xBtn} onClick={closeUserModal} aria-label="Cerrar">
                 ✕
               </button>
@@ -767,152 +928,206 @@ export default function AdminUsers() {
             <form onSubmit={submitUserForm}>
               <div style={S.modalBody}>
                 <div className="users-form-grid" style={S.formGrid}>
-                  <div style={{ gridColumn: "1 / -1" }}>
+                  {/* Nombre solo */}
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
                     <div style={S.label}>Nombre</div>
                     <input
                       value={fName}
-                      onChange={(e) => setFName(e.target.value)}
-                      required
-                      style={S.inputFull}
+                      onChange={(e) => {
+                        setFName(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, name: "" }));
+                      }}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.name ? "#fecaca" : "#dbeafe",
+                      }}
                       placeholder="Ej. Juan Carlos Cruz"
                     />
+                    {fieldErrors.name ? <div style={S.errorText}>{fieldErrors.name}</div> : null}
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1" }}>
+                  {/* Correo y contraseña */}
+                  <div style={S.fieldWrap}>
                     <div style={S.label}>Correo</div>
                     <input
                       value={fEmail}
-                      onChange={(e) => setFEmail(e.target.value)}
-                      required
+                      onChange={(e) => {
+                        setFEmail(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, email: "" }));
+                      }}
                       type="email"
-                      style={S.inputFull}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.email ? "#fecaca" : "#dbeafe",
+                      }}
                       placeholder="correo@empresa.com"
                     />
+                    {fieldErrors.email ? <div style={S.errorText}>{fieldErrors.email}</div> : null}
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={S.fieldWrap}>
                     <div style={S.label}>
-                      Contraseña <span style={S.helper}>{formMode === "edit" ? "(opcional)" : "(requerida)"}</span>
+                      Contraseña{" "}
+                      <span style={S.helper}>
+                        {formMode === "create" ? "(requerida)" : "(opcional)"}
+                      </span>
                     </div>
                     <input
                       value={fPassword}
-                      onChange={(e) => setFPassword(e.target.value)}
+                      onChange={(e) => {
+                        setFPassword(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, password: "" }));
+                      }}
                       type="password"
-                      required={formMode === "create"}
-                      style={S.inputFull}
-                      placeholder={formMode === "edit" ? "Dejar en blanco para no cambiar" : "••••••••"}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.password ? "#fecaca" : "#dbeafe",
+                      }}
+                      placeholder={
+                        formMode === "edit" ? "Dejar en blanco para no cambiar" : "••••••••"
+                      }
                     />
+                    {fieldErrors.password ? (
+                      <div style={S.errorText}>{fieldErrors.password}</div>
+                    ) : null}
                   </div>
 
-                  {/* ✅ Activo */}
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <div style={S.label}>Estado</div>
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 10, fontWeight: 900 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!fActivo}
-                        onChange={(e) => setFActivo(e.target.checked)}
-                      />
-                      {fActivo ? "Activo" : "Inactivo"}
-                      <span style={S.helper}>Si está inactivo, no podrá iniciar sesión.</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* ✅ Roles */}
-                <div>
-                  <div style={S.label}>Roles</div>
-                  <div style={S.rolesBox}>
-                    {roles.length ? (
-                      roles.map((r) => (
-                        <label key={r} style={{ display: "inline-flex", gap: 8, alignItems: "center", fontWeight: 900 }}>
-                          <input type="checkbox" checked={fRoles.includes(r)} onChange={() => toggleRole(r)} />
+                  {/* Rol y unidad */}
+                  <div style={S.fieldWrap}>
+                    <div style={S.label}>Rol</div>
+                    <select
+                      value={fRole}
+                      onChange={(e) => {
+                        setFRole(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, role: "" }));
+                      }}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.role ? "#fecaca" : "#dbeafe",
+                      }}
+                    >
+                      <option value="">Selecciona un rol</option>
+                      {roles.map((r) => (
+                        <option key={r} value={r}>
                           {r}
-                        </label>
-                      ))
-                    ) : (
-                      <div style={{ fontSize: 12, color: "#64748b" }}>No hay roles. Ve a “Roles” y crea uno.</div>
-                    )}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.role ? <div style={S.errorText}>{fieldErrors.role}</div> : null}
+                  </div>
+
+                  <div style={S.fieldWrap}>
+                    <div style={S.label}>Unidad de servicio</div>
+                    <select
+                      value={fUnidadServicio}
+                      onChange={(e) => {
+                        setFUnidadServicio(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, unidad_servicio: "" }));
+                      }}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.unidad_servicio ? "#fecaca" : "#dbeafe",
+                      }}
+                      disabled={loadingCats}
+                    >
+                      <option value="">Selecciona una unidad de servicio</option>
+                      {unidadesServicioAll.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.unidad_servicio ? (
+                      <div style={S.errorText}>{fieldErrors.unidad_servicio}</div>
+                    ) : null}
+                  </div>
+
+                  {/* Empresa y grupo */}
+                  <div style={S.fieldWrap}>
+                    <div style={S.label}>Empresa</div>
+                    <select
+                      value={fEmpresa}
+                      onChange={(e) => {
+                        setFEmpresa(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, empresa: "" }));
+                      }}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.empresa ? "#fecaca" : "#dbeafe",
+                      }}
+                      disabled={loadingCats}
+                    >
+                      <option value="">Selecciona una empresa</option>
+                      {empresasAll.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.empresa ? (
+                      <div style={S.errorText}>{fieldErrors.empresa}</div>
+                    ) : null}
+                  </div>
+
+                  <div style={S.fieldWrap}>
+                    <div style={S.label}>Grupo</div>
+                    <select
+                      value={fGrupo}
+                      onChange={(e) => {
+                        setFGrupo(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, grupo: "" }));
+                      }}
+                      style={{
+                        ...S.inputFull,
+                        borderColor: fieldErrors.grupo ? "#fecaca" : "#dbeafe",
+                      }}
+                      disabled={loadingCats}
+                    >
+                      <option value="">Selecciona un grupo</option>
+                      {gruposAll.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.nombre_mostrar || g.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.grupo ? <div style={S.errorText}>{fieldErrors.grupo}</div> : null}
+                  </div>
+
+                  {/* Estado solo */}
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                    <div style={S.label}>Estado</div>
+                    <div style={S.toggleWrap}>
+                      <button
+                        type="button"
+                        onClick={() => setFActivo((prev) => !prev)}
+                        aria-pressed={fActivo}
+                        style={{
+                          ...S.toggleButton,
+                          background: fActivo ? "#22c55e" : "#cbd5e1",
+                        }}
+                      >
+                        <span
+                          style={{
+                            ...S.toggleThumb,
+                            left: fActivo ? 30 : 4,
+                          }}
+                        />
+                      </button>
+
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: fActivo ? "#166534" : "#64748b",
+                        }}
+                      >
+                        {fActivo ? "Activo" : "Inactivo"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* ✅ Empresas */}
-                <div>
-                  <div style={S.label}>Empresas</div>
-                  <div style={S.sectionBox}>
-                    {loadingCats ? (
-                      <div style={{ fontSize: 12, color: "#64748b" }}>Cargando empresas...</div>
-                    ) : empresasAll.length ? (
-                      <div style={S.chipsRow}>
-                        {empresasAll.map((e) => (
-                          <label
-                            key={e.id}
-                            style={{
-                              display: "inline-flex",
-                              gap: 8,
-                              alignItems: "center",
-                              fontWeight: 900,
-                              opacity: e.activo ? 1 : 0.6,
-                            }}
-                            title={!e.activo ? "Empresa inactiva" : ""}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={fEmpresas.includes(Number(e.id))}
-                              onChange={() => toggleEmpresa(e.id)}
-                            />
-                            {e.nombre}
-                            {e.razon_social ? (
-                              <span style={{ fontWeight: 700, color: "#64748b" }}>— {e.razon_social}</span>
-                            ) : null}
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: "#64748b" }}>No hay empresas. Crea una en “Empresas”.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* ✅ Grupos */}
-                <div>
-                  <div style={S.label}>Grupos</div>
-                  <div style={S.sectionBox}>
-                    {loadingCats ? (
-                      <div style={{ fontSize: 12, color: "#64748b" }}>Cargando grupos...</div>
-                    ) : gruposAll.length ? (
-                      <div style={S.chipsRow}>
-                        {gruposAll.map((g) => (
-                          <label
-                            key={g.id}
-                            style={{
-                              display: "inline-flex",
-                              gap: 8,
-                              alignItems: "center",
-                              fontWeight: 900,
-                              opacity: g.activo ? 1 : 0.6,
-                            }}
-                            title={!g.activo ? "Grupo inactivo" : ""}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={fGrupos.includes(Number(g.id))}
-                              onChange={() => toggleGrupo(g.id)}
-                            />
-                            {g.nombre_mostrar || g.nombre}
-                            {g.descripcion ? (
-                              <span style={{ fontWeight: 700, color: "#64748b" }}>— {g.descripcion}</span>
-                            ) : null}
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: "#64748b" }}>No hay grupos. Crea uno en “Grupos”.</div>
-                    )}
-                  </div>
-                </div>
-
-                {err ? <div style={{ color: "#b91c1c", fontWeight: 900 }}>{err}</div> : null}
+                {err ? <div style={{ color: "#b91c1c", fontWeight: 800 }}>{err}</div> : null}
               </div>
 
               <div style={S.modalFooter}>

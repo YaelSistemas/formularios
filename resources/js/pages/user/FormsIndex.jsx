@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { apiGet } from "../../services/api";
+import { apiDelete, apiGet } from "../../services/api";
 import FormFill from "./FormFill";
 
 function Card({ children, style }) {
@@ -197,6 +197,7 @@ function MobileSearchBox({
 export default function FormsIndex() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const [forms, setForms] = useState([]);
   const [loadingForms, setLoadingForms] = useState(false);
@@ -240,6 +241,27 @@ export default function FormsIndex() {
 
   const token = useMemo(() => localStorage.getItem("token"), []);
 
+  const permissionSet = useMemo(() => {
+    const raw = me?.permissions;
+
+    if (!Array.isArray(raw)) return new Set();
+
+    return new Set(
+      raw
+        .map((p) => (typeof p === "string" ? p : p?.name))
+        .filter(Boolean)
+    );
+  }, [me]);
+
+  const canCreateRecord = permissionSet.has("formularios.create");
+  const canSubmitForm = permissionSet.has("formularios.submit");
+  const canViewSubmissions = permissionSet.has("formularios.submissions.view");
+  const canEditSubmission = permissionSet.has("formularios.edit");
+  const canDeleteSubmission = permissionSet.has("formularios.delete");
+
+  const noPermissionMessage = (actionText) =>
+    `No cuentas con los permisos necesarios para ${actionText}. Contacta a tu administrador o al equipo de Sistemas.`;
+
   const pushFormsState = (nextMode, extra = {}) => {
     const state = {
       page: "forms-index",
@@ -275,6 +297,7 @@ export default function FormsIndex() {
     setDetail(null);
     setSubs([]);
     setErr("");
+    setSuccessMsg("");
     clearSearch();
     setMobileActions({ open: false, form: null });
     setMobileSubmissionActions({ open: false, submission: null });
@@ -283,6 +306,11 @@ export default function FormsIndex() {
   const goToResponses = async () => {
     if (!selectedId) {
       goToTable();
+      return;
+    }
+
+    if (!canViewSubmissions) {
+      setErr(noPermissionMessage("ver los registros de este formulario"));
       return;
     }
 
@@ -317,6 +345,16 @@ export default function FormsIndex() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  useEffect(() => {
+    if (!successMsg) return;
+
+    const t = setTimeout(() => {
+      setSuccessMsg("");
+    }, 3000);
+
+    return () => clearTimeout(t);
+  }, [successMsg]);
+
   const kickToLogin = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -324,13 +362,19 @@ export default function FormsIndex() {
   };
 
   const setAuthError = (e, fallback = "Error") => {
-    const msg = String(e?.message || "");
-    if (msg.includes("401") || msg.toLowerCase().includes("no autorizado")) {
+    const msg = String(e?.message || "").toLowerCase();
+
+    if (msg.includes("401") || msg.includes("no autorizado")) {
       return kickToLogin();
     }
-    if (msg.includes("403") || msg.toLowerCase().includes("forbidden")) {
-      return kickToLogin();
+
+    if (msg.includes("403") || msg.includes("forbidden")) {
+      setErr(
+        "No cuentas con los permisos necesarios para realizar esta acción. Contacta a tu administrador o al equipo de Sistemas."
+      );
+      return;
     }
+
     setErr(e?.message || fallback);
   };
 
@@ -426,6 +470,7 @@ export default function FormsIndex() {
       setSelectedId(nextSelectedId);
       setSelectedSub(nextSelectedSub);
       setErr("");
+      setSuccessMsg("");
       clearSearch();
 
       if (nextMode === "table") {
@@ -437,7 +482,7 @@ export default function FormsIndex() {
       if (nextSelectedId) {
         await loadDetail(nextSelectedId);
 
-        if (nextMode === "responses") {
+        if (nextMode === "responses" && canViewSubmissions) {
           await loadSubmissions(nextSelectedId);
         }
       }
@@ -445,36 +490,60 @@ export default function FormsIndex() {
 
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  }, [canViewSubmissions]);
 
   const onFill = async (id) => {
+    setMobileActions({ open: false, form: null });
+    setMobileSubmissionActions({ open: false, submission: null });
+
+    if (!canCreateRecord) {
+      setErr(noPermissionMessage("crear un registro"));
+      return;
+    }
+
+    if (!canSubmitForm) {
+      setErr(noPermissionMessage("contestar y guardar este formulario"));
+      return;
+    }
+
     pushFormsState("fill", { selectedId: id, selectedSub: null });
 
     setSelectedId(id);
     setSelectedSub(null);
     setMode("fill");
-    setMobileActions({ open: false, form: null });
-    setMobileSubmissionActions({ open: false, submission: null });
     setErr("");
+    setSuccessMsg("");
     clearSearch();
     await loadDetail(id);
   };
 
   const onResponses = async (id) => {
+    setMobileActions({ open: false, form: null });
+    setMobileSubmissionActions({ open: false, submission: null });
+
+    if (!canViewSubmissions) {
+      setErr(noPermissionMessage("ver los registros de este formulario"));
+      return;
+    }
+
     pushFormsState("responses", { selectedId: id, selectedSub: null });
 
     setSelectedId(id);
     setSelectedSub(null);
     setMode("responses");
-    setMobileActions({ open: false, form: null });
-    setMobileSubmissionActions({ open: false, submission: null });
     setErr("");
+    setSuccessMsg("");
     clearSearch();
     await loadDetail(id);
     await loadSubmissions(id);
   };
 
   const onOpenSavedResponse = async (submission) => {
+    if (!canViewSubmissions) {
+      setErr(noPermissionMessage("ver este registro"));
+      return;
+    }
+
     pushFormsState("response_view", {
       selectedId,
       selectedSub: submission,
@@ -484,6 +553,7 @@ export default function FormsIndex() {
     setMode("response_view");
     setMobileSubmissionActions({ open: false, submission: null });
     setErr("");
+    setSuccessMsg("");
 
     if (!detail && selectedId) {
       await loadDetail(selectedId);
@@ -491,6 +561,11 @@ export default function FormsIndex() {
   };
 
   const onEditSavedResponse = async (submission) => {
+    if (!canEditSubmission) {
+      setErr(noPermissionMessage("editar este registro"));
+      return;
+    }
+
     pushFormsState("response_edit", {
       selectedId,
       selectedSub: submission,
@@ -500,14 +575,56 @@ export default function FormsIndex() {
     setMode("response_edit");
     setMobileSubmissionActions({ open: false, submission: null });
     setErr("");
+    setSuccessMsg("");
 
     if (!detail && selectedId) {
       await loadDetail(selectedId);
     }
   };
 
+  const onDeleteSavedResponse = async (submission) => {
+    setMobileSubmissionActions({ open: false, submission: null });
+
+    if (!canDeleteSubmission) {
+      setErr(noPermissionMessage("eliminar este registro"));
+      return;
+    }
+
+    if (!selectedId || !submission?.id) {
+      setErr("No se pudo identificar el registro a eliminar.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `¿Seguro que deseas eliminar el registro ${submission.id}? Esta acción no se puede deshacer.`
+    );
+
+    if (!ok) return;
+
+    try {
+      setErr("");
+      setSuccessMsg("");
+
+      await apiDelete(`/forms/${selectedId}/submissions/${submission.id}`);
+
+      if (selectedSub?.id === submission.id) {
+        setSelectedSub(null);
+      }
+
+      await loadSubmissions(selectedId);
+      setSuccessMsg(`El registro ${submission.id} se eliminó correctamente.`);
+    } catch (e) {
+      setAuthError(e, "Error eliminando registro");
+    }
+  };
+
   const onOpenSubmissionPdf = async (submission) => {
     setMobileSubmissionActions({ open: false, submission: null });
+
+    if (!canViewSubmissions) {
+      setErr(noPermissionMessage("ver o descargar el PDF de este registro"));
+      return;
+    }
 
     if (!selectedId || !submission?.id) {
       setErr("No se pudo generar el PDF del registro.");
@@ -529,6 +646,7 @@ export default function FormsIndex() {
 
     try {
       setErr("");
+      setSuccessMsg("");
 
       const authToken = localStorage.getItem("token");
       if (!authToken) {
@@ -559,7 +677,9 @@ export default function FormsIndex() {
 
       if (response.status === 403) {
         if (pdfWindow) pdfWindow.close();
-        setErr("No tienes permisos para ver este PDF.");
+        setErr(
+          "No cuentas con los permisos necesarios para ver o descargar este PDF. Contacta a tu administrador o al equipo de Sistemas."
+        );
         return;
       }
 
@@ -577,7 +697,7 @@ export default function FormsIndex() {
             if (text) message = text;
           }
         } catch {
-          // ignore
+          //
         }
 
         throw new Error(message);
@@ -602,7 +722,7 @@ export default function FormsIndex() {
         try {
           pdfWindow.close();
         } catch {
-          // ignore
+          //
         }
       }
 
@@ -621,7 +741,7 @@ export default function FormsIndex() {
         try {
           searchInputRef.current.setSelectionRange(len, len);
         } catch {
-          // ignore
+          //
         }
       }
     });
@@ -640,26 +760,37 @@ export default function FormsIndex() {
   const filteredSubs = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return subs;
-
+  
     return subs.filter((s) => {
-      const allText = [
-        String(s.id || ""),
-        String(s.user_name || s.user?.name || s.user_id || ""),
-        String(s.created_at || ""),
-        JSON.stringify(s.answers || {}),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return allText.includes(q);
+      const registroLabel = `registro ${s.id}`.toLowerCase();
+      const registroId = String(s.id || "").toLowerCase();
+      const userName = String(
+        s.user_name || s.user?.name || s.user_id || ""
+      ).toLowerCase();
+  
+      return (
+        registroLabel.includes(q) ||
+        registroId.includes(q) ||
+        userName.includes(q)
+      );
     });
   }, [subs, search]);
 
   const formatDate = (value) => {
     if (!value) return "—";
+  
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleString();
+  
+    return d.toLocaleString("es-MX", {
+      timeZone: "America/Mexico_City",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
   };
 
   const getSubmissionUserName = (submission) => {
@@ -823,7 +954,7 @@ export default function FormsIndex() {
                   onChange={handleDesktopSearchChange}
                   placeholder={
                     mode === "responses"
-                      ? "Buscar registro..."
+                      ? "Buscar registro o usuario..."
                       : "Buscar formulario..."
                   }
                   style={{
@@ -844,7 +975,7 @@ export default function FormsIndex() {
                 onSearchChange={setSearch}
                 placeholder={
                   mode === "responses"
-                    ? "Buscar registro..."
+                    ? "Buscar registro o usuario..."
                     : "Buscar formulario..."
                 }
               />
@@ -855,6 +986,23 @@ export default function FormsIndex() {
         {err ? (
           <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>
             {err}
+          </div>
+        ) : null}
+
+        {successMsg ? (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid #fecaca",
+              background: "#fef2f2",
+              color: "#b91c1c",
+              fontWeight: 800,
+              boxShadow: "0 4px 10px rgba(185, 28, 28, 0.08)",
+            }}
+          >
+            {successMsg}
           </div>
         ) : null}
       </Card>
@@ -983,23 +1131,27 @@ export default function FormsIndex() {
                         flex: "0 0 auto",
                       }}
                     >
-                      <IconBtn
-                        type="button"
-                        title="Ver registros"
-                        onClick={() => onResponses(f.id)}
-                        variant="primary"
-                      >
-                        <i className="fa-solid fa-comments" />
-                      </IconBtn>
+                      {canViewSubmissions ? (
+                        <IconBtn
+                          type="button"
+                          title="Ver registros"
+                          onClick={() => onResponses(f.id)}
+                          variant="primary"
+                        >
+                          <i className="fa-solid fa-comments" />
+                        </IconBtn>
+                      ) : null}
 
-                      <IconBtn
-                        type="button"
-                        title="Crear registro"
-                        onClick={() => onFill(f.id)}
-                        variant="success"
-                      >
-                        <i className="fa-solid fa-circle-plus" />
-                      </IconBtn>
+                      {canCreateRecord ? (
+                        <IconBtn
+                          type="button"
+                          title="Crear registro"
+                          onClick={() => onFill(f.id)}
+                          variant="success"
+                        >
+                          <i className="fa-solid fa-circle-plus" />
+                        </IconBtn>
+                      ) : null}
                     </div>
                   </div>
                 </Card>
@@ -1107,63 +1259,68 @@ export default function FormsIndex() {
                   style={{
                     borderCollapse: "collapse",
                     width: "100%",
-                    minWidth: 1020,
+                    minWidth: 1080,
                   }}
                 >
                   <thead>
                     <tr>
                       <th
                         style={{
-                          textAlign: "left",
+                          textAlign: "center",
                           padding: "12px 10px",
                           borderBottom: "1px solid #e4e7eb",
                           fontSize: 12,
                           color: "#475569",
+                          verticalAlign: "middle",
                         }}
                       >
-                        ID
+                        Registro
                       </th>
                       <th
                         style={{
-                          textAlign: "left",
+                          textAlign: "center",
                           padding: "12px 10px",
                           borderBottom: "1px solid #e4e7eb",
                           fontSize: 12,
                           color: "#475569",
+                          verticalAlign: "middle",
                         }}
                       >
                         Usuario
                       </th>
                       <th
                         style={{
-                          textAlign: "left",
+                          textAlign: "center",
                           padding: "12px 10px",
                           borderBottom: "1px solid #e4e7eb",
                           fontSize: 12,
                           color: "#475569",
+                          verticalAlign: "middle",
                         }}
                       >
                         Fecha
                       </th>
                       <th
                         style={{
-                          textAlign: "left",
+                          textAlign: "center",
                           padding: "12px 10px",
                           borderBottom: "1px solid #e4e7eb",
                           fontSize: 12,
                           color: "#475569",
+                          verticalAlign: "middle",
                         }}
                       >
                         Resumen
                       </th>
                       <th
                         style={{
-                          textAlign: "right",
+                          textAlign: "center",
                           padding: "12px 10px",
                           borderBottom: "1px solid #e4e7eb",
                           fontSize: 12,
                           color: "#475569",
-                          width: 180,
+                          width: 230,
+                          verticalAlign: "middle",
                         }}
                       >
                         Acciones
@@ -1179,6 +1336,8 @@ export default function FormsIndex() {
                             borderBottom: "1px solid #f1f5f9",
                             fontWeight: 700,
                             color: "#0f172a",
+                            textAlign: "center",
+                            verticalAlign: "middle",
                           }}
                         >
                           Registro {s.id}
@@ -1187,6 +1346,8 @@ export default function FormsIndex() {
                           style={{
                             padding: "12px 10px",
                             borderBottom: "1px solid #f1f5f9",
+                            textAlign: "center",
+                            verticalAlign: "middle",
                           }}
                         >
                           {getSubmissionUserName(s)}
@@ -1196,6 +1357,8 @@ export default function FormsIndex() {
                             padding: "12px 10px",
                             borderBottom: "1px solid #f1f5f9",
                             fontSize: 12,
+                            textAlign: "center",
+                            verticalAlign: "middle",
                           }}
                         >
                           {formatDate(s.created_at)}
@@ -1206,6 +1369,8 @@ export default function FormsIndex() {
                             borderBottom: "1px solid #f1f5f9",
                             fontSize: 12,
                             color: "#334155",
+                            textAlign: "center",
+                            verticalAlign: "middle",
                           }}
                         >
                           {getSubmissionSummary(s)}
@@ -1214,7 +1379,8 @@ export default function FormsIndex() {
                           style={{
                             padding: "12px 10px",
                             borderBottom: "1px solid #f1f5f9",
-                            textAlign: "right",
+                            textAlign: "center",
+                            verticalAlign: "middle",
                           }}
                         >
                           <div
@@ -1222,34 +1388,53 @@ export default function FormsIndex() {
                               display: "inline-flex",
                               gap: 8,
                               flexWrap: "nowrap",
+                              justifyContent: "center",
+                              alignItems: "center",
                             }}
                           >
-                            <IconBtn
-                              type="button"
-                              title="Ver registro"
-                              onClick={() => onOpenSavedResponse(s)}
-                              variant="primary"
-                            >
-                              <i className="fa-solid fa-eye" />
-                            </IconBtn>
+                            {canViewSubmissions ? (
+                              <IconBtn
+                                type="button"
+                                title="Ver registro"
+                                onClick={() => onOpenSavedResponse(s)}
+                                variant="primary"
+                              >
+                                <i className="fa-solid fa-eye" />
+                              </IconBtn>
+                            ) : null}
 
-                            <IconBtn
-                              type="button"
-                              title="Editar registro"
-                              onClick={() => onEditSavedResponse(s)}
-                              variant="success"
-                            >
-                              <i className="fa-solid fa-pen" />
-                            </IconBtn>
+                            {canViewSubmissions ? (
+                              <IconBtn
+                                type="button"
+                                title="Ver/Descargar PDF"
+                                onClick={() => onOpenSubmissionPdf(s)}
+                                variant="danger"
+                              >
+                                <PdfIcon size={18} />
+                              </IconBtn>
+                            ) : null}
 
-                            <IconBtn
-                              type="button"
-                              title="Ver/Descargar PDF"
-                              onClick={() => onOpenSubmissionPdf(s)}
-                              variant="danger"
-                            >
-                              <PdfIcon size={18} />
-                            </IconBtn>
+                            {canEditSubmission ? (
+                              <IconBtn
+                                type="button"
+                                title="Editar registro"
+                                onClick={() => onEditSavedResponse(s)}
+                                variant="success"
+                              >
+                                <i className="fa-solid fa-pen" />
+                              </IconBtn>
+                            ) : null}
+
+                            {canDeleteSubmission ? (
+                              <IconBtn
+                                type="button"
+                                title="Eliminar registro"
+                                onClick={() => onDeleteSavedResponse(s)}
+                                variant="danger"
+                              >
+                                <i className="fa-solid fa-trash" />
+                              </IconBtn>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1322,25 +1507,42 @@ export default function FormsIndex() {
             </div>
 
             <div style={{ padding: 14, display: "grid", gap: 10 }}>
-              <Btn
-                type="button"
-                variant="success"
-                onClick={() => onFill(mobileActions.form.id)}
-                style={{ justifyContent: "center", width: "100%" }}
-              >
-                <i className="fa-solid fa-circle-plus" />
-                Crear registro
-              </Btn>
+              {canCreateRecord ? (
+                <Btn
+                  type="button"
+                  variant="success"
+                  onClick={() => onFill(mobileActions.form.id)}
+                  style={{ justifyContent: "center", width: "100%" }}
+                >
+                  <i className="fa-solid fa-circle-plus" />
+                  Crear registro
+                </Btn>
+              ) : null}
 
-              <Btn
-                type="button"
-                variant="primary"
-                onClick={() => onResponses(mobileActions.form.id)}
-                style={{ justifyContent: "center", width: "100%" }}
-              >
-                <i className="fa-solid fa-comments" />
-                Ver registros
-              </Btn>
+              {canViewSubmissions ? (
+                <Btn
+                  type="button"
+                  variant="primary"
+                  onClick={() => onResponses(mobileActions.form.id)}
+                  style={{ justifyContent: "center", width: "100%" }}
+                >
+                  <i className="fa-solid fa-comments" />
+                  Ver registros
+                </Btn>
+              ) : null}
+
+              {!canCreateRecord && !canViewSubmissions ? (
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "#64748b",
+                    textAlign: "center",
+                    padding: "6px 8px",
+                  }}
+                >
+                  No cuentas con acciones disponibles para este formulario.
+                </div>
+              ) : null}
 
               <Btn
                 type="button"
@@ -1412,41 +1614,76 @@ export default function FormsIndex() {
             </div>
 
             <div style={{ padding: 14, display: "grid", gap: 10 }}>
-              <Btn
-                type="button"
-                variant="primary"
-                onClick={() =>
-                  onOpenSavedResponse(mobileSubmissionActions.submission)
-                }
-                style={{ justifyContent: "center", width: "100%" }}
-              >
-                <i className="fa-solid fa-eye" />
-                Ver registro
-              </Btn>
+              {canViewSubmissions ? (
+                <Btn
+                  type="button"
+                  variant="primary"
+                  onClick={() =>
+                    onOpenSavedResponse(mobileSubmissionActions.submission)
+                  }
+                  style={{ justifyContent: "center", width: "100%" }}
+                >
+                  <i className="fa-solid fa-eye" />
+                  Ver registro
+                </Btn>
+              ) : null}
 
-              <Btn
-                type="button"
-                variant="success"
-                onClick={() =>
-                  onEditSavedResponse(mobileSubmissionActions.submission)
-                }
-                style={{ justifyContent: "center", width: "100%" }}
-              >
-                <i className="fa-solid fa-pen" />
-                Editar registro
-              </Btn>
+              {canViewSubmissions ? (
+                <Btn
+                  type="button"
+                  variant="danger"
+                  onClick={() =>
+                    onOpenSubmissionPdf(mobileSubmissionActions.submission)
+                  }
+                  style={{ justifyContent: "center", width: "100%" }}
+                >
+                  <PdfIcon size={20} />
+                  Ver / Descargar PDF
+                </Btn>
+              ) : null}
 
-              <Btn
-                type="button"
-                variant="danger"
-                onClick={() =>
-                  onOpenSubmissionPdf(mobileSubmissionActions.submission)
-                }
-                style={{ justifyContent: "center", width: "100%" }}
-              >
-                <PdfIcon size={20} />
-                Ver / Descargar PDF
-              </Btn>
+              {canEditSubmission ? (
+                <Btn
+                  type="button"
+                  variant="success"
+                  onClick={() =>
+                    onEditSavedResponse(mobileSubmissionActions.submission)
+                  }
+                  style={{ justifyContent: "center", width: "100%" }}
+                >
+                  <i className="fa-solid fa-pen" />
+                  Editar registro
+                </Btn>
+              ) : null}
+
+              {canDeleteSubmission ? (
+                <Btn
+                  type="button"
+                  variant="danger"
+                  onClick={() =>
+                    onDeleteSavedResponse(mobileSubmissionActions.submission)
+                  }
+                  style={{ justifyContent: "center", width: "100%" }}
+                >
+                  <i className="fa-solid fa-trash" />
+                  Eliminar registro
+                </Btn>
+              ) : null}
+
+              {!canViewSubmissions &&
+              !canEditSubmission &&
+              !canDeleteSubmission ? (
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "#64748b",
+                    textAlign: "center",
+                    padding: "6px 8px",
+                  }}
+                >
+                  No cuentas con acciones disponibles para este registro.
+                </div>
+              ) : null}
 
               <Btn
                 type="button"

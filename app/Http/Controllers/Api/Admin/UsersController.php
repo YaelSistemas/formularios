@@ -18,26 +18,44 @@ class UsersController extends Controller
         $perPage = max(5, min(50, $perPage));
 
         $users = User::query()
-            ->with(['empresas:id,nombre,razon_social,activo', 'grupos:id,nombre,nombre_mostrar,activo'])
+            ->with([
+                'empresas:id,nombre,razon_social,activo',
+                'grupos:id,nombre,nombre_mostrar,activo',
+                'unidadesServicio:id,nombre,descripcion,activo',
+            ])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('name', 'like', "%{$q}%")
-                       ->orWhere('email', 'like', "%{$q}%");
+                        ->orWhere('email', 'like', "%{$q}%")
+                        ->orWhereHas('roles', function ($r) use ($q) {
+                            $r->where('name', 'like', "%{$q}%");
+                        })
+                        ->orWhereHas('unidadesServicio', function ($us) use ($q) {
+                            $us->where('nombre', 'like', "%{$q}%")
+                               ->orWhere('descripcion', 'like', "%{$q}%");
+                        })
+                        ->orWhereHas('empresas', function ($e) use ($q) {
+                            $e->where('nombre', 'like', "%{$q}%")
+                              ->orWhere('razon_social', 'like', "%{$q}%");
+                        })
+                        ->orWhereHas('grupos', function ($g) use ($q) {
+                            $g->where('nombre', 'like', "%{$q}%")
+                              ->orWhere('nombre_mostrar', 'like', "%{$q}%")
+                              ->orWhere('descripcion', 'like', "%{$q}%");
+                        });
                 });
             })
             ->orderBy('id', 'desc')
             ->paginate($perPage);
 
-        // adjunta roles + empresas + grupos
         $users->getCollection()->transform(function ($u) {
             return [
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
                 'activo' => (bool) ($u->activo ?? true),
-                'roles' => $u->getRoleNames(),
+                'roles' => $u->getRoleNames()->values(),
 
-                // ✅ para precargar en el frontend (AdminUsers.jsx)
                 'empresas' => $u->empresas?->map(fn ($e) => [
                     'id' => $e->id,
                     'nombre' => $e->nombre,
@@ -52,6 +70,13 @@ class UsersController extends Controller
                     'activo' => (bool) $g->activo,
                 ])->values() ?? [],
 
+                'unidades_servicio' => $u->unidadesServicio?->map(fn ($us) => [
+                    'id' => $us->id,
+                    'nombre' => $us->nombre,
+                    'descripcion' => $us->descripcion,
+                    'activo' => (bool) $us->activo,
+                ])->values() ?? [],
+
                 'created_at' => $u->created_at,
             ];
         });
@@ -61,47 +86,75 @@ class UsersController extends Controller
 
     public function store(Request $request)
     {
+        $messages = [
+            'name.required' => 'No se puede crear el usuario porque falta el nombre.',
+            'email.required' => 'No se puede crear el usuario porque falta el correo.',
+            'email.email' => 'El correo no tiene un formato válido.',
+            'email.unique' => 'El correo ya está registrado.',
+            'password.required' => 'No se puede crear el usuario porque falta la contraseña.',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
+
+            'roles.required' => 'No se puede crear el usuario porque falta el rol.',
+            'roles.array' => 'El rol enviado no es válido.',
+            'roles.min' => 'No se puede crear el usuario porque falta el rol.',
+            'roles.*.exists' => 'El rol seleccionado no existe.',
+
+            'activo.required' => 'No se puede crear el usuario porque falta el estado.',
+            'activo.boolean' => 'El estado enviado no es válido.',
+
+            'empresa_ids.required' => 'No se puede crear el usuario porque falta la empresa.',
+            'empresa_ids.array' => 'La empresa enviada no es válida.',
+            'empresa_ids.min' => 'No se puede crear el usuario porque falta la empresa.',
+            'empresa_ids.*.exists' => 'La empresa seleccionada no existe.',
+
+            'grupo_ids.required' => 'No se puede crear el usuario porque falta el grupo.',
+            'grupo_ids.array' => 'El grupo enviado no es válido.',
+            'grupo_ids.min' => 'No se puede crear el usuario porque falta el grupo.',
+            'grupo_ids.*.exists' => 'El grupo seleccionado no existe.',
+
+            'unidad_servicio_ids.required' => 'No se puede crear el usuario porque falta la unidad de servicio.',
+            'unidad_servicio_ids.array' => 'La unidad de servicio enviada no es válida.',
+            'unidad_servicio_ids.min' => 'No se puede crear el usuario porque falta la unidad de servicio.',
+            'unidad_servicio_ids.*.exists' => 'La unidad de servicio seleccionada no existe.',
+        ];
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
 
-            // ✅ roles
-            'roles' => ['array'],
+            'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
 
-            // ✅ activo
-            'activo' => ['nullable', 'boolean'],
+            'activo' => ['required', 'boolean'],
 
-            // ✅ relaciones
-            'empresa_ids' => ['array'],
+            'empresa_ids' => ['required', 'array', 'min:1'],
             'empresa_ids.*' => ['integer', Rule::exists('empresas', 'id')],
 
-            'grupo_ids' => ['array'],
+            'grupo_ids' => ['required', 'array', 'min:1'],
             'grupo_ids.*' => ['integer', Rule::exists('grupos', 'id')],
-        ]);
+
+            'unidad_servicio_ids' => ['required', 'array', 'min:1'],
+            'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
+        ], $messages);
 
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'activo' => array_key_exists('activo', $data) ? (bool) $data['activo'] : true,
+            'activo' => (bool) $data['activo'],
             'password' => Hash::make($data['password']),
         ]);
 
-        // roles
-        if (!empty($data['roles'])) {
-            $user->syncRoles($data['roles']);
-        }
+        $user->syncRoles($data['roles']);
+        $user->empresas()->sync($data['empresa_ids']);
+        $user->grupos()->sync($data['grupo_ids']);
+        $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
 
-        // ✅ empresas / grupos
-        if (array_key_exists('empresa_ids', $data)) {
-            $user->empresas()->sync($data['empresa_ids'] ?? []);
-        }
-        if (array_key_exists('grupo_ids', $data)) {
-            $user->grupos()->sync($data['grupo_ids'] ?? []);
-        }
-
-        $user->load(['empresas:id,nombre,razon_social,activo', 'grupos:id,nombre,nombre_mostrar,activo']);
+        $user->load([
+            'empresas:id,nombre,razon_social,activo',
+            'grupos:id,nombre,nombre_mostrar,activo',
+            'unidadesServicio:id,nombre,descripcion,activo',
+        ]);
 
         return response()->json([
             'ok' => true,
@@ -110,18 +163,27 @@ class UsersController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'activo' => (bool) ($user->activo ?? true),
-                'roles' => $user->getRoleNames(),
+                'roles' => $user->getRoleNames()->values(),
+
                 'empresas' => $user->empresas->map(fn ($e) => [
                     'id' => $e->id,
                     'nombre' => $e->nombre,
                     'razon_social' => $e->razon_social,
                     'activo' => (bool) $e->activo,
                 ])->values(),
+
                 'grupos' => $user->grupos->map(fn ($g) => [
                     'id' => $g->id,
                     'nombre' => $g->nombre,
                     'nombre_mostrar' => $g->nombre_mostrar,
                     'activo' => (bool) $g->activo,
+                ])->values(),
+
+                'unidades_servicio' => $user->unidadesServicio->map(fn ($us) => [
+                    'id' => $us->id,
+                    'nombre' => $us->nombre,
+                    'descripcion' => $us->descripcion,
+                    'activo' => (bool) $us->activo,
                 ])->values(),
             ],
         ], 201);
@@ -129,33 +191,65 @@ class UsersController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $messages = [
+            'name.required' => 'No se puede actualizar el usuario porque falta el nombre.',
+            'email.required' => 'No se puede actualizar el usuario porque falta el correo.',
+            'email.email' => 'El correo no tiene un formato válido.',
+            'email.unique' => 'El correo ya está registrado.',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
+
+            'roles.required' => 'No se puede actualizar el usuario porque falta el rol.',
+            'roles.array' => 'El rol enviado no es válido.',
+            'roles.min' => 'No se puede actualizar el usuario porque falta el rol.',
+            'roles.*.exists' => 'El rol seleccionado no existe.',
+
+            'activo.required' => 'No se puede actualizar el usuario porque falta el estado.',
+            'activo.boolean' => 'El estado enviado no es válido.',
+
+            'empresa_ids.required' => 'No se puede actualizar el usuario porque falta la empresa.',
+            'empresa_ids.array' => 'La empresa enviada no es válida.',
+            'empresa_ids.min' => 'No se puede actualizar el usuario porque falta la empresa.',
+            'empresa_ids.*.exists' => 'La empresa seleccionada no existe.',
+
+            'grupo_ids.required' => 'No se puede actualizar el usuario porque falta el grupo.',
+            'grupo_ids.array' => 'El grupo enviado no es válido.',
+            'grupo_ids.min' => 'No se puede actualizar el usuario porque falta el grupo.',
+            'grupo_ids.*.exists' => 'El grupo seleccionado no existe.',
+
+            'unidad_servicio_ids.required' => 'No se puede actualizar el usuario porque falta la unidad de servicio.',
+            'unidad_servicio_ids.array' => 'La unidad de servicio enviada no es válida.',
+            'unidad_servicio_ids.min' => 'No se puede actualizar el usuario porque falta la unidad de servicio.',
+            'unidad_servicio_ids.*.exists' => 'La unidad de servicio seleccionada no existe.',
+        ];
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
             'password' => ['nullable', 'string', 'min:6'],
 
-            // ✅ roles
-            'roles' => ['array'],
+            'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
 
-            // ✅ activo
-            'activo' => ['nullable', 'boolean'],
+            'activo' => ['required', 'boolean'],
 
-            // ✅ relaciones
-            'empresa_ids' => ['array'],
+            'empresa_ids' => ['required', 'array', 'min:1'],
             'empresa_ids.*' => ['integer', Rule::exists('empresas', 'id')],
 
-            'grupo_ids' => ['array'],
+            'grupo_ids' => ['required', 'array', 'min:1'],
             'grupo_ids.*' => ['integer', Rule::exists('grupos', 'id')],
-        ]);
+
+            'unidad_servicio_ids' => ['required', 'array', 'min:1'],
+            'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
+        ], $messages);
 
         $user->name = $data['name'];
         $user->email = $data['email'];
-
-        // ✅ activo (si viene)
-        if (array_key_exists('activo', $data)) {
-            $user->activo = (bool) $data['activo'];
-        }
+        $user->activo = (bool) $data['activo'];
 
         if (!empty($data['password'])) {
             $user->password = Hash::make($data['password']);
@@ -163,20 +257,16 @@ class UsersController extends Controller
 
         $user->save();
 
-        // roles (si viene)
-        if (array_key_exists('roles', $data)) {
-            $user->syncRoles($data['roles'] ?? []);
-        }
+        $user->syncRoles($data['roles']);
+        $user->empresas()->sync($data['empresa_ids']);
+        $user->grupos()->sync($data['grupo_ids']);
+        $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
 
-        // ✅ empresas / grupos (si vienen)
-        if (array_key_exists('empresa_ids', $data)) {
-            $user->empresas()->sync($data['empresa_ids'] ?? []);
-        }
-        if (array_key_exists('grupo_ids', $data)) {
-            $user->grupos()->sync($data['grupo_ids'] ?? []);
-        }
-
-        $user->load(['empresas:id,nombre,razon_social,activo', 'grupos:id,nombre,nombre_mostrar,activo']);
+        $user->load([
+            'empresas:id,nombre,razon_social,activo',
+            'grupos:id,nombre,nombre_mostrar,activo',
+            'unidadesServicio:id,nombre,descripcion,activo',
+        ]);
 
         return response()->json([
             'ok' => true,
@@ -185,18 +275,27 @@ class UsersController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'activo' => (bool) ($user->activo ?? true),
-                'roles' => $user->getRoleNames(),
+                'roles' => $user->getRoleNames()->values(),
+
                 'empresas' => $user->empresas->map(fn ($e) => [
                     'id' => $e->id,
                     'nombre' => $e->nombre,
                     'razon_social' => $e->razon_social,
                     'activo' => (bool) $e->activo,
                 ])->values(),
+
                 'grupos' => $user->grupos->map(fn ($g) => [
                     'id' => $g->id,
                     'nombre' => $g->nombre,
                     'nombre_mostrar' => $g->nombre_mostrar,
                     'activo' => (bool) $g->activo,
+                ])->values(),
+
+                'unidades_servicio' => $user->unidadesServicio->map(fn ($us) => [
+                    'id' => $us->id,
+                    'nombre' => $us->nombre,
+                    'descripcion' => $us->descripcion,
+                    'activo' => (bool) $us->activo,
                 ])->values(),
             ],
         ]);
@@ -205,12 +304,19 @@ class UsersController extends Controller
     public function destroy(User $user)
     {
         $user->delete();
-        return response()->json(['ok' => true]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Usuario eliminado correctamente.',
+        ]);
     }
 
     public function roles()
     {
         $roles = Role::query()->orderBy('name')->pluck('name');
-        return response()->json(['roles' => $roles]);
+
+        return response()->json([
+            'roles' => $roles,
+        ]);
     }
 }
