@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\FormSubmissionHistory;
 
 class FormSubmission extends Model
 {
@@ -15,5 +16,10 @@ class FormSubmission extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function histories()
+    {
+        return $this->hasMany(FormSubmissionHistory::class, 'form_submission_id')->orderBy('created_at', 'asc');
     }
 }

@@ -49,7 +49,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Ver respuestas del formulario (tabla submissions)
     Route::get('/forms/{form}/submissions', [FormSubmissionsController::class, 'index'])
-    ->middleware('perm:formularios.submissions.view');
+        ->middleware('perm:formularios.submissions.view');
+
+    // Ver historial de un registro
+    Route::get('/forms/{form}/submissions/{submission}/history', [FormSubmissionsController::class, 'history'])
+        ->middleware('perm:formularios.submissions.view');
 
     Route::put('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'update'])
         ->middleware('perm:formularios.edit');

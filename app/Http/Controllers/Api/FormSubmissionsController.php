@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\FormSubmission;
+use App\Models\FormSubmissionHistory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -14,42 +16,51 @@ class FormSubmissionsController extends Controller
     public function store(Request $request, Form $form)
     {
         $user = $request->user();
-
+    
         if (!$user) {
             return response()->json(['message' => 'No autorizado.'], 401);
         }
-
+    
         // usuario normal solo puede responder PUBLICADOS
         if (!$user->hasRole('Administrador')) {
             if ($form->status !== 'PUBLICADO') {
                 return response()->json(['message' => 'No encontrado.'], 404);
             }
-
+    
             if (!$this->userCanAccessForm($user->id, $form)) {
                 return response()->json(['message' => 'No autorizado para este formulario.'], 403);
             }
         }
-
+    
         $data = $request->validate([
             'answers' => ['required', 'array'],
         ]);
-
+    
         $cleanAnswers = $this->validateAndCleanAnswers(
             form: $form,
             userId: $user?->id,
             answers: $data['answers']
         );
-
+    
         if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
             return $cleanAnswers;
         }
-
+    
         $submission = FormSubmission::create([
             'form_id' => $form->id,
             'user_id' => $user?->id,
             'answers' => $cleanAnswers,
         ]);
-
+    
+        FormSubmissionHistory::create([
+            'form_submission_id' => $submission->id,
+            'form_id' => $form->id,
+            'user_id' => $user?->id,
+            'action' => 'created',
+            'snapshot' => $cleanAnswers,
+            'changes' => null,
+        ]);
+    
         return response()->json([
             'ok' => true,
             'message' => 'Registro creado correctamente.',
@@ -113,44 +124,63 @@ class FormSubmissionsController extends Controller
     public function update(Request $request, Form $form, FormSubmission $submission)
     {
         $user = $request->user();
-
+    
         if (!$user) {
             return response()->json(['message' => 'No autorizado.'], 401);
         }
-
+    
         if ((int) $submission->form_id !== (int) $form->id) {
             return response()->json(['message' => 'Registro no encontrado para este formulario.'], 404);
         }
-
+    
         // usuario normal solo puede editar PUBLICADOS
         if (!$user->hasRole('Administrador')) {
             if ($form->status !== 'PUBLICADO') {
                 return response()->json(['message' => 'No encontrado.'], 404);
             }
-
+    
             if (!$this->userCanAccessForm($user->id, $form)) {
                 return response()->json(['message' => 'No autorizado para este formulario.'], 403);
             }
         }
-
+    
         $data = $request->validate([
             'answers' => ['required', 'array'],
         ]);
-
+    
+        $previousAnswers = is_array($submission->answers) ? $submission->answers : [];
+    
         $cleanAnswers = $this->validateAndCleanAnswers(
             form: $form,
             userId: $user?->id,
             answers: $data['answers'],
-            previousAnswers: is_array($submission->answers) ? $submission->answers : []
+            previousAnswers: $previousAnswers
         );
-
+    
         if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
             return $cleanAnswers;
         }
-
+    
+        $changes = $this->buildSubmissionChanges(
+            form: $form,
+            oldAnswers: $previousAnswers,
+            newAnswers: $cleanAnswers
+        );
+    
         $submission->answers = $cleanAnswers;
         $submission->save();
-
+    
+        if (!empty($changes)) {
+            FormSubmissionHistory::create([
+                'form_submission_id' => $submission->id,
+                'form_id' => $form->id,
+                'user_id' => $user?->id,
+                'action' => 'updated',
+                'snapshot' => $cleanAnswers,
+                'changes' => $changes,
+            ]);
+        }
+    
         return response()->json([
             'ok' => true,
             'message' => 'Registro actualizado correctamente.',
@@ -480,6 +510,183 @@ class FormSubmissionsController extends Controller
         }
 
         return $cleanAnswers;
+    }
+
+    private function buildSubmissionChanges(Form $form, array $oldAnswers, array $newAnswers): array
+    {
+        $changes = [];
+    
+        $fields = [];
+        if (
+            is_array($form->payload) &&
+            isset($form->payload['fields']) &&
+            is_array($form->payload['fields'])
+        ) {
+            $fields = $form->payload['fields'];
+        }
+    
+        foreach ($fields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+    
+            $fieldId = $field['id'] ?? null;
+            if (!$fieldId) {
+                continue;
+            }
+    
+            $type = (string) ($field['type'] ?? 'text');
+            $label = $field['label'] ?? $fieldId;
+    
+            $nonInputTypes = ['static_text', 'separator', 'fixed_image', 'fixed_file'];
+            if (in_array($type, $nonInputTypes, true)) {
+                continue;
+            }
+    
+            $oldValue = $oldAnswers[$fieldId] ?? null;
+            $newValue = $newAnswers[$fieldId] ?? null;
+    
+            if (!$this->valuesAreDifferent($oldValue, $newValue)) {
+                continue;
+            }
+    
+            $changes[] = [
+                'field' => $fieldId,
+                'label' => $label,
+                'type' => $type,
+                'old_value' => $this->normalizeHistoryValue($oldValue),
+                'new_value' => $this->normalizeHistoryValue($newValue),
+            ];
+        }
+    
+        $knownFieldIds = collect($fields)
+            ->map(fn ($f) => is_array($f) ? ($f['id'] ?? null) : null)
+            ->filter()
+            ->values()
+            ->all();
+    
+        $allKeys = array_unique(array_merge(array_keys($oldAnswers), array_keys($newAnswers)));
+    
+        foreach ($allKeys as $extraKey) {
+            if (in_array($extraKey, $knownFieldIds, true)) {
+                continue;
+            }
+    
+            $oldValue = $oldAnswers[$extraKey] ?? null;
+            $newValue = $newAnswers[$extraKey] ?? null;
+    
+            if (!$this->valuesAreDifferent($oldValue, $newValue)) {
+                continue;
+            }
+    
+            $changes[] = [
+                'field' => $extraKey,
+                'label' => $extraKey,
+                'type' => 'unknown',
+                'old_value' => $this->normalizeHistoryValue($oldValue),
+                'new_value' => $this->normalizeHistoryValue($newValue),
+            ];
+        }
+    
+        return array_values($changes);
+    }
+    
+    private function valuesAreDifferent($oldValue, $newValue): bool
+    {
+        return json_encode($this->normalizeForComparison($oldValue), JSON_UNESCAPED_UNICODE) !==
+            json_encode($this->normalizeForComparison($newValue), JSON_UNESCAPED_UNICODE);
+    }
+    
+    private function normalizeForComparison($value)
+    {
+        if (is_array($value)) {
+            if ($this->isAssoc($value)) {
+                ksort($value);
+    
+                $normalized = [];
+                foreach ($value as $key => $item) {
+                    $normalized[$key] = $this->normalizeForComparison($item);
+                }
+    
+                return $normalized;
+            }
+    
+            return array_map(fn ($item) => $this->normalizeForComparison($item), $value);
+        }
+    
+        if (is_string($value)) {
+            return trim($value);
+        }
+    
+        return $value;
+    }
+    
+    private function normalizeHistoryValue($value)
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+    
+        if (is_string($value)) {
+            return trim($value);
+        }
+    
+        return $value;
+    }
+    
+    private function isAssoc(array $array): bool
+    {
+        if ([] === $array) {
+            return false;
+        }
+    
+        return array_keys($array) !== range(0, count($array) - 1);
+    }
+
+    public function history(Request $request, Form $form, FormSubmission $submission)
+    {
+        $user = $request->user();
+    
+        if (!$user) {
+            return response()->json(['message' => 'No autorizado.'], 401);
+        }
+    
+        if ((int) $submission->form_id !== (int) $form->id) {
+            return response()->json(['message' => 'Registro no encontrado para este formulario.'], 404);
+        }
+    
+        if (!$user->hasRole('Administrador')) {
+            if ($form->status !== 'PUBLICADO') {
+                return response()->json(['message' => 'No encontrado.'], 404);
+            }
+    
+            if (!$this->userCanAccessForm($user->id, $form)) {
+                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+            }
+        }
+    
+        $history = $submission->histories()
+            ->with(['user:id,name'])
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'action' => $item->action,
+                    'user_id' => $item->user_id,
+                    'user_name' => $item->user?->name,
+                    'snapshot' => $item->snapshot,
+                    'changes' => $item->changes,
+                    'created_at' => $item->created_at,
+                    'updated_at' => $item->updated_at,
+                ];
+            })
+            ->values();
+    
+        return response()->json([
+            'ok' => true,
+            'submission_id' => $submission->id,
+            'history' => $history,
+        ]);
     }
 
     /**
