@@ -141,7 +141,9 @@ class SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil implements
                             'label' => 'Tipo de Herramienta',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['Taladro', 'Martillo', 'Pulidora'],
+                            'options' => ['Desbrozadora', 'Dremel Multimax MM40', 'Esmeril de Banco 1/2 Hp', 'Esmeriladora Angular', 'Extensiones', 'Maquina Dremel', 
+                                          'Multimetro de Gancho', 'Pistola de Impacto', 'Pulidora o Manipuladora** Alta, Baja', 'Reflectores', 
+                                          'Sierra Circular 7 1/4', 'Taladro', 'Otro'],
                         ],
                         [
                             'id' => 'serie',
