@@ -641,7 +641,7 @@ export default function FormsIndex() {
     }
 
     const ok = window.confirm(
-      `¿Seguro que deseas eliminar el registro ${submission.id}? Esta acción no se puede deshacer.`
+      `¿Seguro que deseas eliminar el registro ${submission.consecutive ?? submission.id}? Esta acción no se puede deshacer.`
     );
 
     if (!ok) return;
@@ -657,7 +657,7 @@ export default function FormsIndex() {
       }
 
       await loadSubmissions(selectedId);
-      setSuccessMsg(`El registro ${submission.id} se eliminó correctamente.`);
+      setSuccessMsg(`El registro ${submission.consecutive ?? submission.id} se eliminó correctamente.`);
     } catch (e) {
       setAuthError(e, "Error eliminando registro");
     }
@@ -1075,8 +1075,8 @@ export default function FormsIndex() {
     if (!q) return subs;
 
     return subs.filter((s) => {
-      const registroLabel = `registro ${s.id}`.toLowerCase();
-      const registroId = String(s.id || "").toLowerCase();
+      const registroLabel = `registro ${s.consecutive ?? s.id}`.toLowerCase();
+      const registroId = String(s.consecutive ?? s.id ?? "").toLowerCase();
       const userName = String(getSubmissionUserName(s)).toLowerCase();
       const summary = String(getSubmissionSummary(s)).toLowerCase();
 
@@ -1485,7 +1485,7 @@ export default function FormsIndex() {
                         }}
                       >
                         <div style={{ fontWeight: 800, color: "#0f172a" }}>
-                          Registro {s.id}
+                          Registro {s.consecutive ?? s.id}
                         </div>
                         <div style={{ fontSize: 12, color: "#64748b" }}>
                           {formatDate(s.created_at)}
@@ -1649,7 +1649,7 @@ export default function FormsIndex() {
                             verticalAlign: "middle",
                           }}
                         >
-                          Registro {s.id}
+                          Registro {s.consecutive ?? s.id}
                         </td>
                         <td
                           style={{
@@ -1936,7 +1936,7 @@ export default function FormsIndex() {
                   lineHeight: 1.4,
                 }}
               >
-                Registro {mobileSubmissionActions.submission.id}
+                Registro {mobileSubmissionActions.submission.consecutive ?? mobileSubmissionActions.submission.id}
               </div>
               <div
                 style={{
@@ -2100,7 +2100,7 @@ export default function FormsIndex() {
                     lineHeight: 1.3,
                   }}
                 >
-                  Historial del registro {historyModal.submission.id}
+                  Historial del registro {historyModal.submission.consecutive ?? historyModal.submission.id}
                 </div>
                 <div
                   style={{

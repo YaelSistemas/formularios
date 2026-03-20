@@ -8,6 +8,7 @@ use App\Models\FormSubmission;
 use App\Models\FormSubmissionHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -45,21 +46,28 @@ class FormSubmissionsController extends Controller
         if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
             return $cleanAnswers;
         }
-    
-        $submission = FormSubmission::create([
-            'form_id' => $form->id,
-            'user_id' => $user?->id,
-            'answers' => $cleanAnswers,
-        ]);
-    
-        FormSubmissionHistory::create([
-            'form_submission_id' => $submission->id,
-            'form_id' => $form->id,
-            'user_id' => $user?->id,
-            'action' => 'created',
-            'snapshot' => $cleanAnswers,
-            'changes' => null,
-        ]);
+
+        $submission = DB::transaction(function () use ($form, $user, $cleanAnswers) {
+            $consecutive = $this->getNextAvailableConsecutive((int) $form->id);
+
+            $submission = FormSubmission::create([
+                'form_id' => $form->id,
+                'consecutive' => $consecutive,
+                'user_id' => $user?->id,
+                'answers' => $cleanAnswers,
+            ]);
+
+            FormSubmissionHistory::create([
+                'form_submission_id' => $submission->id,
+                'form_id' => $form->id,
+                'user_id' => $user?->id,
+                'action' => 'created',
+                'snapshot' => $cleanAnswers,
+                'changes' => null,
+            ]);
+
+            return $submission;
+        });
     
         return response()->json([
             'ok' => true,
@@ -103,13 +111,15 @@ class FormSubmissionsController extends Controller
         }
     
         $subs = $query
+            ->orderByDesc('consecutive')
             ->orderByDesc('id')
             ->limit(100)
-            ->get(['id', 'form_id', 'user_id', 'answers', 'created_at'])
+            ->get(['id', 'form_id', 'consecutive', 'user_id', 'answers', 'created_at'])
             ->map(function ($sub) {
                 return [
                     'id' => $sub->id,
                     'form_id' => $sub->form_id,
+                    'consecutive' => $sub->consecutive,
                     'user_id' => $sub->user_id,
                     'user_name' => $sub->user?->name,
                     'answers' => $sub->answers,
@@ -204,6 +214,41 @@ class FormSubmissionsController extends Controller
         return $form->assignedUsers()
             ->where('users.id', $userId)
             ->exists();
+    }
+
+    /**
+     * Obtiene el primer consecutivo libre por formulario.
+     * Ejemplo:
+     * existentes = [1,2,3,5,6] => devuelve 4
+     * existentes = [2,3] => devuelve 1
+     * existentes = [] => devuelve 1
+     */
+    private function getNextAvailableConsecutive(int $formId): int
+    {
+        $usedNumbers = FormSubmission::where('form_id', $formId)
+            ->whereNotNull('consecutive')
+            ->orderBy('consecutive')
+            ->lockForUpdate()
+            ->pluck('consecutive')
+            ->map(fn ($n) => (int) $n)
+            ->values()
+            ->all();
+
+        $next = 1;
+
+        foreach ($usedNumbers as $number) {
+            if ($number < $next) {
+                continue;
+            }
+
+            if ($number > $next) {
+                return $next;
+            }
+
+            $next++;
+        }
+
+        return $next;
     }
 
     /**

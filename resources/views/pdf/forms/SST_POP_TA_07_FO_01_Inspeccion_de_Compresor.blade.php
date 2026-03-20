@@ -652,7 +652,7 @@
                     <div class="signature-name">{{ $nombreResponsable }}</div>
                 @endif
                 <div class="signature-line"></div>
-                <div class="signature-text">Nombre y firma de Supervisor</div>
+                <div class="signature-text">Nombre y firma del Supervisor</div>
             </div>
         </div>
     </div>

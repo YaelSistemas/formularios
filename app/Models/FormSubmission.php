@@ -7,7 +7,7 @@ use App\Models\FormSubmissionHistory;
 
 class FormSubmission extends Model
 {
-    protected $fillable = ['form_id', 'user_id', 'answers'];
+    protected $fillable = ['form_id', 'consecutive', 'user_id', 'answers'];
 
     protected $casts = [
         'answers' => 'array',

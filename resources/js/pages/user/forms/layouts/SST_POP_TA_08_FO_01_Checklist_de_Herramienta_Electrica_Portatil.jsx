@@ -26,6 +26,8 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   });
 
   const [tableRowDraft, setTableRowDraft] = useState({});
+  const [tableModalError, setTableModalError] = useState("");
+  const [tableModalErrorFieldId, setTableModalErrorFieldId] = useState(null);
 
   const [signatureModal, setSignatureModal] = useState({
     open: false,
@@ -43,10 +45,22 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const lastPointRef = useRef({ x: 0, y: 0 });
   const topRef = useRef(null);
 
+  const tableFieldRefs = useRef({});
+  const tableFieldWrapRefs = useRef({});
+  const tableErrorTimerRef = useRef(null);
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (tableErrorTimerRef.current) {
+        clearTimeout(tableErrorTimerRef.current);
+      }
+    };
   }, []);
 
   const scrollToTopSafe = () => {
@@ -81,9 +95,53 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     return init;
   };
 
+  const clearTableModalError = () => {
+    setTableModalError("");
+    setTableModalErrorFieldId(null);
+
+    if (tableErrorTimerRef.current) {
+      clearTimeout(tableErrorTimerRef.current);
+      tableErrorTimerRef.current = null;
+    }
+  };
+
+  const showTableModalFieldError = (fieldId, message) => {
+    setTableModalError(message);
+    setTableModalErrorFieldId(fieldId);
+
+    if (tableErrorTimerRef.current) {
+      clearTimeout(tableErrorTimerRef.current);
+    }
+
+    requestAnimationFrame(() => {
+      const wrapEl = tableFieldWrapRefs.current[fieldId];
+      const inputEl = tableFieldRefs.current[fieldId];
+
+      if (wrapEl?.scrollIntoView) {
+        wrapEl.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+
+      setTimeout(() => {
+        if (inputEl?.focus) {
+          inputEl.focus();
+        }
+      }, 180);
+    });
+
+    tableErrorTimerRef.current = setTimeout(() => {
+      setTableModalError("");
+      setTableModalErrorFieldId(null);
+      tableErrorTimerRef.current = null;
+    }, 3000);
+  };
+
   const openTableModal = (field) => {
     if (readOnly) return;
 
+    clearTableModalError();
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -98,6 +156,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     const rows = Array.isArray(answers[field.id]) ? answers[field.id] : [];
     const currentRow = rows[rowIndex] || {};
 
+    clearTableModalError();
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -107,6 +166,10 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   };
 
   const closeTableModal = () => {
+    clearTableModalError();
+    tableFieldRefs.current = {};
+    tableFieldWrapRefs.current = {};
+
     setTableModal({
       open: false,
       field: null,
@@ -133,6 +196,23 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     return value === null || value === undefined || String(value).trim() === "";
   };
 
+  const hasTableDraftData = () => {
+    const field = tableModal.field;
+    if (!field) return false;
+
+    const rowSchema = Array.isArray(field.row_schema) ? field.row_schema : [];
+
+    return rowSchema.some((col) => {
+      const value = tableRowDraft[col.id];
+
+      if (col.type === "checkbox") {
+        return value === true;
+      }
+
+      return value !== null && value !== undefined && String(value).trim() !== "";
+    });
+  };
+
   const saveTableRow = () => {
     const field = tableModal.field;
     if (!field) return;
@@ -146,16 +226,17 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       const v = tableRowDraft[col.id];
 
       if (isEmptyValue(v, col.type)) {
-        setMsg(`Falta responder: ${col.label}`);
-        scrollToTopSafe();
+        showTableModalFieldError(col.id, `Falta responder: ${col.label}`);
         return;
       }
 
       if (col.type === "select" || col.type === "radio") {
         const opts = Array.isArray(col.options) ? col.options : [];
         if (opts.length && !opts.includes(v)) {
-          setMsg(`Selecciona una opción válida para: ${col.label}`);
-          scrollToTopSafe();
+          showTableModalFieldError(
+            col.id,
+            `Selecciona una opción válida para: ${col.label}`
+          );
           return;
         }
       }
@@ -172,6 +253,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       setVal(field.id, nextRows);
     }
 
+    clearTableModalError();
     setMsg("");
     closeTableModal();
   };
@@ -538,18 +620,30 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       width: "100%",
       padding: isMobile ? 11 : 10,
       borderRadius: 12,
-      border: "1px solid #d1d5db",
+      border:
+        tableModalErrorFieldId === f.id ? "1px solid #fb923c" : "1px solid #d1d5db",
       background: "#fff",
       fontSize: isMobile ? 16 : 14,
       boxSizing: "border-box",
       minHeight: isMobile ? 46 : "auto",
+      outline: "none",
+      boxShadow:
+        tableModalErrorFieldId === f.id
+          ? "0 0 0 3px rgba(251,146,60,0.12)"
+          : "none",
     };
 
     if (f.type === "textarea") {
       return (
         <textarea
+          ref={(el) => {
+            tableFieldRefs.current[f.id] = el;
+          }}
           value={tableRowDraft[f.id] ?? ""}
-          onChange={(e) => setTableRowVal(f.id, e.target.value)}
+          onChange={(e) => {
+            setTableRowVal(f.id, e.target.value);
+            if (tableModalErrorFieldId === f.id) clearTableModalError();
+          }}
           rows={3}
           style={{ ...commonStyle, resize: "vertical" }}
         />
@@ -560,9 +654,15 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       return (
         <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
           <input
+            ref={(el) => {
+              tableFieldRefs.current[f.id] = el;
+            }}
             type="checkbox"
             checked={!!tableRowDraft[f.id]}
-            onChange={(e) => setTableRowVal(f.id, e.target.checked)}
+            onChange={(e) => {
+              setTableRowVal(f.id, e.target.checked);
+              if (tableModalErrorFieldId === f.id) clearTableModalError();
+            }}
           />
           <span>Marcar</span>
         </label>
@@ -573,8 +673,14 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       const opts = Array.isArray(f.options) ? f.options : [];
       return (
         <select
+          ref={(el) => {
+            tableFieldRefs.current[f.id] = el;
+          }}
           value={tableRowDraft[f.id] ?? ""}
-          onChange={(e) => setTableRowVal(f.id, e.target.value)}
+          onChange={(e) => {
+            setTableRowVal(f.id, e.target.value);
+            if (tableModalErrorFieldId === f.id) clearTableModalError();
+          }}
           style={commonStyle}
         >
           <option value="">-- Selecciona --</option>
@@ -607,11 +713,21 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 }}
               >
                 <input
+                  ref={(el) => {
+                    if (el && tableRowDraft[f.id] === opt) {
+                      tableFieldRefs.current[f.id] = el;
+                    } else if (el && !tableFieldRefs.current[f.id]) {
+                      tableFieldRefs.current[f.id] = el;
+                    }
+                  }}
                   type="radio"
                   name={`modal_${tableModal.field?.id || "table"}_${f.id}`}
                   value={opt}
                   checked={tableRowDraft[f.id] === opt}
-                  onChange={(e) => setTableRowVal(f.id, e.target.value)}
+                  onChange={(e) => {
+                    setTableRowVal(f.id, e.target.value);
+                    if (tableModalErrorFieldId === f.id) clearTableModalError();
+                  }}
                 />
                 <span>{opt}</span>
               </label>
@@ -634,9 +750,15 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
     return (
       <input
+        ref={(el) => {
+          tableFieldRefs.current[f.id] = el;
+        }}
         type={htmlType}
         value={tableRowDraft[f.id] ?? ""}
-        onChange={(e) => setTableRowVal(f.id, e.target.value)}
+        onChange={(e) => {
+          setTableRowVal(f.id, e.target.value);
+          if (tableModalErrorFieldId === f.id) clearTableModalError();
+        }}
         style={commonStyle}
       />
     );
@@ -1479,7 +1601,11 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             padding: 16,
             zIndex: 1000,
           }}
-          onClick={closeTableModal}
+          onClick={() => {
+            if (!hasTableDraftData()) {
+              closeTableModal();
+            }
+          }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1532,13 +1658,49 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 ? tableModal.field.row_schema
                 : []
               ).map((col) => (
-                <div key={col.id} style={{ display: "grid", gap: 8 }}>
+                <div
+                  key={col.id}
+                  ref={(el) => {
+                    tableFieldWrapRefs.current[col.id] = el;
+                  }}
+                  style={{
+                    display: "grid",
+                    gap: 8,
+                    padding: tableModalErrorFieldId === col.id ? "10px" : 0,
+                    borderRadius: 12,
+                    background:
+                      tableModalErrorFieldId === col.id ? "#fff7ed" : "transparent",
+                    border:
+                      tableModalErrorFieldId === col.id
+                        ? "1px solid #fdba74"
+                        : "1px solid transparent",
+                    transition: "all 0.2s ease",
+                  }}
+                >
                   <label style={{ fontSize: isMobile ? 14 : 14, lineHeight: 1.4 }}>
                     <b>{col.label}</b>{" "}
                     {!isObservationColumn(col) ? (
                       <span style={{ color: "crimson" }}>*</span>
                     ) : null}
                   </label>
+
+                  {tableModalErrorFieldId === col.id && tableModalError ? (
+                    <div
+                      style={{
+                        borderRadius: 10,
+                        border: "1px solid #fdba74",
+                        background: "#fff7ed",
+                        color: "#9a3412",
+                        padding: "8px 10px",
+                        fontSize: 13,
+                        lineHeight: 1.4,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {tableModalError}
+                    </div>
+                  ) : null}
+
                   {renderTableModalField(col)}
                 </div>
               ))}

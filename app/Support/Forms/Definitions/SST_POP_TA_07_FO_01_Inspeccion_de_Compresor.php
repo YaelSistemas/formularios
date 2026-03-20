@@ -295,13 +295,13 @@ class SST_POP_TA_07_FO_01_Inspeccion_de_Compresor implements FormDefinition
 
                 [
                     'id' => 'responsable_seguridad',
-                    'label' => 'Nombre de Supervisor',
+                    'label' => 'Nombre del Supervisor',
                     'type' => 'text',
                     'required' => true,
                 ],
                 [
                     'id' => 'firma_responsable_seguridad',
-                    'label' => 'Firma de Supervisor',
+                    'label' => 'Firma del Supervisor',
                     'type' => 'signature',
                     'required' => true,
                 ],
