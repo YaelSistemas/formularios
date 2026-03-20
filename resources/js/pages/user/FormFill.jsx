@@ -4,6 +4,7 @@ import { enqueue, syncNow } from "../../offline/sync";
 
 import DefaultFormLayout from "./forms/layouts/DefaultFormLayout";
 import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "./forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
+import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "./forms/layouts/SST_POP_TA_07_FO_01_Inspeccion_de_Compresor";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -422,6 +423,13 @@ export default function FormFill({
       case "checklist_herramienta_electrica_portatil":
         return (
           <SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil
+            {...sharedProps}
+          />
+        );
+
+        case "inspeccion_compresor":
+        return (
+          <SST_POP_TA_07_FO_01_Inspeccion_de_Compresor
             {...sharedProps}
           />
         );

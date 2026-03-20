@@ -53,6 +53,9 @@ class FormSubmissionPdfController extends Controller
     private function resolvePdfView(string $formCodeKey): string
     {
         return match ($formCodeKey) {
+            'sst_pop_ta_07_fo_01_inspeccion_de_compresor'
+                => 'pdf.forms.SST_POP_TA_07_FO_01_Inspeccion_de_Compresor',
+
             'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil'
                 => 'pdf.forms.SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil',
 

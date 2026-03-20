@@ -267,8 +267,10 @@ export default function FormsIndex() {
   const canViewSubmissions = permissionSet.has("formularios.submissions.view");
   const canEditSubmission = permissionSet.has("formularios.edit");
   const canDeleteSubmission = permissionSet.has("formularios.delete");
+
   const isAdmin =
-    me?.role === "Administrador" || me?.role_name === "Administrador";
+    !!me?.is_admin ||
+    (Array.isArray(me?.roles) && me.roles.includes("Administrador"));
 
   const noPermissionMessage = (actionText) =>
     `No cuentas con los permisos necesarios para ${actionText}. Contacta a tu administrador o al equipo de Sistemas.`;

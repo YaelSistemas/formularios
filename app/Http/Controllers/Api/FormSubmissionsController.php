@@ -461,21 +461,33 @@ class FormSubmissionsController extends Controller
                         continue;
                     }
 
-                    // Guardar PNG físico solo para este formulario
-                    if (
-                        $formCodeKey === 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil' &&
-                        str_starts_with($v, 'data:image/')
-                    ) {
-                        $storedPath = $this->storeSignatureForChecklistHerramienta($v, $userId, $id);
-
-                        if (!$storedPath) {
-                            return response()->json([
-                                'message' => "No se pudo guardar la firma del campo {$label}."
-                            ], 422);
+                    // Guardar PNG físico para formularios específicos
+                    if (str_starts_with($v, 'data:image/')) {
+                        $storedPath = null;
+                    
+                        if ($formCodeKey === 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil') {
+                            $storedPath = $this->storeSignatureForChecklistHerramienta($v, $userId, $id);
                         }
-
-                        $cleanAnswers[$id] = $storedPath;
-                        continue;
+                    
+                        if ($formCodeKey === 'sst_pop_ta_07_fo_01_inspeccion_de_compresor') {
+                            $storedPath = $this->storeSignatureForInspeccionCompresor($v, $userId, $id);
+                        }
+                    
+                        if (
+                            in_array($formCodeKey, [
+                                'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil',
+                                'sst_pop_ta_07_fo_01_inspeccion_de_compresor',
+                            ], true)
+                        ) {
+                            if (!$storedPath) {
+                                return response()->json([
+                                    'message' => "No se pudo guardar la firma del campo {$label}."
+                                ], 422);
+                            }
+                    
+                            $cleanAnswers[$id] = $storedPath;
+                            continue;
+                        }
                     }
 
                     // fallback
@@ -715,6 +727,40 @@ class FormSubmissionsController extends Controller
 
         Storage::disk('public')->put($relativePath, $binary);
 
+        return $relativePath;
+    }
+
+    /**
+     * Guarda la firma como PNG físico para la inspección de compresor.
+     */
+    private function storeSignatureForInspeccionCompresor(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SSTPOPTA07FO01_InspeccionCompresor';
+    
+        $directory = match ($fieldId) {
+            'firma_responsable_seguridad' => $baseDirectory . '/Responsable_Seguridad',
+            default => $baseDirectory,
+        };
+    
+        $fileName = 'firma_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . Str::random(8) . '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        Storage::disk('public')->put($relativePath, $binary);
+    
         return $relativePath;
     }
 
