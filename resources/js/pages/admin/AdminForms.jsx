@@ -6,11 +6,67 @@ export default function AdminForms() {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
+  const me = getStoredUser();
+
+  const isAdmin =
+    !!me?.is_admin ||
+    normalizeRoles(me).some((r) => String(r).toLowerCase() === "administrador");
+
+  const hasPermission = (permission) => {
+    if (isAdmin) return true;
+    return normalizePermissions(me).includes(permission);
+  };
+
+  const canViewFormsAdmin = hasPermission("formularios.admin.view");
+  const canAssignForms = hasPermission("formularios.admin.assign");
+  const canPublishForms = hasPermission("formularios.admin.publish");
+  const canShowActionsColumn =
+    canViewFormsAdmin || canAssignForms || canPublishForms;
+
   const [forms, setForms] = useState([]);
   const [loadingForms, setLoadingForms] = useState(false);
 
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
+
+  const [perPage, setPerPage] = useState(25);
+  const [page, setPage] = useState(1);
 
   const [openPreview, setOpenPreview] = useState(false);
   const [previewForm, setPreviewForm] = useState(null);
@@ -81,7 +137,10 @@ export default function AdminForms() {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => setQ(qDraft.trim().toLowerCase()), 250);
+    const t = setTimeout(() => {
+      setPage(1);
+      setQ(qDraft.trim().toLowerCase());
+    }, 250);
     return () => clearTimeout(t);
   }, [qDraft]);
 
@@ -98,6 +157,23 @@ export default function AdminForms() {
       return title.includes(q) || codeKey.includes(q);
     });
   }, [forms, q]);
+
+  const totalItems = filteredForms.length;
+  const lastPage = Math.max(1, Math.ceil(totalItems / perPage));
+  const safePage = Math.min(page, lastPage);
+  const canPrev = safePage > 1;
+  const canNext = safePage < lastPage;
+
+  const paginatedForms = useMemo(() => {
+    const start = (safePage - 1) * perPage;
+    return filteredForms.slice(start, start + perPage);
+  }, [filteredForms, safePage, perPage]);
+
+  useEffect(() => {
+    if (page > lastPage) {
+      setPage(lastPage);
+    }
+  }, [page, lastPage]);
 
   useEffect(() => {
     if (openPreview || openAssignments) return;
@@ -117,6 +193,11 @@ export default function AdminForms() {
   }, [loadingForms, forms, q, qDraft, filteredForms.length, openPreview, openAssignments]);
 
   const openPreviewModal = async (f) => {
+    if (!canViewFormsAdmin) {
+      setErr("No tienes permiso para ver formularios.");
+      return;
+    }
+
     setErr("");
     setPreviewForm(null);
     setOpenPreview(true);
@@ -139,6 +220,11 @@ export default function AdminForms() {
   };
 
   const publishForm = async (f) => {
+    if (!canPublishForms) {
+      setErr("No tienes permiso para publicar formularios.");
+      return;
+    }
+
     setErr("");
     setPublishingFormId(f.id);
     try {
@@ -153,6 +239,11 @@ export default function AdminForms() {
   };
 
   const unpublishForm = async (f) => {
+    if (!canPublishForms) {
+      setErr("No tienes permiso para despublicar formularios.");
+      return;
+    }
+
     setErr("");
     setUnpublishingFormId(f.id);
     try {
@@ -167,6 +258,11 @@ export default function AdminForms() {
   };
 
   const openAssignmentsModal = async (f) => {
+    if (!canAssignForms) {
+      setErr("No tienes permiso para asignar formularios.");
+      return;
+    }
+
     setErr("");
     setAssignmentForm(f);
     setOpenAssignments(true);
@@ -179,13 +275,10 @@ export default function AdminForms() {
       setLoadingAssignments(true);
 
       const [usersResp, assignmentsResp] = await Promise.all([
-        apiGet("/admin/users"),
+        apiGet("/admin/users?per_page=1000&page=1&q="),
         apiGet(`/admin/forms/${f.id}/assignments`),
       ]);
-      
-      console.log("usersResp", usersResp);
-      console.log("assignmentsResp", assignmentsResp);
-      
+
       const usersList = Array.isArray(usersResp)
         ? usersResp
         : Array.isArray(usersResp?.users)
@@ -193,7 +286,7 @@ export default function AdminForms() {
         : Array.isArray(usersResp?.data)
         ? usersResp.data
         : [];
-      
+
       const assignedIds = Array.isArray(assignmentsResp?.user_ids)
         ? assignmentsResp.user_ids.map((id) => Number(id))
         : [];
@@ -237,6 +330,11 @@ export default function AdminForms() {
   };
 
   const saveAssignments = async () => {
+    if (!canAssignForms) {
+      setErr("No tienes permiso para asignar formularios.");
+      return;
+    }
+
     if (!assignmentForm?.id) return;
 
     setErr("");
@@ -283,6 +381,7 @@ export default function AdminForms() {
         style={{
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           padding: "6px 10px",
           borderRadius: 999,
           border: `1px solid ${v.border}`,
@@ -291,6 +390,7 @@ export default function AdminForms() {
           fontWeight: 800,
           color: v.fg,
           whiteSpace: "nowrap",
+          textAlign: "center",
         }}
       >
         {children}
@@ -417,7 +517,7 @@ export default function AdminForms() {
     },
     filterRow: {
       display: "grid",
-      gridTemplateColumns: "minmax(220px, 1fr)",
+      gridTemplateColumns: "minmax(220px, 1fr) auto auto",
       gap: 12,
       alignItems: "end",
       marginTop: 14,
@@ -437,6 +537,15 @@ export default function AdminForms() {
       outline: "none",
       minHeight: 44,
     },
+    select: {
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#f8fafc",
+      outline: "none",
+      minHeight: 44,
+    },
     tableWrap: {
       width: "100%",
       overflowX: "auto",
@@ -447,11 +556,11 @@ export default function AdminForms() {
       borderCollapse: "separate",
       borderSpacing: 0,
       width: "100%",
-      minWidth: 1020,
+      minWidth: 920,
       background: "#fff",
     },
     th: {
-      textAlign: "left",
+      textAlign: "center",
       fontSize: 12,
       color: "#475569",
       padding: "14px 12px",
@@ -462,6 +571,7 @@ export default function AdminForms() {
       position: "sticky",
       top: 0,
       zIndex: 1,
+      verticalAlign: "middle",
     },
     td: {
       padding: "14px 12px",
@@ -469,6 +579,15 @@ export default function AdminForms() {
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
+      textAlign: "center",
+    },
+    pagination: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+      marginTop: 14,
+      flexWrap: "wrap",
+      justifyContent: "space-between",
     },
     modalOverlay: {
       position: "fixed",
@@ -640,12 +759,21 @@ export default function AdminForms() {
         }
       }
 
+      @media (max-width: 860px) {
+        .forms-filter-row {
+          grid-template-columns: 1fr !important;
+        }
+      }
+
       @media (max-width: 560px) {
         .forms-header-mobile {
           align-items: stretch !important;
         }
         .forms-header-mobile button {
           width: 100%;
+        }
+        .forms-pagination-mobile {
+          justify-content: center !important;
         }
       }
     `,
@@ -860,18 +988,39 @@ export default function AdminForms() {
     return users.filter((u) => {
       const name = String(u?.name || "").toLowerCase();
       const email = String(u?.email || "").toLowerCase();
-      const role = String(u?.role || u?.role_name || "").toLowerCase();
-      const enterprise = String(u?.enterprise || u?.enterprise_name || "").toLowerCase();
-      const group = String(u?.group || u?.group_name || "").toLowerCase();
-      const unit = String(u?.service_unit || u?.service_unit_name || u?.unidad_servicio || "").toLowerCase();
+
+      const roles = Array.isArray(u?.roles)
+        ? u.roles.map((r) => String(typeof r === "string" ? r : r?.name || "")).join(" ").toLowerCase()
+        : String(u?.role || u?.role_name || "").toLowerCase();
+
+      const empresas = Array.isArray(u?.empresas)
+        ? u.empresas
+            .map((e) => String(e?.nombre || e?.razon_social || ""))
+            .join(" ")
+            .toLowerCase()
+        : String(u?.enterprise || u?.enterprise_name || "").toLowerCase();
+
+      const grupos = Array.isArray(u?.grupos)
+        ? u.grupos
+            .map((g) => String(g?.nombre_mostrar || g?.nombre || ""))
+            .join(" ")
+            .toLowerCase()
+        : String(u?.group || u?.group_name || "").toLowerCase();
+
+      const unidades = Array.isArray(u?.unidades_servicio)
+        ? u.unidades_servicio
+            .map((us) => String(us?.nombre || ""))
+            .join(" ")
+            .toLowerCase()
+        : String(u?.service_unit || u?.service_unit_name || u?.unidad_servicio || "").toLowerCase();
 
       return (
         name.includes(term) ||
         email.includes(term) ||
-        role.includes(term) ||
-        enterprise.includes(term) ||
-        group.includes(term) ||
-        unit.includes(term)
+        roles.includes(term) ||
+        empresas.includes(term) ||
+        grupos.includes(term) ||
+        unidades.includes(term)
       );
     });
   }, [users, assignmentSearch]);
@@ -893,12 +1042,12 @@ export default function AdminForms() {
               Formularios definidos por código. Solo puedes ver, publicar y asignar acceso.
             </div>
             <div style={{ fontSize: 12, color: "#64748b" }}>
-              Total registrados: <b>{filteredForms.length}</b>
+              Total registrados: <b>{totalItems}</b>
             </div>
           </div>
         </div>
 
-        <div style={S.filterRow}>
+        <div style={S.filterRow} className="forms-filter-row">
           <div>
             <div style={S.label}>Buscar formulario</div>
             <input
@@ -906,6 +1055,7 @@ export default function AdminForms() {
               value={qDraft}
               onFocus={rememberFocus}
               onClick={rememberFocus}
+              onBlur={() => (searchWasFocusedRef.current = false)}
               onChange={(e) => {
                 rememberFocus();
                 setQDraft(e.target.value);
@@ -913,6 +1063,43 @@ export default function AdminForms() {
               placeholder="Buscar por título o clave"
               style={S.input}
             />
+          </div>
+
+          <div>
+            <div style={S.label}>Por página</div>
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPage(1);
+                setPerPage(Number(e.target.value));
+              }}
+              style={S.select}
+            >
+              <option value={5}>5 registros</option>
+              <option value={10}>10 registros</option>
+              <option value={20}>20 registros</option>
+              <option value={25}>25 registros</option>
+              <option value={50}>50 registros</option>
+              <option value={75}>75 registros</option>
+              <option value={100}>100 registros</option>
+            </select>
+          </div>
+
+          <div>
+            <div style={S.label}>Página actual</div>
+            <div
+              style={{
+                ...S.input,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#fff",
+                color: "#334155",
+                fontWeight: 700,
+              }}
+            >
+              {safePage} de {lastPage}
+            </div>
           </div>
         </div>
 
@@ -946,20 +1133,19 @@ export default function AdminForms() {
               <table style={S.table}>
                 <thead>
                   <tr>
-                    <th style={S.th}>ID</th>
                     <th style={S.th}>Título</th>
                     <th style={S.th}>Status</th>
                     <th style={S.th}>Asignaciones</th>
                     <th style={S.th}>Fecha</th>
-                    <th style={{ ...S.th, width: 190, textAlign: "right" }}>Acciones</th>
+                    {canShowActionsColumn ? (
+                      <th style={{ ...S.th, width: 190 }}>Acciones</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredForms.length ? (
-                    filteredForms.map((f) => (
+                  {paginatedForms.length ? (
+                    paginatedForms.map((f) => (
                       <tr key={f.id}>
-                        <td style={S.td}>{f.id}</td>
-
                         <td style={S.td}>
                           <div style={{ fontWeight: 800 }}>{f.title}</div>
                           <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
@@ -968,63 +1154,79 @@ export default function AdminForms() {
                         </td>
 
                         <td style={S.td}>
-                          <Badge variant={statusBadgeVariant(f.status)}>{f.status}</Badge>
+                          <div style={{ display: "flex", justifyContent: "center" }}>
+                            <Badge variant={statusBadgeVariant(f.status)}>{f.status}</Badge>
+                          </div>
                         </td>
 
                         <td style={S.td}>
-                          {(Number(f?.assignments_count || 0) > 0) ? (
-                            <Badge variant="violet">
-                              {f.assignments_count} usuario{Number(f.assignments_count) === 1 ? "" : "s"}
-                            </Badge>
-                          ) : (
-                            <Badge variant="default">Sin restricción</Badge>
-                          )}
+                          <div style={{ display: "flex", justifyContent: "center" }}>
+                            {Number(f?.assignments_count || 0) > 0 ? (
+                              <Badge variant="violet">
+                                {f.assignments_count} usuario{Number(f.assignments_count) === 1 ? "" : "s"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="default">Sin usuarios asignados</Badge>
+                            )}
+                          </div>
                         </td>
 
                         <td style={{ ...S.td, fontSize: 12, color: "#334155" }}>
                           {formatDate(f.created_at)}
                         </td>
 
-                        <td style={{ ...S.td, textAlign: "right" }}>
-                          <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
-                            <IconBtn onClick={() => openPreviewModal(f)} title="Ver" variant="primary">
-                              <i className="fa-solid fa-eye" />
-                            </IconBtn>
+                        {canShowActionsColumn ? (
+                          <td style={S.td}>
+                            <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
+                              {canViewFormsAdmin ? (
+                                <IconBtn
+                                  onClick={() => openPreviewModal(f)}
+                                  title="Ver"
+                                  variant="primary"
+                                >
+                                  <i className="fa-solid fa-eye" />
+                                </IconBtn>
+                              ) : null}
 
-                            <IconBtn
-                              onClick={() => openAssignmentsModal(f)}
-                              title="Asignaciones"
-                              variant="violet"
-                            >
-                              <i className="fa-solid fa-user-check" />
-                            </IconBtn>
+                              {canAssignForms ? (
+                                <IconBtn
+                                  onClick={() => openAssignmentsModal(f)}
+                                  title="Asignaciones"
+                                  variant="violet"
+                                >
+                                  <i className="fa-solid fa-user-check" />
+                                </IconBtn>
+                              ) : null}
 
-                            {f.status !== "PUBLICADO" ? (
-                              <IconBtn
-                                onClick={() => publishForm(f)}
-                                disabled={publishingFormId === f.id}
-                                variant="default"
-                                title="Publicar"
-                              >
-                                <i className="fa-solid fa-cloud-arrow-up" />
-                              </IconBtn>
-                            ) : (
-                              <IconBtn
-                                onClick={() => unpublishForm(f)}
-                                disabled={unpublishingFormId === f.id}
-                                variant="default"
-                                title="Despublicar"
-                              >
-                                <i className="fa-solid fa-cloud-arrow-down" />
-                              </IconBtn>
-                            )}
-                          </div>
-                        </td>
+                              {canPublishForms ? (
+                                f.status !== "PUBLICADO" ? (
+                                  <IconBtn
+                                    onClick={() => publishForm(f)}
+                                    disabled={publishingFormId === f.id}
+                                    variant="default"
+                                    title="Publicar"
+                                  >
+                                    <i className="fa-solid fa-cloud-arrow-up" />
+                                  </IconBtn>
+                                ) : (
+                                  <IconBtn
+                                    onClick={() => unpublishForm(f)}
+                                    disabled={unpublishingFormId === f.id}
+                                    variant="default"
+                                    title="Despublicar"
+                                  >
+                                    <i className="fa-solid fa-cloud-arrow-down" />
+                                  </IconBtn>
+                                )
+                              ) : null}
+                            </div>
+                          </td>
+                        ) : null}
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={6}>
+                      <td style={S.td} colSpan={canShowActionsColumn ? 5 : 4}>
                         Sin formularios
                       </td>
                     </tr>
@@ -1034,7 +1236,27 @@ export default function AdminForms() {
             </div>
 
             <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
-              Tip: si un formulario tiene usuarios asignados, solo ellos podrán verlo.
+              Tip: si un formulario no tiene usuarios asignados, no será visible para usuarios normales aunque esté publicado.
+            </div>
+
+            <div style={S.pagination} className="forms-pagination-mobile">
+              <Btn
+                disabled={!canPrev}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Btn>
+
+              <div style={{ fontSize: 13, color: "#475569", fontWeight: 700 }}>
+                Mostrando página <b>{safePage}</b> de <b>{lastPage}</b>
+              </div>
+
+              <Btn
+                disabled={!canNext}
+                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+              >
+                Siguiente
+              </Btn>
             </div>
           </>
         )}
@@ -1112,6 +1334,15 @@ export default function AdminForms() {
                             {previewForm?.payload?._code_key || "—"}
                           </div>
                         </div>
+
+                        <div>
+                          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>
+                            Usuarios asignados
+                          </div>
+                          <div style={{ fontWeight: 800 }}>
+                            {Number(previewForm?.assignments_count || 0)}
+                          </div>
+                        </div>
                       </div>
 
                       <div style={{ marginTop: 14, fontSize: 12, color: "#64748b" }}>
@@ -1187,7 +1418,7 @@ export default function AdminForms() {
             </div>
 
             <div style={S.modalBody}>
-              {(loadingUsers || loadingAssignments) ? (
+              {loadingUsers || loadingAssignments ? (
                 <div style={{ color: "#64748b", fontWeight: 800 }}>
                   Cargando usuarios y asignaciones...
                 </div>
@@ -1207,7 +1438,7 @@ export default function AdminForms() {
                       <input
                         value={assignmentSearch}
                         onChange={(e) => setAssignmentSearch(e.target.value)}
-                        placeholder="Buscar por nombre, correo, rol, empresa..."
+                        placeholder="Buscar por nombre, correo, rol, unidad, empresa o grupo"
                         style={S.input}
                       />
 
@@ -1232,6 +1463,35 @@ export default function AdminForms() {
                       {filteredUsers.length ? (
                         filteredUsers.map((u) => {
                           const checked = selectedUserIds.includes(Number(u.id));
+
+                          const roleLabel = Array.isArray(u?.roles)
+                            ? u.roles
+                                .map((r) => (typeof r === "string" ? r : r?.name))
+                                .filter(Boolean)
+                                .join(", ")
+                            : u?.role || u?.role_name || "";
+
+                          const empresaLabel = Array.isArray(u?.empresas)
+                            ? u.empresas
+                                .map((e) => e?.nombre || e?.razon_social)
+                                .filter(Boolean)
+                                .join(", ")
+                            : u?.enterprise || u?.enterprise_name || "";
+
+                          const grupoLabel = Array.isArray(u?.grupos)
+                            ? u.grupos
+                                .map((g) => g?.nombre_mostrar || g?.nombre)
+                                .filter(Boolean)
+                                .join(", ")
+                            : u?.group || u?.group_name || "";
+
+                          const unidadLabel = Array.isArray(u?.unidades_servicio)
+                            ? u.unidades_servicio
+                                .map((us) => us?.nombre)
+                                .filter(Boolean)
+                                .join(", ")
+                            : u?.unidad_servicio || u?.service_unit || u?.service_unit_name || "";
+
                           return (
                             <label key={u.id} style={S.userRow}>
                               <input
@@ -1257,21 +1517,10 @@ export default function AdminForms() {
                                     marginTop: 8,
                                   }}
                                 >
-                                  {u.role || u.role_name ? (
-                                    <Badge variant="info">{u.role || u.role_name}</Badge>
-                                  ) : null}
-
-                                  {u.unidad_servicio || u.service_unit || u.service_unit_name ? (
-                                    <Badge variant="default">
-                                      {u.unidad_servicio || u.service_unit || u.service_unit_name}
-                                    </Badge>
-                                  ) : null}
-
-                                  {u.enterprise || u.enterprise_name ? (
-                                    <Badge variant="default">
-                                      {u.enterprise || u.enterprise_name}
-                                    </Badge>
-                                  ) : null}
+                                  {roleLabel ? <Badge variant="info">{roleLabel}</Badge> : null}
+                                  {unidadLabel ? <Badge variant="default">{unidadLabel}</Badge> : null}
+                                  {empresaLabel ? <Badge variant="default">{empresaLabel}</Badge> : null}
+                                  {grupoLabel ? <Badge variant="default">{grupoLabel}</Badge> : null}
                                 </div>
                               </div>
                             </label>
@@ -1303,8 +1552,7 @@ export default function AdminForms() {
                         Comportamiento
                       </div>
                       <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
-                        Si guardas usuarios aquí, el formulario quedará restringido y solo esos
-                        usuarios podrán verlo.
+                        Si no guardas usuarios aquí, el formulario no será visible para usuarios normales, aunque esté publicado. Solo el administrador podrá verlo.
                       </div>
                     </div>
 
@@ -1341,7 +1589,7 @@ export default function AdminForms() {
                           ))
                         ) : (
                           <div style={{ color: "#64748b", fontSize: 13 }}>
-                            No hay usuarios seleccionados. Si guardas así, el formulario quedará sin restricción.
+                            No hay usuarios seleccionados. En ese caso, el formulario quedará oculto para usuarios normales.
                           </div>
                         )}
                       </div>

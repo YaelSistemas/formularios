@@ -4,6 +4,58 @@ import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 export default function AdminEmpresas() {
   const [err, setErr] = useState("");
 
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
+  const me = getStoredUser();
+
+  const isAdmin =
+    !!me?.is_admin ||
+    normalizeRoles(me).some((r) => String(r).toLowerCase() === "administrador");
+
+  const hasPermission = (permission) => {
+    if (isAdmin) return true;
+    return normalizePermissions(me).includes(permission);
+  };
+
+  const canCreateEmpresas = hasPermission("empresas.create");
+  const canEditEmpresas = hasPermission("empresas.edit");
+  const canDeleteEmpresas = hasPermission("empresas.delete");
+  const canShowActionsColumn = canEditEmpresas || canDeleteEmpresas;
+
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
@@ -25,7 +77,7 @@ export default function AdminEmpresas() {
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
 
-  const perPage = 20;
+  const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ last_page: 1, total: 0 });
 
@@ -64,6 +116,17 @@ export default function AdminEmpresas() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  const empresaHasAssignedUsers = (row) => {
+    if (!row) return false;
+
+    if (Number(row.users_count || 0) > 0) return true;
+    if (Number(row.assigned_users_count || 0) > 0) return true;
+    if (Number(row.total_users || 0) > 0) return true;
+    if (Array.isArray(row.users) && row.users.length > 0) return true;
+
+    return false;
+  };
 
   const load = async () => {
     setErr("");
@@ -104,7 +167,7 @@ export default function AdminEmpresas() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, page]);
+  }, [q, page, perPage]);
 
   useEffect(() => {
     restoreFocusIfNeeded();
@@ -138,12 +201,22 @@ export default function AdminEmpresas() {
   };
 
   const openCreate = () => {
+    if (!canCreateEmpresas) {
+      setErr("No tienes permiso para crear empresas.");
+      return;
+    }
+
     resetForm();
     setFormMode("create");
     setOpenForm(true);
   };
 
   const openEdit = (r) => {
+    if (!canEditEmpresas) {
+      setErr("No tienes permiso para editar empresas.");
+      return;
+    }
+
     resetForm();
     setFormMode("edit");
     setEditingId(r.id);
@@ -182,6 +255,16 @@ export default function AdminEmpresas() {
     e.preventDefault();
     setErr("");
 
+    if (formMode === "create" && !canCreateEmpresas) {
+      setErr("No tienes permiso para crear empresas.");
+      return;
+    }
+
+    if (formMode === "edit" && !canEditEmpresas) {
+      setErr("No tienes permiso para editar empresas.");
+      return;
+    }
+
     if (!validateForm()) return;
 
     setSaving(true);
@@ -211,6 +294,16 @@ export default function AdminEmpresas() {
   };
 
   const remove = async (r) => {
+    if (!canDeleteEmpresas) {
+      setErr("No tienes permiso para eliminar empresas.");
+      return;
+    }
+
+    if (empresaHasAssignedUsers(r)) {
+      setErr("No puedes eliminar una empresa que ya está asignada a uno o más usuarios.");
+      return;
+    }
+
     const ok = window.confirm(`¿Eliminar la empresa "${r.nombre}"?`);
     if (!ok) return;
 
@@ -307,23 +400,37 @@ export default function AdminEmpresas() {
     );
   };
 
-  const Badge = ({ children, active = true }) => (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "6px 10px",
-        borderRadius: 999,
-        border: `1px solid ${active ? "#86efac" : "#fecaca"}`,
-        background: active ? "#ecfdf5" : "#fef2f2",
-        fontSize: 12,
-        fontWeight: 800,
-        color: active ? "#166534" : "#b91c1c",
-      }}
-    >
-      {children}
-    </span>
-  );
+  const Badge = ({ children, active = true, tone = null }) => {
+    let border = active ? "#86efac" : "#fecaca";
+    let background = active ? "#ecfdf5" : "#fef2f2";
+    let color = active ? "#166534" : "#b91c1c";
+
+    if (tone === "warning") {
+      border = "#fdba74";
+      background = "#fff7ed";
+      color = "#c2410c";
+    }
+
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "6px 10px",
+          borderRadius: 999,
+          border: `1px solid ${border}`,
+          background,
+          fontSize: 12,
+          fontWeight: 800,
+          color,
+          textAlign: "center",
+        }}
+      >
+        {children}
+      </span>
+    );
+  };
 
   const toastStyle = (() => {
     if (!toast) return {};
@@ -355,7 +462,7 @@ export default function AdminEmpresas() {
     },
     filterRow: {
       display: "grid",
-      gridTemplateColumns: "minmax(220px, 1fr) auto",
+      gridTemplateColumns: "minmax(220px, 1fr) auto auto",
       gap: 12,
       alignItems: "end",
       marginTop: 14,
@@ -367,6 +474,15 @@ export default function AdminEmpresas() {
       marginBottom: 6,
     },
     input: {
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#f8fafc",
+      outline: "none",
+      minHeight: 44,
+    },
+    select: {
       width: "100%",
       padding: "11px 12px",
       borderRadius: 12,
@@ -394,7 +510,7 @@ export default function AdminEmpresas() {
       background: "#fff",
     },
     th: {
-      textAlign: "left",
+      textAlign: "center",
       fontSize: 12,
       color: "#475569",
       padding: "14px 12px",
@@ -404,6 +520,7 @@ export default function AdminEmpresas() {
       top: 0,
       zIndex: 1,
       fontWeight: 800,
+      verticalAlign: "middle",
     },
     td: {
       padding: "14px 12px",
@@ -411,6 +528,7 @@ export default function AdminEmpresas() {
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
+      textAlign: "center",
     },
     pagination: {
       display: "flex",
@@ -517,6 +635,7 @@ export default function AdminEmpresas() {
       gap: 12,
       minHeight: 46,
       padding: "10px 0",
+      justifyContent: "flex-start",
     },
     toggleButton: {
       position: "relative",
@@ -582,10 +701,12 @@ export default function AdminEmpresas() {
             </div>
           </div>
 
-          <Btn variant="primary" onClick={openCreate}>
-            <i className="fa-solid fa-plus" />
-            Nueva empresa
-          </Btn>
+          {canCreateEmpresas ? (
+            <Btn variant="primary" onClick={openCreate}>
+              <i className="fa-solid fa-plus" />
+              Nueva empresa
+            </Btn>
+          ) : null}
         </div>
 
         <div style={S.filterRow} className="emp-filter-row">
@@ -607,12 +728,33 @@ export default function AdminEmpresas() {
           </div>
 
           <div>
+            <div style={S.label}>Por página</div>
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPage(1);
+                setPerPage(Number(e.target.value));
+              }}
+              style={S.select}
+            >
+              <option value={5}>5 registros</option>
+              <option value={10}>10 registros</option>
+              <option value={20}>20 registros</option>
+              <option value={25}>25 registros</option>
+              <option value={50}>50 registros</option>
+              <option value={75}>75 registros</option>
+              <option value={100}>100 registros</option>
+            </select>
+          </div>
+
+          <div>
             <div style={S.label}>Página actual</div>
             <div
               style={{
                 ...S.input,
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 background: "#fff",
                 color: "#334155",
                 fontWeight: 700,
@@ -658,49 +800,84 @@ export default function AdminEmpresas() {
                     <th style={S.th}>Nombre</th>
                     <th style={S.th}>Razón social</th>
                     <th style={S.th}>Estado</th>
-                    <th style={{ ...S.th, width: 140, textAlign: "right" }}>Acciones</th>
+                    {canShowActionsColumn ? (
+                      <th style={{ ...S.th, width: 160 }}>Acciones</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.length ? (
-                    rows.map((r) => (
-                      <tr key={r.id}>
-                        <td style={S.td}>
-                          <div style={{ fontWeight: 800 }}>{r.nombre}</div>
-                        </td>
-                        <td style={S.td}>
-                          <div style={{ color: "#334155" }}>{r.razon_social || "—"}</div>
-                        </td>
-                        <td style={S.td}>
-                          <Badge active={!!r.activo}>
-                            {r.activo ? "Activa" : "Inactiva"}
-                          </Badge>
-                        </td>
-                        <td style={{ ...S.td, textAlign: "right" }}>
-                          <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
-                            <IconBtn
-                              onClick={() => openEdit(r)}
-                              title="Editar"
-                              variant="primary"
-                            >
-                              <i className="fa-solid fa-pen" />
-                            </IconBtn>
+                    rows.map((r) => {
+                      const inUse = empresaHasAssignedUsers(r);
 
-                            <IconBtn
-                              disabled={deletingId === r.id}
-                              onClick={() => remove(r)}
-                              variant="danger"
-                              title="Eliminar"
+                      return (
+                        <tr key={r.id}>
+                          <td style={S.td}>
+                            <div style={{ fontWeight: 800 }}>{r.nombre}</div>
+                          </td>
+                          <td style={S.td}>
+                            <div style={{ color: "#334155", maxWidth: 320, margin: "0 auto" }}>
+                              {r.razon_social || "—"}
+                            </div>
+                          </td>
+                          <td style={S.td}>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                flexWrap: "wrap",
+                                justifyContent: "center",
+                              }}
                             >
-                              <i className="fa-solid fa-trash" />
-                            </IconBtn>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              <Badge active={!!r.activo}>
+                                {r.activo ? "Activa" : "Inactiva"}
+                              </Badge>
+
+                              {inUse ? (
+                                <Badge tone="warning">En uso</Badge>
+                              ) : null}
+                            </div>
+                          </td>
+
+                          {canShowActionsColumn ? (
+                            <td style={S.td}>
+                              <div
+                                style={{
+                                  display: "inline-flex",
+                                  gap: 8,
+                                  flexWrap: "nowrap",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {canEditEmpresas ? (
+                                  <IconBtn
+                                    onClick={() => openEdit(r)}
+                                    title="Editar"
+                                    variant="primary"
+                                  >
+                                    <i className="fa-solid fa-pen" />
+                                  </IconBtn>
+                                ) : null}
+
+                                {canDeleteEmpresas ? (
+                                  <IconBtn
+                                    disabled={deletingId === r.id || inUse}
+                                    onClick={() => remove(r)}
+                                    variant="danger"
+                                    title={inUse ? "No se puede eliminar porque está asignada a usuarios" : "Eliminar"}
+                                  >
+                                    <i className="fa-solid fa-trash" />
+                                  </IconBtn>
+                                ) : null}
+                              </div>
+                            </td>
+                          ) : null}
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={4}>
+                      <td style={S.td} colSpan={canShowActionsColumn ? 4 : 3}>
                         Sin empresas registradas.
                       </td>
                     </tr>

@@ -35,107 +35,153 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // ---------------- FORMS (Usuarios autenticados) ----------------
-    // Lista (admin ve todo; usuario normal solo PUBLICADO)
     Route::get('/forms', [FormsController::class, 'index'])
         ->middleware('perm:formularios.view');
 
-    // Detalle (admin cualquiera; usuario normal solo PUBLICADO)
     Route::get('/forms/{form}', [FormsController::class, 'show'])
         ->middleware('perm:formularios.view');
 
-    // Llenar formulario (guardar respuestas)
     Route::post('/forms/{form}/submit', [FormSubmissionsController::class, 'store'])
         ->middleware('perm:formularios.submit');
 
-    // Ver respuestas del formulario (tabla submissions)
     Route::get('/forms/{form}/submissions', [FormSubmissionsController::class, 'index'])
         ->middleware('perm:formularios.submissions.view');
 
-    // Ver historial de un registro
     Route::get('/forms/{form}/submissions/{submission}/history', [FormSubmissionsController::class, 'history'])
         ->middleware('perm:formularios.submissions.view');
 
     Route::put('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'update'])
         ->middleware('perm:formularios.edit');
-    
+
     Route::patch('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'update'])
         ->middleware('perm:formularios.edit');
-    
+
     Route::delete('/forms/{form}/submissions/{submission}', [FormSubmissionsController::class, 'destroy'])
         ->middleware('perm:formularios.delete');
-    
+
     Route::get('/forms/{form}/submissions/{submission}/pdf', [FormSubmissionPdfController::class, 'show'])
         ->middleware('perm:formularios.submissions.view');
 });
 
 /*
 |--------------------------------------------------------------------------
-| Admin (Authenticated + Admin role)
+| Admin (Authenticated + permiso panel admin)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth:sanctum', 'admin'])
+Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
     ->prefix('admin')
     ->group(function () {
 
         // Roles (solo nombres, para asignar en usuarios)
-        Route::get('/roles', [UsersController::class, 'roles']);
+        Route::get('/roles', [UsersController::class, 'roles'])
+            ->middleware('perm:usuarios.view');
 
         // Users CRUD
-        Route::get('/users', [UsersController::class, 'index']);
-        Route::post('/users', [UsersController::class, 'store']);
-        Route::put('/users/{user}', [UsersController::class, 'update']);
-        Route::delete('/users/{user}', [UsersController::class, 'destroy']);
+        Route::get('/users', [UsersController::class, 'index'])
+            ->middleware('perm:usuarios.view');
+
+        Route::post('/users', [UsersController::class, 'store'])
+            ->middleware('perm:usuarios.create');
+
+        Route::put('/users/{user}', [UsersController::class, 'update'])
+            ->middleware('perm:usuarios.edit');
+
+        Route::delete('/users/{user}', [UsersController::class, 'destroy'])
+            ->middleware('perm:usuarios.delete');
 
         // Roles CRUD
-        Route::get('/roles-list', [RolesController::class, 'index']);
-        Route::get('/roles-list/{role}', [RolesController::class, 'show']);
-        Route::post('/roles-list', [RolesController::class, 'store']);
-        Route::put('/roles-list/{role}', [RolesController::class, 'update']);
-        Route::delete('/roles-list/{role}', [RolesController::class, 'destroy']);
+        Route::get('/roles-list', [RolesController::class, 'index'])
+            ->middleware('perm:roles.view');
+
+        Route::get('/roles-list/{role}', [RolesController::class, 'show'])
+            ->middleware('perm:roles.edit');
+
+        Route::post('/roles-list', [RolesController::class, 'store'])
+            ->middleware('perm:roles.create');
+
+        Route::put('/roles-list/{role}', [RolesController::class, 'update'])
+            ->middleware('perm:roles.edit');
+
+        Route::delete('/roles-list/{role}', [RolesController::class, 'destroy'])
+            ->middleware('perm:roles.delete');
 
         // Permissions CRUD
-        Route::get('/permissions', [PermissionsController::class, 'index']);
-        Route::post('/permissions', [PermissionsController::class, 'store']);
-        Route::put('/permissions/{permission}', [PermissionsController::class, 'update']);
-        Route::delete('/permissions/{permission}', [PermissionsController::class, 'destroy']);
+        Route::get('/permissions', [PermissionsController::class, 'index'])
+            ->middleware('perm:permisos.view');
+
+        Route::post('/permissions', [PermissionsController::class, 'store'])
+            ->middleware('perm:permisos.create');
+
+        Route::put('/permissions/{permission}', [PermissionsController::class, 'update'])
+            ->middleware('perm:permisos.edit');
+
+        Route::delete('/permissions/{permission}', [PermissionsController::class, 'destroy'])
+            ->middleware('perm:permisos.delete');
 
         // Role <-> Permissions
-        Route::get('/roles/{role}/permissions', [RolePermissionsController::class, 'show']);
-        Route::put('/roles/{role}/permissions', [RolePermissionsController::class, 'update']);
+        Route::get('/roles/{role}/permissions', [RolePermissionsController::class, 'show'])
+            ->middleware('perm:roles.edit');
 
-        Route::get('empresas', [EmpresasController::class, 'index']);
-        Route::post('empresas', [EmpresasController::class, 'store']);
-        Route::put('empresas/{empresa}', [EmpresasController::class, 'update']);
-        Route::delete('empresas/{empresa}', [EmpresasController::class, 'destroy']);
+        Route::put('/roles/{role}/permissions', [RolePermissionsController::class, 'update'])
+            ->middleware('perm:roles.edit');
 
-        Route::get('grupos', [GruposController::class, 'index']);
-        Route::post('grupos', [GruposController::class, 'store']);
-        Route::put('grupos/{grupo}', [GruposController::class, 'update']);
-        Route::delete('grupos/{grupo}', [GruposController::class, 'destroy']);
+        // Empresas
+        Route::get('/empresas', [EmpresasController::class, 'index'])
+            ->middleware('perm:empresas.view');
 
-        Route::get('unidades-servicio', [UnidadesServicioController::class, 'index']);
-        Route::post('unidades-servicio', [UnidadesServicioController::class, 'store']);
-        Route::put('unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'update']);
-        Route::delete('unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'destroy']);
+        Route::post('/empresas', [EmpresasController::class, 'store'])
+            ->middleware('perm:empresas.create');
 
-        // ---------------- FORMS (Admin solo lectura + publicar) ----------------
+        Route::put('/empresas/{empresa}', [EmpresasController::class, 'update'])
+            ->middleware('perm:empresas.edit');
+
+        Route::delete('/empresas/{empresa}', [EmpresasController::class, 'destroy'])
+            ->middleware('perm:empresas.delete');
+
+        // Grupos
+        Route::get('/grupos', [GruposController::class, 'index'])
+            ->middleware('perm:grupos.view');
+
+        Route::post('/grupos', [GruposController::class, 'store'])
+            ->middleware('perm:grupos.create');
+
+        Route::put('/grupos/{grupo}', [GruposController::class, 'update'])
+            ->middleware('perm:grupos.edit');
+
+        Route::delete('/grupos/{grupo}', [GruposController::class, 'destroy'])
+            ->middleware('perm:grupos.delete');
+
+        // Unidades de servicio
+        Route::get('/unidades-servicio', [UnidadesServicioController::class, 'index'])
+            ->middleware('perm:unidades_servicio.view');
+
+        Route::post('/unidades-servicio', [UnidadesServicioController::class, 'store'])
+            ->middleware('perm:unidades_servicio.create');
+
+        Route::put('/unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'update'])
+            ->middleware('perm:unidades_servicio.edit');
+
+        Route::delete('/unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'destroy'])
+            ->middleware('perm:unidades_servicio.delete');
+
+        // ---------------- FORMS ADMIN ----------------
         Route::get('/forms', [FormsController::class, 'adminIndex'])
-            ->middleware('perm:formularios.view');
+            ->middleware('perm:formularios.admin.view');
 
         Route::get('/forms/{form}', [FormsController::class, 'show'])
-            ->middleware('perm:formularios.view');
+            ->middleware('perm:formularios.admin.view');
 
         // Asignaciones de formularios
         Route::get('/forms/{form}/assignments', [AdminFormAssignmentsController::class, 'index'])
-            ->middleware('perm:formularios.view');
+            ->middleware('perm:formularios.admin.assign');
 
         Route::post('/forms/{form}/assignments', [AdminFormAssignmentsController::class, 'store'])
-            ->middleware('perm:formularios.publish');
+            ->middleware('perm:formularios.admin.assign');
 
         // Publicar / Despublicar
         Route::post('/forms/{form}/publish', [FormsController::class, 'publish'])
-            ->middleware('perm:formularios.publish');
+            ->middleware('perm:formularios.admin.publish');
 
         Route::post('/forms/{form}/unpublish', [FormsController::class, 'unpublish'])
-            ->middleware('perm:formularios.publish');
+            ->middleware('perm:formularios.admin.publish');
     });

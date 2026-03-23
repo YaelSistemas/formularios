@@ -14,14 +14,15 @@ class UsersController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-        $perPage = (int) $request->query('per_page', 10);
-        $perPage = max(5, min(50, $perPage));
+        $perPage = (int) $request->query('per_page', 25);
+        $perPage = max(5, min(100, $perPage));
 
         $users = User::query()
             ->with([
                 'empresas:id,nombre,razon_social,activo',
                 'grupos:id,nombre,nombre_mostrar,activo',
                 'unidadesServicio:id,nombre,descripcion,activo',
+                'roles:id,name',
             ])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
@@ -139,8 +140,8 @@ class UsersController extends Controller
         ], $messages);
 
         $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
+            'name' => trim($data['name']),
+            'email' => trim($data['email']),
             'activo' => (bool) $data['activo'],
             'password' => Hash::make($data['password']),
         ]);
@@ -247,8 +248,8 @@ class UsersController extends Controller
             'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
         ], $messages);
 
-        $user->name = $data['name'];
-        $user->email = $data['email'];
+        $user->name = trim($data['name']);
+        $user->email = trim($data['email']);
         $user->activo = (bool) $data['activo'];
 
         if (!empty($data['password'])) {
@@ -301,8 +302,22 @@ class UsersController extends Controller
         ]);
     }
 
-    public function destroy(User $user)
+    public function destroy(Request $request, User $user)
     {
+        $authUser = $request->user();
+
+        if ($authUser && (int) $authUser->id === (int) $user->id) {
+            return response()->json([
+                'message' => 'No puedes eliminar tu propio usuario.',
+            ], 422);
+        }
+
+        if ($user->hasRole('Administrador')) {
+            return response()->json([
+                'message' => 'No se puede eliminar un usuario con rol Administrador.',
+            ], 422);
+        }
+
         $user->delete();
 
         return response()->json([

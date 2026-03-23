@@ -12,10 +12,11 @@ class UnidadesServicioController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-        $perPage = (int) $request->query('per_page', 20);
-        $perPage = max(5, min(50, $perPage));
+        $perPage = (int) $request->query('per_page', 25);
+        $perPage = max(5, min(100, $perPage));
 
         $rows = UnidadServicio::query()
+            ->withCount('users')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('nombre', 'like', "%{$q}%")
@@ -47,6 +48,8 @@ class UnidadesServicioController extends Controller
             'activo' => (bool) $data['activo'],
         ]);
 
+        $row->loadCount('users');
+
         return response()->json([
             'ok' => true,
             'unidad_servicio' => $row,
@@ -55,6 +58,8 @@ class UnidadesServicioController extends Controller
 
     public function show(UnidadServicio $unidades_servicio)
     {
+        $unidades_servicio->loadCount('users');
+
         return response()->json([
             'ok' => true,
             'unidad_servicio' => $unidades_servicio,
@@ -87,12 +92,20 @@ class UnidadesServicioController extends Controller
 
         return response()->json([
             'ok' => true,
-            'unidad_servicio' => $unidades_servicio->fresh(),
+            'unidad_servicio' => $unidades_servicio->fresh()->loadCount('users'),
         ]);
     }
 
     public function destroy(UnidadServicio $unidades_servicio)
     {
+        $unidades_servicio->loadCount('users');
+
+        if ((int) $unidades_servicio->users_count > 0) {
+            return response()->json([
+                'message' => 'No puedes eliminar una unidad de servicio que ya está asignada a uno o más usuarios.',
+            ], 422);
+        }
+
         $unidades_servicio->delete();
 
         return response()->json([

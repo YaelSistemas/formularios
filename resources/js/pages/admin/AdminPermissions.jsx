@@ -4,6 +4,58 @@ import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 export default function AdminPermissions() {
   const [err, setErr] = useState("");
 
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
+  const me = getStoredUser();
+
+  const isAdmin =
+    !!me?.is_admin ||
+    normalizeRoles(me).some((r) => String(r).toLowerCase() === "administrador");
+
+  const hasPermission = (permission) => {
+    if (isAdmin) return true;
+    return normalizePermissions(me).includes(permission);
+  };
+
+  const canCreatePermissions = hasPermission("permisos.create");
+  const canEditPermissions = hasPermission("permisos.edit");
+  const canDeletePermissions = hasPermission("permisos.delete");
+  const canShowActionsColumn = canEditPermissions || canDeletePermissions;
+
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
@@ -25,7 +77,7 @@ export default function AdminPermissions() {
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
 
-  const perPage = 20;
+  const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ last_page: 1, total: 0 });
 
@@ -103,7 +155,7 @@ export default function AdminPermissions() {
   useEffect(() => {
     loadPermissions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, page]);
+  }, [q, page, perPage]);
 
   useEffect(() => {
     restoreFocusIfNeeded();
@@ -135,12 +187,22 @@ export default function AdminPermissions() {
   };
 
   const openCreatePermModal = () => {
+    if (!canCreatePermissions) {
+      setErr("No tienes permiso para crear permisos.");
+      return;
+    }
+
     resetPermForm();
     setPermMode("create");
     setOpenPermModal(true);
   };
 
   const openEditPermModal = (p) => {
+    if (!canEditPermissions) {
+      setErr("No tienes permiso para editar permisos.");
+      return;
+    }
+
     resetPermForm();
     setPermMode("edit");
     setEditingPermId(p.id);
@@ -177,6 +239,16 @@ export default function AdminPermissions() {
     e.preventDefault();
     setErr("");
 
+    if (permMode === "create" && !canCreatePermissions) {
+      setErr("No tienes permiso para crear permisos.");
+      return;
+    }
+
+    if (permMode === "edit" && !canEditPermissions) {
+      setErr("No tienes permiso para editar permisos.");
+      return;
+    }
+
     if (!validatePermForm()) return;
 
     setSavingPermModal(true);
@@ -201,7 +273,19 @@ export default function AdminPermissions() {
     }
   };
 
+  const permissionHasRoles = (p) => Number(p?.roles_count || 0) > 0;
+
   const deletePermission = async (p) => {
+    if (!canDeletePermissions) {
+      setErr("No tienes permiso para eliminar permisos.");
+      return;
+    }
+
+    if (permissionHasRoles(p)) {
+      setErr("No se puede eliminar el permiso porque está asignado a uno o más roles.");
+      return;
+    }
+
     const ok = window.confirm(`¿Eliminar el permiso "${p.name}"?`);
     if (!ok) return;
 
@@ -305,6 +389,8 @@ export default function AdminPermissions() {
       role: { bg: "#f1f5f9", border: "#cbd5e1", fg: "#334155" },
       formatOk: { bg: "#ecfdf5", border: "#86efac", fg: "#166534" },
       formatWarn: { bg: "#fff7ed", border: "#fdba74", fg: "#c2410c" },
+      warning: { bg: "#fef2f2", border: "#fecaca", fg: "#b91c1c" },
+      info: { bg: "#eff6ff", border: "#93c5fd", fg: "#1e40af" },
     };
 
     const t = tones[tone] || tones.default;
@@ -314,6 +400,7 @@ export default function AdminPermissions() {
         style={{
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           padding: "6px 10px",
           borderRadius: 999,
           border: `1px solid ${t.border}`,
@@ -321,6 +408,7 @@ export default function AdminPermissions() {
           color: t.fg,
           fontSize: 12,
           fontWeight: 800,
+          textAlign: "center",
         }}
       >
         {children}
@@ -358,7 +446,7 @@ export default function AdminPermissions() {
     },
     filterRow: {
       display: "grid",
-      gridTemplateColumns: "minmax(220px, 1fr) auto",
+      gridTemplateColumns: "minmax(220px, 1fr) auto auto",
       gap: 12,
       alignItems: "end",
       marginTop: 14,
@@ -370,6 +458,15 @@ export default function AdminPermissions() {
       marginBottom: 6,
     },
     input: {
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#f8fafc",
+      outline: "none",
+      minHeight: 44,
+    },
+    select: {
       width: "100%",
       padding: "11px 12px",
       borderRadius: 12,
@@ -397,7 +494,7 @@ export default function AdminPermissions() {
       background: "#fff",
     },
     th: {
-      textAlign: "left",
+      textAlign: "center",
       fontSize: 12,
       color: "#475569",
       padding: "14px 12px",
@@ -407,6 +504,7 @@ export default function AdminPermissions() {
       top: 0,
       zIndex: 1,
       fontWeight: 800,
+      verticalAlign: "middle",
     },
     td: {
       padding: "14px 12px",
@@ -414,6 +512,7 @@ export default function AdminPermissions() {
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
+      textAlign: "center",
     },
     pagination: {
       display: "flex",
@@ -509,6 +608,13 @@ export default function AdminPermissions() {
       cursor: "pointer",
       fontWeight: 900,
     },
+    badgesWrap: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      flexWrap: "wrap",
+    },
     responsiveStyleTag: `
       @media (max-width: 860px) {
         .perms-filter-row {
@@ -549,10 +655,12 @@ export default function AdminPermissions() {
             </div>
           </div>
 
-          <Btn variant="primary" onClick={openCreatePermModal}>
-            <i className="fa-solid fa-plus" />
-            Nuevo permiso
-          </Btn>
+          {canCreatePermissions ? (
+            <Btn variant="primary" onClick={openCreatePermModal}>
+              <i className="fa-solid fa-plus" />
+              Nuevo permiso
+            </Btn>
+          ) : null}
         </div>
 
         <div style={S.filterRow} className="perms-filter-row">
@@ -574,12 +682,33 @@ export default function AdminPermissions() {
           </div>
 
           <div>
+            <div style={S.label}>Por página</div>
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPage(1);
+                setPerPage(Number(e.target.value));
+              }}
+              style={S.select}
+            >
+              <option value={5}>5 registros</option>
+              <option value={10}>10 registros</option>
+              <option value={20}>20 registros</option>
+              <option value={25}>25 registros</option>
+              <option value={50}>50 registros</option>
+              <option value={75}>75 registros</option>
+              <option value={100}>100 registros</option>
+            </select>
+          </div>
+
+          <div>
             <div style={S.label}>Página actual</div>
             <div
               style={{
                 ...S.input,
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 background: "#fff",
                 color: "#334155",
                 fontWeight: 700,
@@ -622,54 +751,83 @@ export default function AdminPermissions() {
               <table style={S.table}>
                 <thead>
                   <tr>
-                    <th style={S.th}>ID</th>
                     <th style={S.th}>Permiso</th>
                     <th style={S.th}>Formato</th>
-                    <th style={{ ...S.th, width: 140, textAlign: "right" }}>Acciones</th>
+                    <th style={S.th}>Roles asignados</th>
+                    {canShowActionsColumn ? (
+                      <th style={{ ...S.th, width: 140 }}>Acciones</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
                   {permissions.length ? (
                     permissions.map((p) => {
                       const okFormat = String(p.name || "").includes(".");
+                      const hasRoles = permissionHasRoles(p);
 
                       return (
                         <tr key={p.id}>
-                          <td style={S.td}>{p.id}</td>
                           <td style={S.td}>
                             <div style={{ fontWeight: 800 }}>{p.name}</div>
                           </td>
+
                           <td style={S.td}>
                             <Badge tone={okFormat ? "formatOk" : "formatWarn"}>
                               {okFormat ? "modulo.accion" : "sin punto"}
                             </Badge>
                           </td>
-                          <td style={{ ...S.td, textAlign: "right" }}>
-                            <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
-                              <IconBtn
-                                onClick={() => openEditPermModal(p)}
-                                title="Editar"
-                                variant="primary"
-                              >
-                                <i className="fa-solid fa-pen" />
-                              </IconBtn>
 
-                              <IconBtn
-                                onClick={() => deletePermission(p)}
-                                disabled={deletingPermId === p.id}
-                                variant="danger"
-                                title="Eliminar"
-                              >
-                                <i className="fa-solid fa-trash" />
-                              </IconBtn>
+                          <td style={S.td}>
+                            <div style={S.badgesWrap}>
+                              <Badge tone={hasRoles ? "warning" : "info"}>
+                                {Number(p.roles_count || 0)} rol{Number(p.roles_count || 0) === 1 ? "" : "es"}
+                              </Badge>
                             </div>
                           </td>
+
+                          {canShowActionsColumn ? (
+                            <td style={S.td}>
+                              <div
+                                style={{
+                                  display: "inline-flex",
+                                  gap: 8,
+                                  flexWrap: "nowrap",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {canEditPermissions ? (
+                                  <IconBtn
+                                    onClick={() => openEditPermModal(p)}
+                                    title="Editar"
+                                    variant="primary"
+                                  >
+                                    <i className="fa-solid fa-pen" />
+                                  </IconBtn>
+                                ) : null}
+
+                                {canDeletePermissions ? (
+                                  <IconBtn
+                                    onClick={() => deletePermission(p)}
+                                    disabled={deletingPermId === p.id || hasRoles}
+                                    variant="danger"
+                                    title={
+                                      hasRoles
+                                        ? "No se puede eliminar porque está asignado a roles"
+                                        : "Eliminar"
+                                    }
+                                  >
+                                    <i className="fa-solid fa-trash" />
+                                  </IconBtn>
+                                ) : null}
+                              </div>
+                            </td>
+                          ) : null}
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={4}>
+                      <td style={S.td} colSpan={canShowActionsColumn ? 4 : 3}>
                         Sin permisos registrados.
                       </td>
                     </tr>

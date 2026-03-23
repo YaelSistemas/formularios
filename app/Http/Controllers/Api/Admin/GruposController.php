@@ -1,6 +1,5 @@
 <?php
 
-// app/Http/Controllers/Admin/GruposController.php
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
@@ -13,10 +12,10 @@ class GruposController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-        $perPage = (int) $request->query('per_page', 20);
-        $perPage = max(1, min(100, $perPage));
+        $perPage = (int) $request->query('per_page', 25);
+        $perPage = max(5, min(100, $perPage));
 
-        $query = Grupo::query();
+        $query = Grupo::query()->withCount('users');
 
         if ($q !== '') {
             $query->where(function ($sub) use ($q) {
@@ -46,37 +45,58 @@ class GruposController extends Controller
         ]);
 
         $grupo = Grupo::create([
-            'nombre' => $data['nombre'],
-            'nombre_mostrar' => $data['nombre_mostrar'],
-            'descripcion' => $data['descripcion'] ?? null,
+            'nombre' => trim($data['nombre']),
+            'nombre_mostrar' => trim($data['nombre_mostrar']),
+            'descripcion' => filled($data['descripcion'] ?? null) ? trim($data['descripcion']) : null,
             'activo' => array_key_exists('activo', $data) ? (bool) $data['activo'] : true,
         ]);
 
-        return response()->json(['grupo' => $grupo], 201);
+        return response()->json([
+            'grupo' => $grupo->fresh()->loadCount('users'),
+        ], 201);
     }
 
     public function update(Request $request, Grupo $grupo)
     {
         $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:255', Rule::unique('grupos', 'nombre')->ignore($grupo->id)],
+            'nombre' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('grupos', 'nombre')->ignore($grupo->id),
+            ],
             'nombre_mostrar' => ['required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
             'activo' => ['nullable', 'boolean'],
         ]);
 
         $grupo->update([
-            'nombre' => $data['nombre'],
-            'nombre_mostrar' => $data['nombre_mostrar'],
-            'descripcion' => $data['descripcion'] ?? null,
+            'nombre' => trim($data['nombre']),
+            'nombre_mostrar' => trim($data['nombre_mostrar']),
+            'descripcion' => filled($data['descripcion'] ?? null) ? trim($data['descripcion']) : null,
             'activo' => array_key_exists('activo', $data) ? (bool) $data['activo'] : $grupo->activo,
         ]);
 
-        return response()->json(['grupo' => $grupo]);
+        return response()->json([
+            'grupo' => $grupo->fresh()->loadCount('users'),
+        ]);
     }
 
     public function destroy(Grupo $grupo)
     {
+        $grupo->loadCount('users');
+
+        if ((int) $grupo->users_count > 0) {
+            return response()->json([
+                'message' => 'No puedes eliminar un grupo que ya está asignado a uno o más usuarios.',
+            ], 422);
+        }
+
         $grupo->delete();
-        return response()->json(['ok' => true]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Grupo eliminado correctamente.',
+        ]);
     }
 }

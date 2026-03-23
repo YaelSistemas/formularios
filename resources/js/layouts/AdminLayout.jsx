@@ -34,9 +34,104 @@ export default function AdminLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
   const isAdmin =
     !!me?.is_admin ||
-    (Array.isArray(me?.roles) && me.roles.includes("Administrador"));
+    normalizeRoles(me).some((r) => String(r).toLowerCase() === "administrador");
+
+  const hasPermission = (permission) => {
+    if (isAdmin) return true;
+    return normalizePermissions(me).includes(permission);
+  };
+
+  const canAccessAdminPanel = isAdmin || hasPermission("admin.panel.view");
+
+  const canViewUsers = hasPermission("usuarios.view");
+  const canViewRoles = hasPermission("roles.view");
+  const canViewPermissions = hasPermission("permisos.view");
+  const canViewUnidadesServicio = hasPermission("unidades_servicio.view");
+  const canViewEmpresas = hasPermission("empresas.view");
+  const canViewGrupos = hasPermission("grupos.view");
+  const canViewFormsAdmin = hasPermission("formularios.admin.view");
+
+  const visibleAdminLinks = [
+    canViewUsers && {
+      to: "/admin/users",
+      title: "Usuarios",
+      label: "Usuarios",
+      icon: "fa-solid fa-user",
+      active: location.pathname.startsWith("/admin/users"),
+    },
+    canViewRoles && {
+      to: "/admin/roles",
+      title: "Roles",
+      label: "Roles",
+      icon: "fa-solid fa-shield",
+      active: location.pathname.startsWith("/admin/roles"),
+    },
+    canViewPermissions && {
+      to: "/admin/permissions",
+      title: "Permisos",
+      label: "Permisos",
+      icon: "fa-solid fa-lock",
+      active: location.pathname.startsWith("/admin/permissions"),
+    },
+    canViewUnidadesServicio && {
+      to: "/admin/unidades-servicio",
+      title: "Unidades de servicio",
+      label: "Unidades de servicio",
+      icon: "fa-solid fa-layer-group",
+      active: location.pathname.startsWith("/admin/unidades-servicio"),
+    },
+    canViewEmpresas && {
+      to: "/admin/empresas",
+      title: "Empresas",
+      label: "Empresas",
+      icon: "fa-solid fa-building",
+      active: location.pathname.startsWith("/admin/empresas"),
+    },
+    canViewGrupos && {
+      to: "/admin/grupos",
+      title: "Grupos",
+      label: "Grupos",
+      icon: "fa-solid fa-people-group",
+      active: location.pathname.startsWith("/admin/grupos"),
+    },
+    canViewFormsAdmin && {
+      to: "/admin/forms",
+      title: "Formularios",
+      label: "Formularios",
+      icon: "fa-brands fa-wpforms",
+      active: location.pathname.startsWith("/admin/forms"),
+    },
+  ].filter(Boolean);
 
   useEffect(() => {
     function onResize() {
@@ -54,8 +149,9 @@ export default function AdminLayout() {
 
       try {
         const data = await apiMe();
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setMe(data.user);
+        const user = data?.user || data;
+        localStorage.setItem("user", JSON.stringify(user));
+        setMe(user);
       } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -114,8 +210,9 @@ export default function AdminLayout() {
   const initials = getInitialsFromName(me?.name);
   const colors = getAvatarColors(me);
 
+  const normalizedRoles = normalizeRoles(me);
   const roleLabel =
-    (me?.roles || []).join(", ") ||
+    normalizedRoles.join(", ") ||
     (me?.is_admin ? "Administrador" : "Usuario");
 
   const desktopSidebarWidth = sidebarExpanded ? 240 : 72;
@@ -155,14 +252,6 @@ export default function AdminLayout() {
     justifyContent: "center",
     fontSize: 18,
   };
-
-  const isUsersActive = location.pathname.startsWith("/admin/users");
-  const isRolesActive = location.pathname.startsWith("/admin/roles");
-  const isPermissionsActive = location.pathname.startsWith("/admin/permissions");
-  const isUnidadesServicioActive = location.pathname.startsWith("/admin/unidades-servicio");
-  const isEmpresasActive = location.pathname.startsWith("/admin/empresas");
-  const isGruposActive = location.pathname.startsWith("/admin/grupos");
-  const isFormsActive = location.pathname.startsWith("/admin/forms");
 
   const bottomNavScrollItemStyle = (active) => ({
     minWidth: 86,
@@ -463,11 +552,11 @@ export default function AdminLayout() {
 
   if (loading) return <div style={{ padding: 16 }}>Cargando panel admin...</div>;
 
-  if (!isAdmin) {
+  if (!canAccessAdminPanel) {
     return (
       <div style={{ padding: 16 }}>
         <h2>Acceso denegado</h2>
-        <p>No tienes permisos de Administrador.</p>
+        <p>No cuentas con permiso para entrar al panel admin.</p>
       </div>
     );
   }
@@ -501,82 +590,19 @@ export default function AdminLayout() {
 
           <div style={S.navWrap}>
             <nav style={S.navTop}>
-              <NavLink
-                to="/admin/users"
-                title="Usuarios"
-                style={({ isActive }) => navItemStyle(isActive)}
-              >
-                <span style={navIconWrapStyle}>
-                  <i className="fa-solid fa-user" />
-                </span>
-                <span style={S.navLabel}>Usuarios</span>
-              </NavLink>
-
-              <NavLink
-                to="/admin/roles"
-                title="Roles"
-                style={({ isActive }) => navItemStyle(isActive)}
-              >
-                <span style={navIconWrapStyle}>
-                  <i className="fa-solid fa-shield" />
-                </span>
-                <span style={S.navLabel}>Roles</span>
-              </NavLink>
-
-              <NavLink
-                to="/admin/permissions"
-                title="Permisos"
-                style={({ isActive }) => navItemStyle(isActive)}
-              >
-                <span style={navIconWrapStyle}>
-                  <i className="fa-solid fa-lock" />
-                </span>
-                <span style={S.navLabel}>Permisos</span>
-              </NavLink>
-
-              <NavLink
-                to="/admin/unidades-servicio"
-                title="Unidades de servicio"
-                style={({ isActive }) => navItemStyle(isActive)}
-              >
-                <span style={navIconWrapStyle}>
-                  <i className="fa-solid fa-layer-group" />
-                </span>
-                <span style={S.navLabel}>Unidades de servicio</span>
-              </NavLink>
-
-              <NavLink
-                to="/admin/empresas"
-                title="Empresas"
-                style={({ isActive }) => navItemStyle(isActive)}
-              >
-                <span style={navIconWrapStyle}>
-                  <i className="fa-solid fa-building" />
-                </span>
-                <span style={S.navLabel}>Empresas</span>
-              </NavLink>
-
-              <NavLink
-                to="/admin/grupos"
-                title="Grupos"
-                style={({ isActive }) => navItemStyle(isActive)}
-              >
-                <span style={navIconWrapStyle}>
-                  <i className="fa-solid fa-people-group" />
-                </span>
-                <span style={S.navLabel}>Grupos</span>
-              </NavLink>
-
-              <NavLink
-                to="/admin/forms"
-                title="Formularios"
-                style={({ isActive }) => navItemStyle(isActive)}
-              >
-                <span style={navIconWrapStyle}>
-                  <i className="fa-brands fa-wpforms" />
-                </span>
-                <span style={S.navLabel}>Formularios</span>
-              </NavLink>
+              {visibleAdminLinks.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  title={item.title}
+                  style={({ isActive }) => navItemStyle(isActive)}
+                >
+                  <span style={navIconWrapStyle}>
+                    <i className={item.icon} />
+                  </span>
+                  <span style={S.navLabel}>{item.label}</span>
+                </NavLink>
+              ))}
             </nav>
 
             <div style={S.navBottom}>
@@ -688,96 +714,25 @@ export default function AdminLayout() {
       {isMobile ? (
         <div style={S.mobileBottomBarWrap}>
           <nav style={S.mobileBottomBar}>
-            <NavLink
-              to="/admin/users"
-              style={() => bottomNavScrollItemStyle(isUsersActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isUsersActive)} />
-              <span style={bottomNavInnerStyle(isUsersActive)}>
-                <span style={bottomIconWrapStyle(isUsersActive)}>
-                  <i className="fa-solid fa-user" />
+            {visibleAdminLinks.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                style={() => bottomNavScrollItemStyle(item.active)}
+              >
+                <span style={bottomTopIndicatorStyle(item.active)} />
+                <span style={bottomNavInnerStyle(item.active)}>
+                  <span style={bottomIconWrapStyle(item.active)}>
+                    <i className={item.icon} />
+                  </span>
+                  <span style={bottomLabelStyle(item.active)}>
+                    {item.label === "Unidades de servicio"
+                      ? "Unidades"
+                      : item.label}
+                  </span>
                 </span>
-                <span style={bottomLabelStyle(isUsersActive)}>Usuarios</span>
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/admin/roles"
-              style={() => bottomNavScrollItemStyle(isRolesActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isRolesActive)} />
-              <span style={bottomNavInnerStyle(isRolesActive)}>
-                <span style={bottomIconWrapStyle(isRolesActive)}>
-                  <i className="fa-solid fa-shield" />
-                </span>
-                <span style={bottomLabelStyle(isRolesActive)}>Roles</span>
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/admin/permissions"
-              style={() => bottomNavScrollItemStyle(isPermissionsActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isPermissionsActive)} />
-              <span style={bottomNavInnerStyle(isPermissionsActive)}>
-                <span style={bottomIconWrapStyle(isPermissionsActive)}>
-                  <i className="fa-solid fa-lock" />
-                </span>
-                <span style={bottomLabelStyle(isPermissionsActive)}>Permisos</span>
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/admin/unidades-servicio"
-              style={() => bottomNavScrollItemStyle(isUnidadesServicioActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isUnidadesServicioActive)} />
-              <span style={bottomNavInnerStyle(isUnidadesServicioActive)}>
-                <span style={bottomIconWrapStyle(isUnidadesServicioActive)}>
-                  <i className="fa-solid fa-layer-group" />
-                </span>
-                <span style={bottomLabelStyle(isUnidadesServicioActive)}>Unidades</span>
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/admin/empresas"
-              style={() => bottomNavScrollItemStyle(isEmpresasActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isEmpresasActive)} />
-              <span style={bottomNavInnerStyle(isEmpresasActive)}>
-                <span style={bottomIconWrapStyle(isEmpresasActive)}>
-                  <i className="fa-solid fa-building" />
-                </span>
-                <span style={bottomLabelStyle(isEmpresasActive)}>Empresas</span>
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/admin/grupos"
-              style={() => bottomNavScrollItemStyle(isGruposActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isGruposActive)} />
-              <span style={bottomNavInnerStyle(isGruposActive)}>
-                <span style={bottomIconWrapStyle(isGruposActive)}>
-                  <i className="fa-solid fa-people-group" />
-                </span>
-                <span style={bottomLabelStyle(isGruposActive)}>Grupos</span>
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/admin/forms"
-              style={() => bottomNavScrollItemStyle(isFormsActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isFormsActive)} />
-              <span style={bottomNavInnerStyle(isFormsActive)}>
-                <span style={bottomIconWrapStyle(isFormsActive)}>
-                  <i className="fa-brands fa-wpforms" />
-                </span>
-                <span style={bottomLabelStyle(isFormsActive)}>Formularios</span>
-              </span>
-            </NavLink>
+              </NavLink>
+            ))}
 
             <button
               type="button"

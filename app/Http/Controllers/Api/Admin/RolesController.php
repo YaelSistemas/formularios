@@ -4,12 +4,21 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class RolesController extends Controller
 {
+    protected function countUsersByRoleId(int $roleId): int
+    {
+        return DB::table('model_has_roles')
+            ->where('role_id', $roleId)
+            ->where('model_type', \App\Models\User::class)
+            ->count();
+    }
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
@@ -34,6 +43,7 @@ class RolesController extends Controller
                 'nombre_mostrar' => $r->nombre_mostrar,
                 'descripcion' => $r->descripcion,
                 'permissions' => $r->permissions()->pluck('name')->values(),
+                'users_count' => $this->countUsersByRoleId((int) $r->id),
                 'created_at' => $r->created_at,
             ];
         });
@@ -77,6 +87,7 @@ class RolesController extends Controller
                 'nombre_mostrar' => $role->nombre_mostrar,
                 'descripcion' => $role->descripcion,
                 'permissions' => $role->permissions()->pluck('name')->values(),
+                'users_count' => $this->countUsersByRoleId((int) $role->id),
                 'created_at' => $role->created_at,
             ],
         ], 201);
@@ -91,8 +102,13 @@ class RolesController extends Controller
                 'nombre_mostrar' => $role->nombre_mostrar,
                 'descripcion' => $role->descripcion,
                 'permissions' => $role->permissions()->pluck('name')->values(),
+                'users_count' => $this->countUsersByRoleId((int) $role->id),
             ],
-            'all_permissions' => Permission::query()->orderBy('name')->pluck('name')->values(),
+            'all_permissions' => Permission::query()
+                ->where('guard_name', 'sanctum')
+                ->orderBy('name')
+                ->pluck('name')
+                ->values(),
             'is_admin_role' => $role->name === 'Administrador',
         ]);
     }
@@ -137,6 +153,7 @@ class RolesController extends Controller
                 'nombre_mostrar' => $role->nombre_mostrar,
                 'descripcion' => $role->descripcion,
                 'permissions' => $role->permissions()->pluck('name')->values(),
+                'users_count' => $this->countUsersByRoleId((int) $role->id),
                 'created_at' => $role->created_at,
             ],
         ]);
@@ -147,6 +164,14 @@ class RolesController extends Controller
         if ($role->name === 'Administrador') {
             return response()->json([
                 'message' => 'No puedes eliminar el rol Administrador.'
+            ], 422);
+        }
+
+        $usersCount = $this->countUsersByRoleId((int) $role->id);
+
+        if ($usersCount > 0) {
+            return response()->json([
+                'message' => 'No puedes eliminar un rol que ya está asignado a uno o más usuarios.'
             ], 422);
         }
 

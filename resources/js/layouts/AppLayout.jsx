@@ -15,9 +15,41 @@ export default function AppLayout() {
     }
   });
 
-  const isAdmin =
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
+  const roles = normalizeRoles(me);
+  const permissions = normalizePermissions(me);
+
+  const canViewAdminPanel =
     !!me?.is_admin ||
-    (Array.isArray(me?.roles) && me.roles.includes("Administrador"));
+    roles.some((r) => String(r).toLowerCase() === "administrador") ||
+    permissions.includes("admin.panel.view");
 
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(() => {
@@ -66,10 +98,11 @@ export default function AppLayout() {
   const colors = getAvatarColors(me);
 
   const roleLabel =
-    me?.role ||
-    (me?.is_admin ? "Administrador" : "") ||
-    (Array.isArray(me?.roles) && me.roles.join(", ")) ||
-    "Usuario";
+    roles.length > 0
+      ? roles.join(", ")
+      : me?.is_admin
+      ? "Administrador"
+      : "Usuario";
 
   const kickToLogin = () => {
     localStorage.removeItem("token");
@@ -435,7 +468,7 @@ export default function AppLayout() {
               <span style={S.navLabel}>Formularios</span>
             </NavLink>
 
-            {isAdmin ? (
+            {canViewAdminPanel ? (
               <button
                 type="button"
                 onClick={handleAdminGo}
@@ -580,7 +613,7 @@ export default function AppLayout() {
               </span>
             </NavLink>
 
-            {isAdmin ? (
+            {canViewAdminPanel ? (
               <button
                 type="button"
                 onClick={handleAdminGo}

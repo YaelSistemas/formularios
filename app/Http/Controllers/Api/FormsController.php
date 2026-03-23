@@ -18,7 +18,8 @@ class FormsController extends Controller
      * LISTA (Usuario autenticado)
      * - Admin: ve todos los formularios de código
      * - Usuario normal: solo PUBLICADO
-     * - Si un formulario tiene asignaciones, solo lo ve el usuario asignado
+     * - Si el formulario NO tiene usuarios asignados, no lo ve nadie excepto admin
+     * - Si tiene asignaciones, solo lo ve el usuario asignado
      */
     public function index(Request $request)
     {
@@ -33,11 +34,8 @@ class FormsController extends Controller
 
         if (!($user && $user->hasRole('Administrador'))) {
             $query->where('status', 'PUBLICADO')
-                ->where(function ($q) use ($user) {
-                    $q->whereDoesntHave('assignedUsers')
-                        ->orWhereHas('assignedUsers', function ($sub) use ($user) {
-                            $sub->where('users.id', $user->id);
-                        });
+                ->whereHas('assignedUsers', function ($sub) use ($user) {
+                    $sub->where('users.id', $user->id);
                 });
         }
 
@@ -128,22 +126,34 @@ class FormsController extends Controller
         $payload = $this->normalizePayload($form->payload ?? []);
 
         $choiceErr = $this->validateChoiceFields($payload);
-        if ($choiceErr) return response()->json(['message' => $choiceErr], 422);
+        if ($choiceErr) {
+            return response()->json(['message' => $choiceErr], 422);
+        }
 
         $fixedErr = $this->validateFixedFields($payload);
-        if ($fixedErr) return response()->json(['message' => $fixedErr], 422);
+        if ($fixedErr) {
+            return response()->json(['message' => $fixedErr], 422);
+        }
 
         $tableErr = $this->validateTableFields($payload);
-        if ($tableErr) return response()->json(['message' => $tableErr], 422);
+        if ($tableErr) {
+            return response()->json(['message' => $tableErr], 422);
+        }
 
         $pubErr = $this->validatePublishable($payload);
-        if ($pubErr) return response()->json(['message' => $pubErr], 422);
+        if ($pubErr) {
+            return response()->json(['message' => $pubErr], 422);
+        }
 
         $form->payload = $payload;
         $form->status = 'PUBLICADO';
         $form->save();
 
-        $resp = $form->toArray();
+        $resp = $form->loadCount([
+            'submissions',
+            'assignedUsers as assignments_count',
+        ])->toArray();
+
         $resp['payload'] = $payload;
 
         return response()->json(['ok' => true, 'form' => $resp]);
@@ -180,7 +190,7 @@ class FormsController extends Controller
 
     /**
      * Determina si el usuario puede acceder al formulario.
-     * - Si no hay asignaciones, cualquiera puede acceder
+     * - Si no hay asignaciones, nadie excepto admin puede acceder
      * - Si hay asignaciones, solo usuarios asignados
      */
     private function userCanAccessForm(int $userId, Form $form): bool
@@ -188,7 +198,7 @@ class FormsController extends Controller
         $hasAssignments = $form->assignedUsers()->exists();
 
         if (!$hasAssignments) {
-            return true;
+            return false;
         }
 
         return $form->assignedUsers()
@@ -241,75 +251,95 @@ class FormsController extends Controller
      */
     private function normalizePayload($payload): array
     {
-        if (!is_array($payload)) return ['fields' => []];
+        if (!is_array($payload)) {
+            return ['fields' => []];
+        }
 
         if (array_key_exists('fields', $payload) && is_array($payload['fields'])) {
             $payload['fields'] = array_values(array_filter(array_map(function ($f) {
-                if (!is_array($f)) return null;
+                if (!is_array($f)) {
+                    return null;
+                }
 
-                $id = isset($f['id']) ? (string)$f['id'] : null;
-                $type = isset($f['type']) ? (string)$f['type'] : null;
-                $label = isset($f['label']) ? trim((string)$f['label']) : '';
+                $id = isset($f['id']) ? (string) $f['id'] : null;
+                $type = isset($f['type']) ? (string) $f['type'] : null;
+                $label = isset($f['label']) ? trim((string) $f['label']) : '';
 
-                if (!$id || !$type) return null;
+                if (!$id || !$type) {
+                    return null;
+                }
 
                 $field = [
                     'id'       => $id,
                     'label'    => $label,
                     'type'     => $type,
-                    'required' => (bool)($f['required'] ?? false),
+                    'required' => (bool) ($f['required'] ?? false),
                 ];
 
                 if (in_array($type, ['select', 'radio'], true)) {
                     $opts = $f['options'] ?? [];
-                    if (!is_array($opts)) $opts = [];
+                    if (!is_array($opts)) {
+                        $opts = [];
+                    }
+
                     $field['options'] = array_values(array_filter(array_map(function ($o) {
-                        $s = trim((string)$o);
+                        $s = trim((string) $o);
                         return $s !== '' ? $s : null;
                     }, $opts)));
                 }
 
                 if ($type === 'static_text') {
-                    $field['text'] = (string)($f['text'] ?? '');
+                    $field['text'] = (string) ($f['text'] ?? '');
                 }
 
                 if (in_array($type, ['fixed_image', 'fixed_file'], true)) {
-                    $field['url'] = (string)($f['url'] ?? '');
+                    $field['url'] = (string) ($f['url'] ?? '');
                 }
 
                 if ($type === 'table') {
                     $cols = $f['columns'] ?? [];
-                    if (!is_array($cols)) $cols = [];
+                    if (!is_array($cols)) {
+                        $cols = [];
+                    }
+
                     $field['columns'] = array_values(array_filter(array_map(function ($c) {
-                        $s = trim((string)$c);
+                        $s = trim((string) $c);
                         return $s !== '' ? $s : null;
                     }, $cols)));
 
                     $rowSchema = $f['row_schema'] ?? [];
-                    if (!is_array($rowSchema)) $rowSchema = [];
+                    if (!is_array($rowSchema)) {
+                        $rowSchema = [];
+                    }
 
                     $field['row_schema'] = array_values(array_filter(array_map(function ($col) {
-                        if (!is_array($col)) return null;
+                        if (!is_array($col)) {
+                            return null;
+                        }
 
-                        $colId = isset($col['id']) ? (string)$col['id'] : null;
-                        $colType = isset($col['type']) ? (string)$col['type'] : null;
-                        $colLabel = isset($col['label']) ? trim((string)$col['label']) : '';
+                        $colId = isset($col['id']) ? (string) $col['id'] : null;
+                        $colType = isset($col['type']) ? (string) $col['type'] : null;
+                        $colLabel = isset($col['label']) ? trim((string) $col['label']) : '';
 
-                        if (!$colId || !$colType) return null;
+                        if (!$colId || !$colType) {
+                            return null;
+                        }
 
                         $normalizedCol = [
                             'id' => $colId,
                             'label' => $colLabel,
                             'type' => $colType,
-                            'required' => (bool)($col['required'] ?? false),
+                            'required' => (bool) ($col['required'] ?? false),
                         ];
 
                         if (in_array($colType, ['select', 'radio'], true)) {
                             $colOpts = $col['options'] ?? [];
-                            if (!is_array($colOpts)) $colOpts = [];
+                            if (!is_array($colOpts)) {
+                                $colOpts = [];
+                            }
 
                             $normalizedCol['options'] = array_values(array_filter(array_map(function ($o) {
-                                $s = trim((string)$o);
+                                $s = trim((string) $o);
                                 return $s !== '' ? $s : null;
                             }, $colOpts)));
                         }
@@ -333,10 +363,13 @@ class FormsController extends Controller
     private function validateChoiceFields(array $payload): ?string
     {
         $fields = $payload['fields'] ?? [];
-        if (!is_array($fields)) return null;
+        if (!is_array($fields)) {
+            return null;
+        }
 
         foreach ($fields as $f) {
             $type = $f['type'] ?? null;
+
             if (in_array($type, ['select', 'radio'], true)) {
                 $options = $f['options'] ?? [];
                 if (!is_array($options) || count($options) < 2) {
@@ -355,20 +388,22 @@ class FormsController extends Controller
     private function validateFixedFields(array $payload): ?string
     {
         $fields = $payload['fields'] ?? [];
-        if (!is_array($fields)) return null;
+        if (!is_array($fields)) {
+            return null;
+        }
 
         foreach ($fields as $f) {
             $type = $f['type'] ?? null;
             $label = $f['label'] ?? '(sin etiqueta)';
 
             if ($type === 'static_text') {
-                if (trim((string)($f['text'] ?? '')) === '') {
+                if (trim((string) ($f['text'] ?? '')) === '') {
                     return "El campo \"{$label}\" (texto fijo) requiere contenido.";
                 }
             }
 
             if (in_array($type, ['fixed_image', 'fixed_file'], true)) {
-                if (trim((string)($f['url'] ?? '')) === '') {
+                if (trim((string) ($f['url'] ?? '')) === '') {
                     return "El campo \"{$label}\" ({$type}) requiere URL.";
                 }
             }
@@ -383,10 +418,14 @@ class FormsController extends Controller
     private function validateTableFields(array $payload): ?string
     {
         $fields = $payload['fields'] ?? [];
-        if (!is_array($fields)) return null;
+        if (!is_array($fields)) {
+            return null;
+        }
 
         foreach ($fields as $f) {
-            if (($f['type'] ?? null) !== 'table') continue;
+            if (($f['type'] ?? null) !== 'table') {
+                continue;
+            }
 
             $label = $f['label'] ?? '(sin etiqueta)';
             $cols = $f['columns'] ?? [];
@@ -416,13 +455,16 @@ class FormsController extends Controller
         foreach ($fields as $f) {
             $id = $f['id'] ?? null;
             $type = $f['type'] ?? null;
-            $label = isset($f['label']) ? trim((string)$f['label']) : '';
+            $label = isset($f['label']) ? trim((string) $f['label']) : '';
 
             if (!$id || !$type) {
                 return 'El formulario tiene campos inválidos. Revisa el catálogo en código.';
             }
 
-            if (!in_array($type, ['separator', 'static_text', 'fixed_image', 'fixed_file'], true) && $label === '') {
+            if (
+                !in_array($type, ['separator', 'static_text', 'fixed_image', 'fixed_file'], true)
+                && $label === ''
+            ) {
                 return 'El formulario tiene campos sin etiqueta. Revisa el catálogo en código.';
             }
         }

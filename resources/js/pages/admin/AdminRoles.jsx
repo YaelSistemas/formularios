@@ -1,8 +1,105 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 
+function PermissionModuleGroup({
+  title,
+  permissions,
+  styles,
+  selectedPermissions,
+  togglePermission,
+  roleIsAdmin,
+  formatPermissionLabel,
+  formatPermissionHint,
+}) {
+  if (!permissions?.length) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 900,
+          color: "#0f172a",
+        }}
+      >
+        {title}
+      </div>
+
+      <div style={styles.permsGrid}>
+        {permissions.map((p) => (
+          <label key={p} style={styles.permItem}>
+            <input
+              type="checkbox"
+              checked={selectedPermissions.includes(p)}
+              onChange={() => togglePermission(p)}
+              disabled={roleIsAdmin}
+              style={{ marginTop: 2 }}
+            />
+            <span style={styles.permContent}>
+              <span style={styles.permTitle}>{formatPermissionLabel(p)}</span>
+              <span style={styles.permHint}>{formatPermissionHint(p)}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminRoles() {
   const [err, setErr] = useState("");
+
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
+  const me = getStoredUser();
+
+  const isAdmin =
+    !!me?.is_admin ||
+    normalizeRoles(me).some((r) => String(r).toLowerCase() === "administrador");
+
+  const hasPermission = (permission) => {
+    if (isAdmin) return true;
+    return normalizePermissions(me).includes(permission);
+  };
+
+  const canCreateRoles = hasPermission("roles.create");
+  const canEditRoles = hasPermission("roles.edit");
+  const canDeleteRoles = hasPermission("roles.delete");
+  const canShowActionsColumn = canEditRoles || canDeleteRoles;
 
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
@@ -25,7 +122,7 @@ export default function AdminRoles() {
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
 
-  const perPage = 20;
+  const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ last_page: 1, total: 0 });
 
@@ -127,7 +224,7 @@ export default function AdminRoles() {
   useEffect(() => {
     loadRolesList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, page]);
+  }, [q, page, perPage]);
 
   useEffect(() => {
     restoreFocusIfNeeded();
@@ -164,6 +261,11 @@ export default function AdminRoles() {
   };
 
   const openCreateRoleModal = async () => {
+    if (!canCreateRoles) {
+      setErr("No tienes permiso para crear roles.");
+      return;
+    }
+
     resetRoleForm();
     setRoleMode("create");
     setOpenRoleModal(true);
@@ -171,7 +273,9 @@ export default function AdminRoles() {
 
     try {
       const perms = await loadPermissionsCatalog();
-      const normalized = perms.map((p) => (typeof p === "string" ? p : p?.name)).filter(Boolean);
+      const normalized = perms
+        .map((p) => (typeof p === "string" ? p : p?.name))
+        .filter(Boolean);
       setAllPermissions(normalized);
     } finally {
       setLoadingRoleDetail(false);
@@ -179,6 +283,11 @@ export default function AdminRoles() {
   };
 
   const openEditRoleModal = async (r) => {
+    if (!canEditRoles) {
+      setErr("No tienes permiso para editar roles.");
+      return;
+    }
+
     resetRoleForm();
     setRoleMode("edit");
     setEditingRoleId(r.id);
@@ -255,6 +364,16 @@ export default function AdminRoles() {
     e.preventDefault();
     setErr("");
 
+    if (roleMode === "create" && !canCreateRoles) {
+      setErr("No tienes permiso para crear roles.");
+      return;
+    }
+
+    if (roleMode === "edit" && !canEditRoles) {
+      setErr("No tienes permiso para editar roles.");
+      return;
+    }
+
     if (!validateRoleForm()) return;
 
     setSavingRoleModal(true);
@@ -284,9 +403,35 @@ export default function AdminRoles() {
     }
   };
 
+  const roleHasAssignedUsers = (r) => {
+    if (!r) return false;
+
+    if (Number(r.users_count || 0) > 0) return true;
+    if (Number(r.assigned_users_count || 0) > 0) return true;
+    if (Number(r.total_users || 0) > 0) return true;
+    if (Array.isArray(r.users) && r.users.length > 0) return true;
+
+    return false;
+  };
+
+  const isProtectedRole = (r) => {
+    if (!r) return false;
+    return r.name === "Administrador" || roleHasAssignedUsers(r);
+  };
+
   const deleteRole = async (r) => {
+    if (!canDeleteRoles) {
+      setErr("No tienes permiso para eliminar roles.");
+      return;
+    }
+
     if (r.name === "Administrador") {
       setErr("No puedes eliminar el rol Administrador.");
+      return;
+    }
+
+    if (roleHasAssignedUsers(r)) {
+      setErr("No puedes eliminar un rol que ya está asignado a uno o más usuarios.");
       return;
     }
 
@@ -392,6 +537,7 @@ export default function AdminRoles() {
       default: { bg: "#f8fafc", border: "#e2e8f0", fg: "#0f172a" },
       role: { bg: "#f1f5f9", border: "#cbd5e1", fg: "#334155" },
       system: { bg: "#eff6ff", border: "#bfdbfe", fg: "#1d4ed8" },
+      warning: { bg: "#fff7ed", border: "#fdba74", fg: "#c2410c" },
     };
 
     const t = tones[tone] || tones.default;
@@ -401,6 +547,7 @@ export default function AdminRoles() {
         style={{
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           padding: "6px 10px",
           borderRadius: 999,
           border: `1px solid ${t.border}`,
@@ -408,6 +555,7 @@ export default function AdminRoles() {
           color: t.fg,
           fontSize: 12,
           fontWeight: 800,
+          textAlign: "center",
         }}
       >
         {children}
@@ -424,6 +572,180 @@ export default function AdminRoles() {
     };
     return map[toast.type] || map.info;
   })();
+
+  const moduleLabelMap = {
+    admin: "panel admin",
+    formularios: "formularios",
+    usuarios: "usuarios",
+    roles: "roles",
+    permisos: "permisos",
+    empresas: "empresas",
+    grupos: "grupos",
+    unidades_servicio: "unidades de servicio",
+  };
+
+  const actionLabelMap = {
+    view: "Ver",
+    create: "Crear",
+    edit: "Editar",
+    delete: "Eliminar",
+    submit: "Enviar",
+    assign: "Asignar",
+    publish: "Publicar",
+  };
+
+  const formatPermissionLabel = (permission) => {
+    if (!permission) return "Permiso";
+
+    if (permission === "admin.panel.view") {
+      return "Ver panel admin";
+    }
+
+    if (permission === "formularios.submissions.view") {
+      return "Ver respuestas de formularios";
+    }
+
+    if (permission.startsWith("formularios.admin.")) {
+      const action = permission.replace("formularios.admin.", "");
+      return `${actionLabelMap[action] || action} formularios admin`;
+    }
+
+    const parts = String(permission).split(".");
+    const [module, action, third] = parts;
+
+    if (module === "formularios" && action === "submissions" && third === "view") {
+      return "Ver respuestas de formularios";
+    }
+
+    if (parts.length >= 2) {
+      return `${actionLabelMap[action] || action} ${moduleLabelMap[module] || module}`;
+    }
+
+    return permission;
+  };
+
+  const formatPermissionHint = (permission) => permission;
+
+  const sortPermissions = (permissions) => {
+    return [...permissions].sort((a, b) => {
+      const aParts = String(a).split(".");
+      const bParts = String(b).split(".");
+
+      const aAction =
+        a === "admin.panel.view"
+          ? "view"
+          : aParts[0] === "formularios" && aParts[1] === "submissions"
+          ? "submissions_view"
+          : aParts[aParts.length - 1];
+
+      const bAction =
+        b === "admin.panel.view"
+          ? "view"
+          : bParts[0] === "formularios" && bParts[1] === "submissions"
+          ? "submissions_view"
+          : bParts[bParts.length - 1];
+
+      const customOrder = {
+        view: 1,
+        create: 2,
+        edit: 3,
+        delete: 4,
+        submit: 5,
+        submissions_view: 6,
+        assign: 7,
+        publish: 8,
+      };
+
+      return (customOrder[aAction] || 999) - (customOrder[bAction] || 999);
+    });
+  };
+
+  const groupedPermissions = useMemo(() => {
+    const groups = {
+      userPanel: {
+        formularios: [],
+      },
+      adminPanel: {
+        admin: [],
+        usuarios: [],
+        roles: [],
+        permisos: [],
+        empresas: [],
+        grupos: [],
+        unidades_servicio: [],
+        formularios_admin: [],
+      },
+      other: [],
+    };
+
+    (allPermissions || []).forEach((p) => {
+      if (
+        p === "formularios.view" ||
+        p === "formularios.create" ||
+        p === "formularios.edit" ||
+        p === "formularios.delete" ||
+        p === "formularios.submit" ||
+        p === "formularios.submissions.view"
+      ) {
+        groups.userPanel.formularios.push(p);
+        return;
+      }
+
+      if (p === "admin.panel.view") {
+        groups.adminPanel.admin.push(p);
+        return;
+      }
+
+      if (p.startsWith("usuarios.")) {
+        groups.adminPanel.usuarios.push(p);
+        return;
+      }
+
+      if (p.startsWith("roles.")) {
+        groups.adminPanel.roles.push(p);
+        return;
+      }
+
+      if (p.startsWith("permisos.")) {
+        groups.adminPanel.permisos.push(p);
+        return;
+      }
+
+      if (p.startsWith("empresas.")) {
+        groups.adminPanel.empresas.push(p);
+        return;
+      }
+
+      if (p.startsWith("grupos.")) {
+        groups.adminPanel.grupos.push(p);
+        return;
+      }
+
+      if (p.startsWith("unidades_servicio.")) {
+        groups.adminPanel.unidades_servicio.push(p);
+        return;
+      }
+
+      if (p.startsWith("formularios.admin.")) {
+        groups.adminPanel.formularios_admin.push(p);
+        return;
+      }
+
+      groups.other.push(p);
+    });
+
+    Object.keys(groups.userPanel).forEach((key) => {
+      groups.userPanel[key] = sortPermissions(groups.userPanel[key]);
+    });
+
+    Object.keys(groups.adminPanel).forEach((key) => {
+      groups.adminPanel[key] = sortPermissions(groups.adminPanel[key]);
+    });
+
+    groups.other = sortPermissions(groups.other);
+
+    return groups;
+  }, [allPermissions]);
 
   const S = {
     page: {
@@ -445,7 +767,7 @@ export default function AdminRoles() {
     },
     filterRow: {
       display: "grid",
-      gridTemplateColumns: "minmax(220px, 1fr) auto",
+      gridTemplateColumns: "minmax(220px, 1fr) auto auto",
       gap: 12,
       alignItems: "end",
       marginTop: 14,
@@ -457,6 +779,15 @@ export default function AdminRoles() {
       marginBottom: 6,
     },
     input: {
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#f8fafc",
+      outline: "none",
+      minHeight: 44,
+    },
+    select: {
       width: "100%",
       padding: "11px 12px",
       borderRadius: 12,
@@ -485,13 +816,13 @@ export default function AdminRoles() {
     },
     table: {
       width: "100%",
-      minWidth: 900,
+      minWidth: 840,
       borderCollapse: "separate",
       borderSpacing: 0,
       background: "#fff",
     },
     th: {
-      textAlign: "left",
+      textAlign: "center",
       fontSize: 12,
       color: "#475569",
       padding: "14px 12px",
@@ -501,6 +832,7 @@ export default function AdminRoles() {
       top: 0,
       zIndex: 1,
       fontWeight: 800,
+      verticalAlign: "middle",
     },
     td: {
       padding: "14px 12px",
@@ -508,6 +840,7 @@ export default function AdminRoles() {
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
+      textAlign: "center",
     },
     pagination: {
       display: "flex",
@@ -529,7 +862,7 @@ export default function AdminRoles() {
     },
     modal: {
       width: "100%",
-      maxWidth: 980,
+      maxWidth: 1120,
       maxHeight: "90vh",
       overflowY: "auto",
       background: "#fff",
@@ -559,7 +892,7 @@ export default function AdminRoles() {
       padding: 18,
       display: "flex",
       flexDirection: "column",
-      gap: 16,
+      gap: 18,
     },
     modalFooter: {
       padding: 18,
@@ -616,31 +949,58 @@ export default function AdminRoles() {
     permsSection: {
       display: "flex",
       flexDirection: "column",
-      gap: 10,
+      gap: 12,
     },
-    permsBox: {
-      maxHeight: 360,
-      overflow: "auto",
+    permsGroup: {
       border: "1px solid #e2e8f0",
-      padding: 12,
-      borderRadius: 14,
+      borderRadius: 16,
       background: "#f8fafc",
+      padding: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+    },
+    permsGroupTitle: {
+      fontSize: 14,
+      fontWeight: 900,
+      color: "#0f172a",
+    },
+    permsGroupDesc: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 700,
+      marginTop: -4,
     },
     permsGrid: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
       gap: 10,
     },
     permItem: {
       display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "10px 12px",
+      alignItems: "flex-start",
+      gap: 10,
+      padding: "12px 12px",
       borderRadius: 12,
       border: "1px solid #e2e8f0",
       background: "#fff",
-      fontWeight: 700,
       color: "#0f172a",
+    },
+    permContent: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 4,
+      minWidth: 0,
+    },
+    permTitle: {
+      fontWeight: 800,
+      fontSize: 13,
+      color: "#0f172a",
+    },
+    permHint: {
+      fontSize: 11,
+      color: "#64748b",
+      wordBreak: "break-word",
     },
     responsiveStyleTag: `
       @media (max-width: 860px) {
@@ -670,10 +1030,10 @@ export default function AdminRoles() {
   };
 
   const roleTypeBadge = (r) => {
-    const isAdmin = r.name === "Administrador";
+    const isSystemRole = r.name === "Administrador";
     return (
-      <Badge tone={isAdmin ? "system" : "role"}>
-        {isAdmin ? "Sistema" : "Normal"}
+      <Badge tone={isSystemRole ? "system" : "role"}>
+        {isSystemRole ? "Sistema" : "Normal"}
       </Badge>
     );
   };
@@ -694,10 +1054,12 @@ export default function AdminRoles() {
             </div>
           </div>
 
-          <Btn variant="primary" onClick={openCreateRoleModal}>
-            <i className="fa-solid fa-plus" />
-            Nuevo rol
-          </Btn>
+          {canCreateRoles ? (
+            <Btn variant="primary" onClick={openCreateRoleModal}>
+              <i className="fa-solid fa-plus" />
+              Nuevo rol
+            </Btn>
+          ) : null}
         </div>
 
         <div style={S.filterRow} className="roles-filter-row">
@@ -719,12 +1081,33 @@ export default function AdminRoles() {
           </div>
 
           <div>
+            <div style={S.label}>Por página</div>
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPage(1);
+                setPerPage(Number(e.target.value));
+              }}
+              style={S.select}
+            >
+              <option value={5}>5 registros</option>
+              <option value={10}>10 registros</option>
+              <option value={20}>20 registros</option>
+              <option value={25}>25 registros</option>
+              <option value={50}>50 registros</option>
+              <option value={75}>75 registros</option>
+              <option value={100}>100 registros</option>
+            </select>
+          </div>
+
+          <div>
             <div style={S.label}>Página actual</div>
             <div
               style={{
                 ...S.input,
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 background: "#fff",
                 color: "#334155",
                 fontWeight: 700,
@@ -767,22 +1150,29 @@ export default function AdminRoles() {
               <table style={S.table}>
                 <thead>
                   <tr>
-                    <th style={S.th}>ID</th>
                     <th style={S.th}>Nombre interno</th>
                     <th style={S.th}>Nombre a mostrar</th>
                     <th style={S.th}>Descripción</th>
                     <th style={S.th}>Tipo</th>
-                    <th style={{ ...S.th, width: 120, textAlign: "right" }}>Acciones</th>
+                    {canShowActionsColumn ? (
+                      <th style={{ ...S.th, width: 150 }}>Acciones</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
                   {rolesList.length ? (
                     rolesList.map((r) => {
-                      const isAdmin = r.name === "Administrador";
+                      const protectedRole = isProtectedRole(r);
+                      const usedByUsers = roleHasAssignedUsers(r);
+                      const deleteTitle =
+                        r.name === "Administrador"
+                          ? "No se puede eliminar"
+                          : usedByUsers
+                          ? "Rol asignado a usuarios"
+                          : "Eliminar";
 
                       return (
                         <tr key={r.id}>
-                          <td style={S.td}>{r.id}</td>
                           <td style={S.td}>
                             <div style={{ fontWeight: 800 }}>{r.name}</div>
                           </td>
@@ -792,37 +1182,68 @@ export default function AdminRoles() {
                             </div>
                           </td>
                           <td style={S.td}>
-                            <div style={{ color: "#475569", maxWidth: 280 }}>
+                            <div
+                              style={{
+                                color: "#475569",
+                                maxWidth: 320,
+                                margin: "0 auto",
+                              }}
+                            >
                               {r.descripcion || "—"}
                             </div>
                           </td>
-                          <td style={S.td}>{roleTypeBadge(r)}</td>
-                          <td style={{ ...S.td, textAlign: "right" }}>
-                            <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
-                              <IconBtn
-                                onClick={() => openEditRoleModal(r)}
-                                title="Editar"
-                                variant="primary"
-                              >
-                                <i className="fa-solid fa-pen" />
-                              </IconBtn>
-
-                              <IconBtn
-                                onClick={() => deleteRole(r)}
-                                disabled={deletingRoleId === r.id || isAdmin}
-                                title={isAdmin ? "No se puede eliminar" : "Eliminar"}
-                                variant="danger"
-                              >
-                                <i className="fa-solid fa-trash" />
-                              </IconBtn>
+                          <td style={S.td}>
+                            <div style={{ display: "flex", justifyContent: "center" }}>
+                              {usedByUsers && r.name !== "Administrador" ? (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    flexWrap: "wrap",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  {roleTypeBadge(r)}
+                                  <Badge tone="warning">En uso</Badge>
+                                </div>
+                              ) : (
+                                roleTypeBadge(r)
+                              )}
                             </div>
                           </td>
+
+                          {canShowActionsColumn ? (
+                            <td style={S.td}>
+                              <div style={{ display: "inline-flex", gap: 8, flexWrap: "nowrap" }}>
+                                {canEditRoles ? (
+                                  <IconBtn
+                                    onClick={() => openEditRoleModal(r)}
+                                    title="Editar"
+                                    variant="primary"
+                                  >
+                                    <i className="fa-solid fa-pen" />
+                                  </IconBtn>
+                                ) : null}
+
+                                {canDeleteRoles ? (
+                                  <IconBtn
+                                    onClick={() => deleteRole(r)}
+                                    disabled={deletingRoleId === r.id || protectedRole}
+                                    title={deleteTitle}
+                                    variant="danger"
+                                  >
+                                    <i className="fa-solid fa-trash" />
+                                  </IconBtn>
+                                ) : null}
+                              </div>
+                            </td>
+                          ) : null}
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={6}>
+                      <td style={S.td} colSpan={canShowActionsColumn ? 5 : 4}>
                         Sin roles registrados.
                       </td>
                     </tr>
@@ -873,7 +1294,9 @@ export default function AdminRoles() {
             <form onSubmit={submitRoleModal}>
               <div style={S.modalBody}>
                 {loadingRoleDetail ? (
-                  <div style={{ color: "#475569", fontWeight: 700 }}>Cargando datos del rol...</div>
+                  <div style={{ color: "#475569", fontWeight: 700 }}>
+                    Cargando datos del rol...
+                  </div>
                 ) : (
                   <>
                     <div className="roles-form-grid" style={S.formGrid}>
@@ -892,7 +1315,9 @@ export default function AdminRoles() {
                           placeholder="Ej. supervisor"
                           disabled={roleIsAdmin}
                         />
-                        {fieldErrors.name ? <div style={S.errorText}>{fieldErrors.name}</div> : null}
+                        {fieldErrors.name ? (
+                          <div style={S.errorText}>{fieldErrors.name}</div>
+                        ) : null}
                       </div>
 
                       <div style={S.fieldWrap}>
@@ -953,30 +1378,146 @@ export default function AdminRoles() {
                           Este rol tiene acceso total por sistema. No requiere permisos específicos.
                         </div>
                       ) : (
-                        <div style={S.permsBox}>
-                          {allPermissions.length ? (
-                            <div style={S.permsGrid}>
-                              {allPermissions.map((p) => (
-                                <label key={p} style={S.permItem}>
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedPermissions.includes(p)}
-                                    onChange={() => togglePermission(p)}
-                                  />
-                                  <span>{p}</span>
-                                </label>
-                              ))}
+                        <>
+                          <div style={S.permsGroup}>
+                            <div style={S.permsGroupTitle}>Permisos panel usuario</div>
+                            <div style={S.permsGroupDesc}>
+                              Accesos relacionados con captura, consulta y gestión de formularios del panel usuario.
                             </div>
-                          ) : (
-                            <div style={{ fontSize: 12, color: "#64748b" }}>
-                              No hay permisos creados. Ve a “Permisos” y crea algunos.
+
+                            <PermissionModuleGroup
+                              title="Formularios"
+                              permissions={groupedPermissions.userPanel.formularios}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+                          </div>
+
+                          <div style={S.permsGroup}>
+                            <div style={S.permsGroupTitle}>Permisos panel admin</div>
+                            <div style={S.permsGroupDesc}>
+                              Accesos relacionados con administración del sistema, catálogos, usuarios, roles y formularios del panel admin.
                             </div>
-                          )}
-                        </div>
+
+                            <PermissionModuleGroup
+                              title="Panel admin"
+                              permissions={groupedPermissions.adminPanel.admin}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+
+                            <PermissionModuleGroup
+                              title="Usuarios"
+                              permissions={groupedPermissions.adminPanel.usuarios}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+
+                            <PermissionModuleGroup
+                              title="Roles"
+                              permissions={groupedPermissions.adminPanel.roles}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+
+                            <PermissionModuleGroup
+                              title="Permisos"
+                              permissions={groupedPermissions.adminPanel.permisos}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+
+                            <PermissionModuleGroup
+                              title="Empresas"
+                              permissions={groupedPermissions.adminPanel.empresas}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+
+                            <PermissionModuleGroup
+                              title="Grupos"
+                              permissions={groupedPermissions.adminPanel.grupos}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+
+                            <PermissionModuleGroup
+                              title="Unidades de servicio"
+                              permissions={groupedPermissions.adminPanel.unidades_servicio}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+
+                            <PermissionModuleGroup
+                              title="Formularios admin"
+                              permissions={groupedPermissions.adminPanel.formularios_admin}
+                              styles={S}
+                              selectedPermissions={selectedPermissions}
+                              togglePermission={togglePermission}
+                              roleIsAdmin={roleIsAdmin}
+                              formatPermissionLabel={formatPermissionLabel}
+                              formatPermissionHint={formatPermissionHint}
+                            />
+                          </div>
+
+                          {groupedPermissions.other.length ? (
+                            <div style={S.permsGroup}>
+                              <div style={S.permsGroupTitle}>Otros permisos</div>
+                              <div style={S.permsGroupDesc}>
+                                Permisos adicionales que no entran en las categorías anteriores.
+                              </div>
+
+                              <PermissionModuleGroup
+                                title="Adicionales"
+                                permissions={groupedPermissions.other}
+                                styles={S}
+                                selectedPermissions={selectedPermissions}
+                                togglePermission={togglePermission}
+                                roleIsAdmin={roleIsAdmin}
+                                formatPermissionLabel={formatPermissionLabel}
+                                formatPermissionHint={formatPermissionHint}
+                              />
+                            </div>
+                          ) : null}
+                        </>
                       )}
                     </div>
 
-                    {err ? <div style={{ color: "#b91c1c", fontWeight: 800 }}>{err}</div> : null}
+                    {err ? (
+                      <div style={{ color: "#b91c1c", fontWeight: 800 }}>{err}</div>
+                    ) : null}
                   </>
                 )}
               </div>

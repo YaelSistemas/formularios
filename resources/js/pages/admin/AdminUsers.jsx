@@ -1,10 +1,299 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../services/api";
 
+function MultiSelectInlineBox({
+  label,
+  items = [],
+  selectedValues = [],
+  onChange,
+  getLabel,
+  getDescription,
+  placeholder = "Buscar...",
+  helper = "",
+  error = "",
+  disabled = false,
+  height = 180,
+}) {
+  const [search, setSearch] = useState("");
+
+  const selectedSet = useMemo(
+    () => new Set((selectedValues || []).map((v) => Number(v))),
+    [selectedValues]
+  );
+
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items;
+
+    return items.filter((item) => {
+      const labelText = String(getLabel?.(item) || "").toLowerCase();
+      const descText = String(getDescription?.(item) || "").toLowerCase();
+      return labelText.includes(term) || descText.includes(term);
+    });
+  }, [items, search, getLabel, getDescription]);
+
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedSet.has(Number(item.id))),
+    [items, selectedSet]
+  );
+
+  const toggleValue = (id) => {
+    if (disabled) return;
+    const numId = Number(id);
+
+    if (selectedSet.has(numId)) {
+      onChange(selectedValues.filter((v) => Number(v) !== numId));
+    } else {
+      onChange([...selectedValues, numId]);
+    }
+  };
+
+  const removeValue = (id) => {
+    if (disabled) return;
+    const numId = Number(id);
+    onChange(selectedValues.filter((v) => Number(v) !== numId));
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800, marginBottom: 6 }}>
+        {label}
+      </div>
+
+      <div
+        style={{
+          border: `1px solid ${error ? "#fecaca" : "#dbeafe"}`,
+          borderRadius: 12,
+          background: disabled ? "#f8fafc" : "#fff",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "10px 12px 8px 12px",
+            borderBottom: "1px solid #eef2f7",
+            minHeight: 52,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            alignItems: "flex-start",
+            alignContent: "flex-start",
+          }}
+        >
+          {selectedItems.length ? (
+            selectedItems.map((item) => (
+              <span
+                key={item.id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  border: "1px solid #bfdbfe",
+                  background: "#eff6ff",
+                  color: "#1d4ed8",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  maxWidth: "100%",
+                }}
+              >
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: 180,
+                  }}
+                >
+                  {getLabel(item)}
+                </span>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => removeValue(item.id)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#1d4ed8",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    fontWeight: 900,
+                    padding: 0,
+                    lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            ))
+          ) : (
+            <span style={{ fontSize: 13, color: "#94a3b8", paddingTop: 2 }}>
+              Sin selección
+            </span>
+          )}
+        </div>
+
+        <div style={{ padding: 10, borderBottom: "1px solid #eef2f7" }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={placeholder}
+            disabled={disabled}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #dbeafe",
+              background: disabled ? "#f8fafc" : "#fff",
+              outline: "none",
+              minHeight: 40,
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            maxHeight: height,
+            overflowY: "auto",
+            background: "#fff",
+          }}
+        >
+          {filteredItems.length ? (
+            filteredItems.map((item, idx) => {
+              const checked = selectedSet.has(Number(item.id));
+
+              return (
+                <label
+                  key={item.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    padding: "10px 12px",
+                    borderBottom:
+                      idx !== filteredItems.length - 1 ? "1px solid #eef2f7" : "none",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    background: checked ? "#f8fbff" : "#fff",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={() => toggleValue(item.id)}
+                    style={{ marginTop: 3 }}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "#0f172a",
+                      }}
+                    >
+                      {getLabel(item)}
+                    </div>
+                    {getDescription?.(item) ? (
+                      <div
+                        style={{
+                          marginTop: 2,
+                          fontSize: 12,
+                          color: "#64748b",
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {getDescription(item)}
+                      </div>
+                    ) : null}
+                  </div>
+                </label>
+              );
+            })
+          ) : (
+            <div
+              style={{
+                padding: "12px",
+                fontSize: 12,
+                color: "#64748b",
+              }}
+            >
+              No hay resultados para mostrar.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error ? (
+        <div style={{ color: "#b91c1c", fontSize: 12, fontWeight: 700, marginTop: 6 }}>
+          {error}
+        </div>
+      ) : helper ? (
+        <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginTop: 6 }}>
+          {helper}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AdminUsers() {
   const [err, setErr] = useState("");
 
-  // toast
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
+  const me = getStoredUser();
+
+  const isAdmin =
+    !!me?.is_admin ||
+    normalizeRoles(me).some((r) => String(r).toLowerCase() === "administrador");
+
+  const hasPermission = (permission) => {
+    if (isAdmin) return true;
+    return normalizePermissions(me).includes(permission);
+  };
+
+  const canCreateUsers = hasPermission("usuarios.create");
+  const canEditUsers = hasPermission("usuarios.edit");
+  const canDeleteUsers = hasPermission("usuarios.delete");
+  const canShowActionsColumn = canEditUsers || canDeleteUsers;
+
+  const myUserId = Number(me?.id || 0);
+
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
@@ -20,22 +309,19 @@ export default function AdminUsers() {
     };
   }, []);
 
-  // users
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // catálogos
   const [empresasAll, setEmpresasAll] = useState([]);
   const [gruposAll, setGruposAll] = useState([]);
   const [unidadesServicioAll, setUnidadesServicioAll] = useState([]);
   const [loadingCats, setLoadingCats] = useState(false);
 
-  // buscador
   const [qDraft, setQDraft] = useState("");
   const [q, setQ] = useState("");
 
-  const [perPage, setPerPage] = useState(20);
+  const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ last_page: 1, total: 0 });
 
@@ -43,15 +329,14 @@ export default function AdminUsers() {
   const [formMode, setFormMode] = useState("create");
   const [editingId, setEditingId] = useState(null);
 
-  // form
   const [fName, setFName] = useState("");
   const [fEmail, setFEmail] = useState("");
   const [fPassword, setFPassword] = useState("");
   const [fRole, setFRole] = useState("");
   const [fActivo, setFActivo] = useState(true);
-  const [fEmpresa, setFEmpresa] = useState("");
-  const [fGrupo, setFGrupo] = useState("");
-  const [fUnidadServicio, setFUnidadServicio] = useState("");
+  const [fEmpresas, setFEmpresas] = useState([]);
+  const [fGrupos, setFGrupos] = useState([]);
+  const [fUnidadesServicio, setFUnidadesServicio] = useState([]);
 
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -61,7 +346,6 @@ export default function AdminUsers() {
   const canPrev = useMemo(() => page > 1, [page]);
   const canNext = useMemo(() => page < (meta.last_page || 1), [page, meta.last_page]);
 
-  // focus buscador
   const searchRef = useRef(null);
   const searchWasFocusedRef = useRef(false);
 
@@ -179,20 +463,30 @@ export default function AdminUsers() {
     setFPassword("");
     setFRole("");
     setFActivo(true);
-    setFEmpresa("");
-    setFGrupo("");
-    setFUnidadServicio("");
+    setFEmpresas([]);
+    setFGrupos([]);
+    setFUnidadesServicio([]);
     setFieldErrors({});
     setErr("");
   };
 
   const openCreate = () => {
+    if (!canCreateUsers) {
+      setErr("No tienes permiso para crear usuarios.");
+      return;
+    }
+
     resetUserForm();
     setFormMode("create");
     setOpenForm(true);
   };
 
   const openEdit = (u) => {
+    if (!canEditUsers) {
+      setErr("No tienes permiso para editar usuarios.");
+      return;
+    }
+
     resetUserForm();
     setFormMode("edit");
     setEditingId(u.id);
@@ -205,27 +499,27 @@ export default function AdminUsers() {
 
     setFActivo(u.activo === true || u.activo === 1);
 
-    const empresaId = Array.isArray(u.empresas) && u.empresas.length
-      ? String(u.empresas[0]?.id ?? "")
-      : Array.isArray(u.empresa_ids) && u.empresa_ids.length
-      ? String(u.empresa_ids[0] ?? "")
-      : "";
+    const empresaIds = Array.isArray(u.empresas)
+      ? u.empresas.map((e) => Number(e?.id)).filter(Boolean)
+      : Array.isArray(u.empresa_ids)
+      ? u.empresa_ids.map(Number).filter(Boolean)
+      : [];
 
-    const grupoId = Array.isArray(u.grupos) && u.grupos.length
-      ? String(u.grupos[0]?.id ?? "")
-      : Array.isArray(u.grupo_ids) && u.grupo_ids.length
-      ? String(u.grupo_ids[0] ?? "")
-      : "";
+    const grupoIds = Array.isArray(u.grupos)
+      ? u.grupos.map((g) => Number(g?.id)).filter(Boolean)
+      : Array.isArray(u.grupo_ids)
+      ? u.grupo_ids.map(Number).filter(Boolean)
+      : [];
 
-    const unidadServicioId = Array.isArray(u.unidades_servicio) && u.unidades_servicio.length
-      ? String(u.unidades_servicio[0]?.id ?? "")
-      : Array.isArray(u.unidad_servicio_ids) && u.unidad_servicio_ids.length
-      ? String(u.unidad_servicio_ids[0] ?? "")
-      : "";
+    const unidadServicioIds = Array.isArray(u.unidades_servicio)
+      ? u.unidades_servicio.map((us) => Number(us?.id)).filter(Boolean)
+      : Array.isArray(u.unidad_servicio_ids)
+      ? u.unidad_servicio_ids.map(Number).filter(Boolean)
+      : [];
 
-    setFEmpresa(empresaId);
-    setFGrupo(grupoId);
-    setFUnidadServicio(unidadServicioId);
+    setFEmpresas(empresaIds);
+    setFGrupos(grupoIds);
+    setFUnidadesServicio(unidadServicioIds);
 
     setOpenForm(true);
   };
@@ -241,17 +535,27 @@ export default function AdminUsers() {
     const actionText = formMode === "create" ? "crear" : "actualizar";
     const errors = {};
 
-    if (!fName.trim()) errors.name = `No se puede ${actionText} el usuario porque falta el nombre.`;
-    if (!fEmail.trim()) errors.email = `No se puede ${actionText} el usuario porque falta el correo.`;
+    if (!fName.trim()) {
+      errors.name = `No se puede ${actionText} el usuario porque falta el nombre.`;
+    }
+    if (!fEmail.trim()) {
+      errors.email = `No se puede ${actionText} el usuario porque falta el correo.`;
+    }
     if (formMode === "create" && !fPassword.trim()) {
       errors.password = "No se puede crear el usuario porque falta la contraseña.";
     }
-    if (!fRole) errors.role = `No se puede ${actionText} el usuario porque falta el rol.`;
-    if (!fUnidadServicio) {
+    if (!fRole) {
+      errors.role = `No se puede ${actionText} el usuario porque falta el rol.`;
+    }
+    if (!fUnidadesServicio.length) {
       errors.unidad_servicio = `No se puede ${actionText} el usuario porque falta la unidad de servicio.`;
     }
-    if (!fEmpresa) errors.empresa = `No se puede ${actionText} el usuario porque falta la empresa.`;
-    if (!fGrupo) errors.grupo = `No se puede ${actionText} el usuario porque falta el grupo.`;
+    if (!fEmpresas.length) {
+      errors.empresa = `No se puede ${actionText} el usuario porque falta la empresa.`;
+    }
+    if (!fGrupos.length) {
+      errors.grupo = `No se puede ${actionText} el usuario porque falta el grupo.`;
+    }
 
     setFieldErrors(errors);
 
@@ -268,6 +572,16 @@ export default function AdminUsers() {
     e.preventDefault();
     setErr("");
 
+    if (formMode === "create" && !canCreateUsers) {
+      setErr("No tienes permiso para crear usuarios.");
+      return;
+    }
+
+    if (formMode === "edit" && !canEditUsers) {
+      setErr("No tienes permiso para editar usuarios.");
+      return;
+    }
+
     if (!validateForm()) return;
 
     setSaving(true);
@@ -278,9 +592,9 @@ export default function AdminUsers() {
         email: fEmail.trim(),
         roles: [fRole],
         activo: !!fActivo,
-        empresa_ids: [Number(fEmpresa)],
-        grupo_ids: [Number(fGrupo)],
-        unidad_servicio_ids: [Number(fUnidadServicio)],
+        empresa_ids: fEmpresas,
+        grupo_ids: fGrupos,
+        unidad_servicio_ids: fUnidadesServicio,
       };
 
       if (formMode === "create") {
@@ -302,7 +616,37 @@ export default function AdminUsers() {
     }
   };
 
+  const userHasAdminRole = (u) => {
+    const rr = Array.isArray(u?.roles) ? u.roles : [];
+    return rr.some((r) => String(r).toLowerCase() === "administrador");
+  };
+
+  const isCurrentLoggedUser = (u) => Number(u?.id) === myUserId;
+
+  const isProtectedUser = (u) => userHasAdminRole(u) || isCurrentLoggedUser(u);
+
+  const getDeleteTitle = (u) => {
+    if (userHasAdminRole(u)) return "No se puede eliminar un usuario con rol Administrador";
+    if (isCurrentLoggedUser(u)) return "No puedes eliminar tu propio usuario";
+    return "Eliminar";
+  };
+
   const deleteUser = async (u) => {
+    if (!canDeleteUsers) {
+      setErr("No tienes permiso para eliminar usuarios.");
+      return;
+    }
+
+    if (userHasAdminRole(u)) {
+      setErr("No se puede eliminar un usuario con rol Administrador.");
+      return;
+    }
+
+    if (isCurrentLoggedUser(u)) {
+      setErr("No puedes eliminar tu propio usuario.");
+      return;
+    }
+
     const ok = window.confirm(`¿Eliminar al usuario ${u.name} (${u.email})?`);
     if (!ok) return;
 
@@ -412,6 +756,7 @@ export default function AdminUsers() {
         style={{
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           padding: "6px 10px",
           borderRadius: 999,
           border: `1px solid ${t.border}`,
@@ -419,6 +764,7 @@ export default function AdminUsers() {
           color: t.fg,
           fontSize: 12,
           fontWeight: 800,
+          textAlign: "center",
         }}
       >
         {children}
@@ -493,13 +839,13 @@ export default function AdminUsers() {
     },
     table: {
       width: "100%",
-      minWidth: 920,
+      minWidth: 980,
       borderCollapse: "separate",
       borderSpacing: 0,
       background: "#fff",
     },
     th: {
-      textAlign: "left",
+      textAlign: "center",
       fontSize: 12,
       color: "#475569",
       padding: "14px 12px",
@@ -509,6 +855,7 @@ export default function AdminUsers() {
       top: 0,
       zIndex: 1,
       fontWeight: 800,
+      verticalAlign: "middle",
     },
     td: {
       padding: "14px 12px",
@@ -516,6 +863,7 @@ export default function AdminUsers() {
       verticalAlign: "middle",
       fontSize: 13,
       color: "#0f172a",
+      textAlign: "center",
     },
     pagination: {
       display: "flex",
@@ -649,6 +997,12 @@ export default function AdminUsers() {
       boxShadow: "0 1px 3px rgba(0,0,0,.22)",
       transition: "all 0.2s ease",
     },
+    badgesWrap: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      justifyContent: "center",
+    },
     responsiveStyleTag: `
       @media (max-width: 860px) {
         .users-filter-row {
@@ -676,30 +1030,30 @@ export default function AdminUsers() {
     `,
   };
 
-  const roleLabel = (u) => {
+  const roleLabels = (u) => {
     const rr = Array.isArray(u?.roles) ? u.roles : [];
-    return rr.length ? rr[0] : "—";
+    return rr.length ? rr : ["—"];
   };
 
-  const firstEmpresaLabel = (u) => {
+  const empresaLabels = (u) => {
     if (Array.isArray(u?.empresas) && u.empresas.length) {
-      return u.empresas[0]?.nombre || "—";
+      return u.empresas.map((e) => e?.nombre).filter(Boolean);
     }
-    return "—";
+    return ["—"];
   };
 
-  const firstGrupoLabel = (u) => {
+  const grupoLabels = (u) => {
     if (Array.isArray(u?.grupos) && u.grupos.length) {
-      return u.grupos[0]?.nombre_mostrar || u.grupos[0]?.nombre || "—";
+      return u.grupos.map((g) => g?.nombre_mostrar || g?.nombre).filter(Boolean);
     }
-    return "—";
+    return ["—"];
   };
 
-  const firstUnidadServicioLabel = (u) => {
+  const unidadServicioLabels = (u) => {
     if (Array.isArray(u?.unidades_servicio) && u.unidades_servicio.length) {
-      return u.unidades_servicio[0]?.nombre || "—";
+      return u.unidades_servicio.map((us) => us?.nombre).filter(Boolean);
     }
-    return "—";
+    return ["—"];
   };
 
   const activeBadge = (u) => {
@@ -709,6 +1063,7 @@ export default function AdminUsers() {
         style={{
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: "center",
           gap: 6,
           padding: "6px 10px",
           borderRadius: 999,
@@ -717,6 +1072,7 @@ export default function AdminUsers() {
           color: a ? "#166534" : "#b91c1c",
           fontSize: 12,
           fontWeight: 800,
+          textAlign: "center",
         }}
       >
         {a ? "Activo" : "Inactivo"}
@@ -740,10 +1096,12 @@ export default function AdminUsers() {
             </div>
           </div>
 
-          <Btn variant="primary" onClick={openCreate}>
-            <i className="fa-solid fa-user-plus" />
-            Nuevo usuario
-          </Btn>
+          {canCreateUsers ? (
+            <Btn variant="primary" onClick={openCreate}>
+              <i className="fa-solid fa-user-plus" />
+              Nuevo usuario
+            </Btn>
+          ) : null}
         </div>
 
         <div style={S.filterRow} className="users-filter-row">
@@ -774,9 +1132,13 @@ export default function AdminUsers() {
               }}
               style={S.select}
             >
+              <option value={5}>5 registros</option>
               <option value={10}>10 registros</option>
               <option value={20}>20 registros</option>
+              <option value={25}>25 registros</option>
               <option value={50}>50 registros</option>
+              <option value={75}>75 registros</option>
+              <option value={100}>100 registros</option>
             </select>
           </div>
 
@@ -787,6 +1149,7 @@ export default function AdminUsers() {
                 ...S.input,
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 background: "#fff",
                 color: "#334155",
                 fontWeight: 700,
@@ -836,7 +1199,7 @@ export default function AdminUsers() {
                     <th style={S.th}>Empresa</th>
                     <th style={S.th}>Grupo</th>
                     <th style={S.th}>Estado</th>
-                    <th style={{ ...S.th, width: 120, textAlign: "right" }}>Acciones</th>
+                    {canShowActionsColumn ? <th style={{ ...S.th, width: 120 }}>Acciones</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -846,37 +1209,74 @@ export default function AdminUsers() {
                         <td style={S.td}>
                           <div style={{ fontWeight: 800 }}>{u.name}</div>
                         </td>
+
                         <td style={S.td}>
                           <div style={{ color: "#334155" }}>{u.email}</div>
                         </td>
-                        <td style={S.td}>
-                          <Badge tone="role">{roleLabel(u)}</Badge>
-                        </td>
-                        <td style={S.td}>{firstUnidadServicioLabel(u)}</td>
-                        <td style={S.td}>{firstEmpresaLabel(u)}</td>
-                        <td style={S.td}>{firstGrupoLabel(u)}</td>
-                        <td style={S.td}>{activeBadge(u)}</td>
-                        <td style={{ ...S.td, textAlign: "right" }}>
-                          <div style={{ display: "inline-flex", gap: 8 }}>
-                            <IconBtn onClick={() => openEdit(u)} title="Editar" variant="primary">
-                              <i className="fa-solid fa-pen" />
-                            </IconBtn>
 
-                            <IconBtn
-                              disabled={confirmingDelete}
-                              onClick={() => deleteUser(u)}
-                              variant="danger"
-                              title="Eliminar"
-                            >
-                              <i className="fa-solid fa-trash" />
-                            </IconBtn>
+                        <td style={S.td}>
+                          <div style={S.badgesWrap}>
+                            {roleLabels(u).map((r, idx) => (
+                              <Badge key={`${u.id}-role-${idx}`} tone="role">
+                                {r}
+                              </Badge>
+                            ))}
                           </div>
                         </td>
+
+                        <td style={S.td}>
+                          <div style={S.badgesWrap}>
+                            {unidadServicioLabels(u).map((label, idx) => (
+                              <Badge key={`${u.id}-us-${idx}`}>{label}</Badge>
+                            ))}
+                          </div>
+                        </td>
+
+                        <td style={S.td}>
+                          <div style={S.badgesWrap}>
+                            {empresaLabels(u).map((label, idx) => (
+                              <Badge key={`${u.id}-emp-${idx}`}>{label}</Badge>
+                            ))}
+                          </div>
+                        </td>
+
+                        <td style={S.td}>
+                          <div style={S.badgesWrap}>
+                            {grupoLabels(u).map((label, idx) => (
+                              <Badge key={`${u.id}-grp-${idx}`}>{label}</Badge>
+                            ))}
+                          </div>
+                        </td>
+
+                        <td style={S.td}>{activeBadge(u)}</td>
+
+                        {canShowActionsColumn ? (
+                          <td style={S.td}>
+                            <div style={{ display: "inline-flex", gap: 8, justifyContent: "center" }}>
+                              {canEditUsers ? (
+                                <IconBtn onClick={() => openEdit(u)} title="Editar" variant="primary">
+                                  <i className="fa-solid fa-pen" />
+                                </IconBtn>
+                              ) : null}
+
+                              {canDeleteUsers ? (
+                                <IconBtn
+                                  disabled={confirmingDelete || isProtectedUser(u)}
+                                  onClick={() => deleteUser(u)}
+                                  variant="danger"
+                                  title={getDeleteTitle(u)}
+                                >
+                                  <i className="fa-solid fa-trash" />
+                                </IconBtn>
+                              ) : null}
+                            </div>
+                          </td>
+                        ) : null}
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={8}>
+                      <td style={S.td} colSpan={canShowActionsColumn ? 8 : 7}>
                         Sin usuarios registrados.
                       </td>
                     </tr>
@@ -886,10 +1286,7 @@ export default function AdminUsers() {
             </div>
 
             <div style={S.pagination} className="users-pagination-mobile">
-              <Btn
-                disabled={!canPrev}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
+              <Btn disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                 Anterior
               </Btn>
 
@@ -897,10 +1294,7 @@ export default function AdminUsers() {
                 Mostrando página <b>{page}</b> de <b>{meta.last_page}</b>
               </div>
 
-              <Btn
-                disabled={!canNext}
-                onClick={() => setPage((p) => p + 1)}
-              >
+              <Btn disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
                 Siguiente
               </Btn>
             </div>
@@ -928,7 +1322,6 @@ export default function AdminUsers() {
             <form onSubmit={submitUserForm}>
               <div style={S.modalBody}>
                 <div className="users-form-grid" style={S.formGrid}>
-                  {/* Nombre solo */}
                   <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
                     <div style={S.label}>Nombre</div>
                     <input
@@ -946,7 +1339,6 @@ export default function AdminUsers() {
                     {fieldErrors.name ? <div style={S.errorText}>{fieldErrors.name}</div> : null}
                   </div>
 
-                  {/* Correo y contraseña */}
                   <div style={S.fieldWrap}>
                     <div style={S.label}>Correo</div>
                     <input
@@ -992,7 +1384,6 @@ export default function AdminUsers() {
                     ) : null}
                   </div>
 
-                  {/* Rol y unidad */}
                   <div style={S.fieldWrap}>
                     <div style={S.label}>Rol</div>
                     <select
@@ -1017,83 +1408,62 @@ export default function AdminUsers() {
                   </div>
 
                   <div style={S.fieldWrap}>
-                    <div style={S.label}>Unidad de servicio</div>
-                    <select
-                      value={fUnidadServicio}
-                      onChange={(e) => {
-                        setFUnidadServicio(e.target.value);
+                    <MultiSelectInlineBox
+                      label="Unidades de servicio"
+                      items={unidadesServicioAll}
+                      selectedValues={fUnidadesServicio}
+                      onChange={(vals) => {
+                        setFUnidadesServicio(vals);
                         setFieldErrors((prev) => ({ ...prev, unidad_servicio: "" }));
                       }}
-                      style={{
-                        ...S.inputFull,
-                        borderColor: fieldErrors.unidad_servicio ? "#fecaca" : "#dbeafe",
-                      }}
+                      getLabel={(item) => item.nombre}
+                      getDescription={(item) => item.descripcion || ""}
+                      placeholder="Buscar unidad de servicio..."
+                      helper="Selecciona una o varias unidades."
+                      error={fieldErrors.unidad_servicio}
                       disabled={loadingCats}
-                    >
-                      <option value="">Selecciona una unidad de servicio</option>
-                      {unidadesServicioAll.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.unidad_servicio ? (
-                      <div style={S.errorText}>{fieldErrors.unidad_servicio}</div>
-                    ) : null}
+                      height={140}
+                    />
                   </div>
 
-                  {/* Empresa y grupo */}
                   <div style={S.fieldWrap}>
-                    <div style={S.label}>Empresa</div>
-                    <select
-                      value={fEmpresa}
-                      onChange={(e) => {
-                        setFEmpresa(e.target.value);
+                    <MultiSelectInlineBox
+                      label="Empresa"
+                      items={empresasAll}
+                      selectedValues={fEmpresas}
+                      onChange={(vals) => {
+                        setFEmpresas(vals);
                         setFieldErrors((prev) => ({ ...prev, empresa: "" }));
                       }}
-                      style={{
-                        ...S.inputFull,
-                        borderColor: fieldErrors.empresa ? "#fecaca" : "#dbeafe",
-                      }}
+                      getLabel={(item) => item.nombre}
+                      getDescription={(item) => item.razon_social || ""}
+                      placeholder="Buscar empresa..."
+                      helper="Selecciona una o varias empresas."
+                      error={fieldErrors.empresa}
                       disabled={loadingCats}
-                    >
-                      <option value="">Selecciona una empresa</option>
-                      {empresasAll.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.empresa ? (
-                      <div style={S.errorText}>{fieldErrors.empresa}</div>
-                    ) : null}
+                      height={140}
+                    />
                   </div>
 
                   <div style={S.fieldWrap}>
-                    <div style={S.label}>Grupo</div>
-                    <select
-                      value={fGrupo}
-                      onChange={(e) => {
-                        setFGrupo(e.target.value);
+                    <MultiSelectInlineBox
+                      label="Grupo"
+                      items={gruposAll}
+                      selectedValues={fGrupos}
+                      onChange={(vals) => {
+                        setFGrupos(vals);
                         setFieldErrors((prev) => ({ ...prev, grupo: "" }));
                       }}
-                      style={{
-                        ...S.inputFull,
-                        borderColor: fieldErrors.grupo ? "#fecaca" : "#dbeafe",
-                      }}
+                      getLabel={(item) => item.nombre_mostrar || item.nombre}
+                      getDescription={(item) => item.descripcion || ""}
+                      placeholder="Buscar grupo..."
+                      helper="Selecciona uno o varios grupos."
+                      error={fieldErrors.grupo}
                       disabled={loadingCats}
-                    >
-                      <option value="">Selecciona un grupo</option>
-                      {gruposAll.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.nombre_mostrar || g.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.grupo ? <div style={S.errorText}>{fieldErrors.grupo}</div> : null}
+                      height={140}
+                    />
                   </div>
 
-                  {/* Estado solo */}
                   <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
                     <div style={S.label}>Estado</div>
                     <div style={S.toggleWrap}>

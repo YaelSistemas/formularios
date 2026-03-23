@@ -8,6 +8,53 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const normalizePermissions = (user) => {
+    if (!user) return [];
+
+    const directPermissions = Array.isArray(user.permissions)
+      ? user.permissions.map((p) =>
+          typeof p === "string" ? p : p?.name
+        ).filter(Boolean)
+      : [];
+
+    return [...new Set(directPermissions)];
+  };
+
+  const normalizeRoles = (user) => {
+    if (!user) return [];
+
+    const rolesFromArray = Array.isArray(user.roles)
+      ? user.roles.map((r) =>
+          typeof r === "string" ? r : r?.name
+        ).filter(Boolean)
+      : [];
+
+    const roleSingle = user.role
+      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      : [];
+
+    return [...new Set([...rolesFromArray, ...roleSingle])];
+  };
+
+  const isAdmin = (user) => {
+    const roles = normalizeRoles(user).map((r) => String(r).toLowerCase());
+    return roles.includes("administrador");
+  };
+
+  const hasPermission = (user, permission) => {
+    if (isAdmin(user)) return true;
+    const permissions = normalizePermissions(user);
+    return permissions.includes(permission);
+  };
+
+  const getRedirectPath = (user) => {
+    if (isAdmin(user) || hasPermission(user, "admin.panel.view")) {
+      return "/admin";
+    }
+
+    return "/forms";
+  };
+
   useEffect(() => {
     (async () => {
       const token = localStorage.getItem("token");
@@ -15,8 +62,10 @@ export default function Login() {
 
       try {
         const data = await apiMe();
-        localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "/forms";
+        const user = data?.user || data;
+
+        localStorage.setItem("user", JSON.stringify(user));
+        window.location.href = getRedirectPath(user);
       } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -37,7 +86,7 @@ export default function Login() {
 
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
-      window.location.href = "/forms";
+      window.location.href = getRedirectPath(user);
     } catch (ex) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -84,10 +133,6 @@ export default function Login() {
       outline: "none",
       fontSize: 14,
     },
-    inputFocus: {
-      borderColor: "#3b82f6",
-      boxShadow: "0 0 0 3px rgba(59,130,246,.2)",
-    },
     err: {
       marginBottom: 12,
       borderRadius: 6,
@@ -111,7 +156,6 @@ export default function Login() {
       letterSpacing: 0.3,
     },
     btnDisabled: { opacity: 0.6, cursor: "not-allowed" },
-    tip: { marginTop: 12, fontSize: 12, color: "#71717a" },
   };
 
   return (
