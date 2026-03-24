@@ -3,78 +3,119 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-
+use App\Models\User;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        // ✅ Guard para API con Sanctum
         $guard = 'sanctum';
 
-        /**
-         * 1) Roles base
-         */
-        $adminRole = Role::firstOrCreate([
-            'name' => 'Administrador',
-            'guard_name' => $guard,
-        ]);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $userRole = Role::firstOrCreate([
-            'name' => 'Usuario',
-            'guard_name' => $guard,
-        ]);
-
-        /**
-         * 2) Permisos base (Forms)
-         */
+        /*
+        |--------------------------------------------------------------------------
+        | Permisos permitidos
+        |--------------------------------------------------------------------------
+        */
         $permissions = [
             'formularios.view',
             'formularios.create',
             'formularios.edit',
             'formularios.delete',
             'formularios.submit',
-            'formularios.publish', 
+            'formularios.admin.publish',
             'formularios.submissions.view',
+            'admin.panel.view',
+            'formularios.admin.view',
+            'formularios.admin.assign',
+            'usuarios.view',
+            'usuarios.create',
+            'usuarios.edit',
+            'usuarios.delete',
+            'roles.view',
+            'roles.create',
+            'roles.edit',
+            'roles.delete',
+            'permisos.view',
+            'permisos.create',
+            'permisos.edit',
+            'permisos.delete',
+            'empresas.view',
+            'empresas.create',
+            'empresas.edit',
+            'empresas.delete',
+            'grupos.view',
+            'grupos.create',
+            'grupos.edit',
+            'grupos.delete',
+            'unidades_servicio.view',
+            'unidades_servicio.create',
+            'unidades_servicio.edit',
+            'unidades_servicio.delete',
         ];
 
-        foreach ($permissions as $p) {
+        /*
+        |--------------------------------------------------------------------------
+        | Crear permisos
+        |--------------------------------------------------------------------------
+        */
+        foreach ($permissions as $permissionName) {
             Permission::firstOrCreate([
-                'name' => $p,
+                'name' => $permissionName,
                 'guard_name' => $guard,
             ]);
         }
 
-        /**
-         * 3) Asignación de permisos
-         * - Admin: todo
-         * - Usuario: ver + responder
-         */
-        $adminRole->syncPermissions($permissions);
-
-        $userRole->syncPermissions([
-            'formularios.view',
-            'formularios.submit',
-        ]);
-
-        /**
-         * 4) Usuario admin base
-         */
-        $user = User::firstOrCreate(
-            ['email' => 'admin@local.test'],
+        /*
+        |--------------------------------------------------------------------------
+        | Crear solo rol Administrador
+        |--------------------------------------------------------------------------
+        */
+        $adminRole = Role::updateOrCreate(
             [
-                'name' => 'Admin',
-                'password' => Hash::make('Admin1234*'),
+                'name' => 'Administrador',
+                'guard_name' => $guard,
+            ],
+            [
+                'name' => 'Administrador',
+                'guard_name' => $guard,
             ]
         );
 
-        // ✅ Asegura rol admin
-        if (! $user->hasRole('Administrador')) {
-            $user->assignRole($adminRole);
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | Asignar todos los permisos al Administrador
+        |--------------------------------------------------------------------------
+        */
+        $adminRole->syncPermissions($permissions);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Crear / actualizar usuario administrador
+        |--------------------------------------------------------------------------
+        */
+        $user = User::updateOrCreate(
+            [
+                'email' => 'soporte.sistemas3@grupo-vysisa.mx',
+            ],
+            [
+                'name' => 'Yael Alain Romero Cazarez',
+                'password' => Hash::make('S1$T3m4s@'),
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Asignar solo rol Administrador al usuario
+        |--------------------------------------------------------------------------
+        */
+        $user->syncRoles([$adminRole]);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
