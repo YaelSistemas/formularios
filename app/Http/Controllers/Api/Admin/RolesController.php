@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\RoleHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesController extends Controller
 {
@@ -17,6 +19,103 @@ class RolesController extends Controller
             ->where('role_id', $roleId)
             ->where('model_type', \App\Models\User::class)
             ->count();
+    }
+
+    protected function isAdminUser($user): bool
+    {
+        return $user && method_exists($user, 'hasRole') && $user->hasRole('Administrador');
+    }
+
+    protected function normalizePermissionNames($permissions): array
+    {
+        $items = collect($permissions)
+            ->map(fn ($p) => trim((string) $p))
+            ->filter()
+            ->values()
+            ->all();
+
+        sort($items);
+
+        return array_values($items);
+    }
+
+    protected function serializeRoleSnapshot(Role $role): array
+    {
+        $role->loadMissing('permissions:id,name');
+
+        return [
+            'name' => $role->name,
+            'nombre_mostrar' => $role->nombre_mostrar,
+            'descripcion' => $role->descripcion,
+            'permissions' => $this->normalizePermissionNames(
+                $role->permissions->pluck('name')->values()->all()
+            ),
+        ];
+    }
+
+    protected function buildRoleChanges(array $before, array $after): array
+    {
+        $fields = [
+            'name' => [
+                'label' => 'Nombre interno',
+                'type' => 'text',
+            ],
+            'nombre_mostrar' => [
+                'label' => 'Nombre a mostrar',
+                'type' => 'text',
+            ],
+            'descripcion' => [
+                'label' => 'Descripción',
+                'type' => 'text',
+            ],
+            'permissions' => [
+                'label' => 'Permisos',
+                'type' => 'list',
+            ],
+        ];
+
+        $changes = [];
+
+        foreach ($fields as $field => $meta) {
+            $old = $before[$field] ?? ($meta['type'] === 'list' ? [] : null);
+            $new = $after[$field] ?? ($meta['type'] === 'list' ? [] : null);
+
+            if ($meta['type'] === 'list') {
+                $old = $this->normalizePermissionNames((array) $old);
+                $new = $this->normalizePermissionNames((array) $new);
+            } else {
+                $old = $old === null ? null : trim((string) $old);
+                $new = $new === null ? null : trim((string) $new);
+            }
+
+            if ($old !== $new) {
+                $changes[] = [
+                    'field' => $field,
+                    'label' => $meta['label'],
+                    'type' => $meta['type'],
+                    'old' => $old,
+                    'new' => $new,
+                ];
+            }
+        }
+
+        return $changes;
+    }
+
+    protected function createHistoryEntry(
+        int $roleId,
+        ?int $actorId,
+        string $action,
+        array $snapshot,
+        ?array $changes = null
+    ): void {
+        RoleHistory::create([
+            'role_id' => $roleId,
+            'user_id' => $actorId,
+            'action' => $action,
+            'snapshot' => $snapshot,
+            'changes' => $changes,
+        ]);
     }
 
     public function index(Request $request)
@@ -51,6 +150,42 @@ class RolesController extends Controller
         return response()->json($roles);
     }
 
+    public function history(Request $request, Role $role)
+    {
+        $authUser = $request->user();
+
+        if (!$this->isAdminUser($authUser)) {
+            return response()->json([
+                'message' => 'No tienes permiso para ver el historial de roles.',
+            ], 403);
+        }
+
+        $items = RoleHistory::query()
+            ->with(['actor:id,name,email'])
+            ->where('role_id', $role->id)
+            ->oldest()
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'action' => $row->action,
+                    'snapshot' => $row->snapshot,
+                    'changes' => $row->changes ?? [],
+                    'actor' => $row->actor ? [
+                        'id' => $row->actor->id,
+                        'name' => $row->actor->name,
+                        'email' => $row->actor->email,
+                    ] : null,
+                    'created_at' => $row->created_at,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'history' => $items,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $messages = [
@@ -61,7 +196,7 @@ class RolesController extends Controller
             'permissions.array' => 'El formato de permisos no es válido.',
             'permissions.*.exists' => 'Uno o más permisos no existen.',
         ];
-
+    
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('roles', 'name')],
             'nombre_mostrar' => ['required', 'string', 'max:255'],
@@ -69,26 +204,41 @@ class RolesController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::exists('permissions', 'name')],
         ], $messages);
-
-        $role = Role::create([
-            'name' => trim($data['name']),
-            'guard_name' => 'sanctum',
-            'nombre_mostrar' => trim($data['nombre_mostrar']),
-            'descripcion' => trim($data['descripcion']),
-        ]);
-
-        $role->syncPermissions($data['permissions'] ?? []);
-
+    
+        $authUser = $request->user();
+    
+        $createdRole = DB::transaction(function () use ($data, $authUser) {
+            $role = Role::create([
+                'name' => trim($data['name']),
+                'guard_name' => 'sanctum',
+                'nombre_mostrar' => trim($data['nombre_mostrar']),
+                'descripcion' => trim($data['descripcion']),
+            ]);
+    
+            $role->syncPermissions($data['permissions'] ?? []);
+            $role->load('permissions:id,name');
+    
+            $this->createHistoryEntry(
+                roleId: (int) $role->id,
+                actorId: $authUser?->id,
+                action: 'created',
+                snapshot: $this->serializeRoleSnapshot($role),
+                changes: null
+            );
+    
+            return $role;
+        });
+    
         return response()->json([
             'ok' => true,
             'role' => [
-                'id' => $role->id,
-                'name' => $role->name,
-                'nombre_mostrar' => $role->nombre_mostrar,
-                'descripcion' => $role->descripcion,
-                'permissions' => $role->permissions()->pluck('name')->values(),
-                'users_count' => $this->countUsersByRoleId((int) $role->id),
-                'created_at' => $role->created_at,
+                'id' => $createdRole->id,
+                'name' => $createdRole->name,
+                'nombre_mostrar' => $createdRole->nombre_mostrar,
+                'descripcion' => $createdRole->descripcion,
+                'permissions' => $createdRole->permissions->pluck('name')->values(),
+                'users_count' => $this->countUsersByRoleId((int) $createdRole->id),
+                'created_at' => $createdRole->created_at,
             ],
         ], 201);
     }
@@ -138,12 +288,33 @@ class RolesController extends Controller
             'permissions.*' => ['string', Rule::exists('permissions', 'name')],
         ], $messages);
 
-        $role->name = trim($data['name']);
-        $role->nombre_mostrar = trim($data['nombre_mostrar']);
-        $role->descripcion = trim($data['descripcion']);
-        $role->save();
+        $authUser = $request->user();
 
-        $role->syncPermissions($data['permissions'] ?? []);
+        DB::transaction(function () use ($role, $data, $authUser) {
+            $role->load('permissions:id,name');
+            $before = $this->serializeRoleSnapshot($role);
+
+            $role->name = trim($data['name']);
+            $role->nombre_mostrar = trim($data['nombre_mostrar']);
+            $role->descripcion = trim($data['descripcion']);
+            $role->save();
+
+            $role->syncPermissions($data['permissions'] ?? []);
+            $role->load('permissions:id,name');
+
+            $after = $this->serializeRoleSnapshot($role);
+            $changes = $this->buildRoleChanges($before, $after);
+
+            if (!empty($changes)) {
+                $this->createHistoryEntry(
+                    roleId: (int) $role->id,
+                    actorId: $authUser?->id,
+                    action: 'updated',
+                    snapshot: $after,
+                    changes: $changes
+                );
+            }
+        });
 
         return response()->json([
             'ok' => true,
@@ -159,24 +330,56 @@ class RolesController extends Controller
         ]);
     }
 
-    public function destroy(Role $role)
+    public function destroy(Request $request, Role $role)
     {
+        if ($role->guard_name !== 'sanctum') {
+            return response()->json([
+                'message' => 'Solo se pueden eliminar roles del guard sanctum.'
+            ], 422);
+        }
+    
         if ($role->name === 'Administrador') {
             return response()->json([
-                'message' => 'No puedes eliminar el rol Administrador.'
+                'message' => 'No se puede eliminar el rol Administrador.'
             ], 422);
         }
-
+    
         $usersCount = $this->countUsersByRoleId((int) $role->id);
-
+    
         if ($usersCount > 0) {
             return response()->json([
-                'message' => 'No puedes eliminar un rol que ya está asignado a uno o más usuarios.'
+                'message' => 'No se puede eliminar el rol porque está asignado a uno o más usuarios.'
             ], 422);
         }
-
-        $role->delete();
-
+    
+        $authUser = $request->user();
+    
+        DB::transaction(function () use ($role, $authUser) {
+            $snapshot = $this->serializeRoleSnapshot($role);
+    
+            $this->createHistoryEntry(
+                roleId: (int) $role->id,
+                actorId: $authUser?->id,
+                action: 'deleted',
+                snapshot: $snapshot,
+                changes: null
+            );
+    
+            DB::table('model_has_roles')
+                ->where('role_id', $role->id)
+                ->delete();
+    
+            DB::table('role_has_permissions')
+                ->where('role_id', $role->id)
+                ->delete();
+    
+            DB::table('roles')
+                ->where('id', $role->id)
+                ->delete();
+        });
+    
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    
         return response()->json(['ok' => true]);
     }
 }

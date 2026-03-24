@@ -58,6 +58,7 @@ export default function AdminForms() {
   const canViewFormsAdmin = hasPermission("formularios.admin.view");
   const canAssignForms = hasPermission("formularios.admin.assign");
   const canPublishForms = hasPermission("formularios.admin.publish");
+  const canViewFormsHistory = isAdmin;
   const canShowActionsColumn =
     canViewFormsAdmin || canAssignForms || canPublishForms;
 
@@ -75,6 +76,12 @@ export default function AdminForms() {
 
   const [publishingFormId, setPublishingFormId] = useState(null);
   const [unpublishingFormId, setUnpublishingFormId] = useState(null);
+
+  const [openHistoryModal, setOpenHistoryModal] = useState(false);
+  const [historyForm, setHistoryForm] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyError, setHistoryError] = useState("");
 
   // asignaciones
   const [openAssignments, setOpenAssignments] = useState(false);
@@ -178,7 +185,7 @@ export default function AdminForms() {
   }, [page, lastPage]);
 
   useEffect(() => {
-    if (openPreview || openAssignments) return;
+    if (openPreview || openAssignments || openHistoryModal) return;
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
@@ -192,7 +199,16 @@ export default function AdminForms() {
     } catch {
       //
     }
-  }, [loadingForms, forms, q, qDraft, filteredForms.length, openPreview, openAssignments]);
+  }, [
+    loadingForms,
+    forms,
+    q,
+    qDraft,
+    filteredForms.length,
+    openPreview,
+    openAssignments,
+    openHistoryModal,
+  ]);
 
   const openPreviewModal = async (f) => {
     if (!canViewFormsAdmin) {
@@ -219,6 +235,37 @@ export default function AdminForms() {
   const closePreviewModal = () => {
     setOpenPreview(false);
     setPreviewForm(null);
+  };
+
+  const closeHistoryModal = () => {
+    setOpenHistoryModal(false);
+    setHistoryForm(null);
+    setHistoryItems([]);
+    setHistoryError("");
+    setHistoryLoading(false);
+  };
+
+  const openHistory = async (f) => {
+    if (!canViewFormsHistory) {
+      setErr("No tienes permiso para ver el historial de formularios.");
+      return;
+    }
+
+    setErr("");
+    setHistoryForm(f);
+    setHistoryItems([]);
+    setHistoryError("");
+    setOpenHistoryModal(true);
+    setHistoryLoading(true);
+
+    try {
+      const data = await apiGet(`/admin/forms/${f.id}/history`);
+      setHistoryItems(Array.isArray(data?.history) ? data.history : []);
+    } catch (e) {
+      setHistoryError(e?.message || "Error cargando historial del formulario");
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const publishForm = async (f) => {
@@ -558,7 +605,7 @@ export default function AdminForms() {
       borderCollapse: "separate",
       borderSpacing: 0,
       width: "100%",
-      minWidth: 920,
+      minWidth: canViewFormsHistory ? 1080 : 920,
       background: "#fff",
     },
     th: {
@@ -614,6 +661,16 @@ export default function AdminForms() {
     assignmentsModal: {
       width: "100%",
       maxWidth: 980,
+      maxHeight: "90vh",
+      overflowY: "auto",
+      background: "#fff",
+      borderRadius: 18,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 25px 60px rgba(0,0,0,.18)",
+    },
+    historyModal: {
+      width: "100%",
+      maxWidth: 960,
       maxHeight: "90vh",
       overflowY: "auto",
       background: "#fff",
@@ -748,12 +805,67 @@ export default function AdminForms() {
       flexDirection: "column",
       gap: 12,
     },
+    historyCard: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+      background: "#fff",
+      overflow: "hidden",
+    },
+    historyCardHeader: {
+      padding: "14px 16px",
+      borderBottom: "1px solid #eef2f7",
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      background: "#f8fafc",
+    },
+    historyCardBody: {
+      padding: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+    },
+    historyGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: 12,
+    },
+    historyFieldBox: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 12,
+      background: "#fff",
+      padding: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
+    historyFieldLabel: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 800,
+    },
+    historySectionTitle: {
+      fontSize: 13,
+      color: "#334155",
+      fontWeight: 900,
+      marginBottom: 2,
+    },
+    historyUsersWrap: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
     responsiveStyleTag: `
       @media (max-width: 980px) {
         .forms-preview-wrap {
           grid-template-columns: 1fr !important;
         }
         .forms-modal-full {
+          max-width: 100% !important;
+        }
+        .forms-history-modal-full {
           max-width: 100% !important;
         }
         .forms-assignments-grid {
@@ -810,6 +922,80 @@ export default function AdminForms() {
     });
 
     return result;
+  };
+
+  const enumeratedHistoryItems = useMemo(() => {
+    const sorted = [...historyItems].sort((a, b) => {
+      const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      return aDate - bDate;
+    });
+
+    return sorted;
+  }, [historyItems]);
+
+  const getHistoryActionMeta = (action) => {
+    if (action === "published") {
+      return {
+        label: "Publicado",
+        tone: "success",
+      };
+    }
+
+    if (action === "unpublished") {
+      return {
+        label: "Despublicado",
+        tone: "warn",
+      };
+    }
+
+    if (action === "assigned_users") {
+      return {
+        label: "Usuarios agregados",
+        tone: "violet",
+      };
+    }
+
+    if (action === "unassigned_users") {
+      return {
+        label: "Usuarios quitados",
+        tone: "danger",
+      };
+    }
+
+    return {
+      label: action || "Movimiento",
+      tone: "default",
+    };
+  };
+
+  const renderHistoryUsers = (usersList = []) => {
+    if (!Array.isArray(usersList) || !usersList.length) {
+      return <div style={{ color: "#64748b" }}>Sin usuarios para mostrar.</div>;
+    }
+
+    return (
+      <div style={S.historyUsersWrap}>
+        {usersList.map((user, idx) => (
+          <div
+            key={`${user?.id ?? "user"}-${idx}`}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid #e2e8f0",
+              background: "#fff",
+            }}
+          >
+            <div style={{ fontWeight: 800, color: "#0f172a" }}>
+              {user?.name || "Sin nombre"}
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+              {user?.email || "Sin correo"}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const PreviewRenderer = ({ form }) => {
@@ -1226,6 +1412,9 @@ export default function AdminForms() {
                     <th style={S.th}>Status</th>
                     <th style={S.th}>Asignaciones</th>
                     <th style={S.th}>Fecha</th>
+                    {canViewFormsHistory ? (
+                      <th style={{ ...S.th, width: 160 }}>Historial</th>
+                    ) : null}
                     {canShowActionsColumn ? (
                       <th style={{ ...S.th, width: 190 }}>Acciones</th>
                     ) : null}
@@ -1263,6 +1452,37 @@ export default function AdminForms() {
                         <td style={{ ...S.td, fontSize: 12, color: "#334155" }}>
                           {formatDate(f.created_at)}
                         </td>
+
+                        {canViewFormsHistory ? (
+                          <td style={{ ...S.td, textAlign: "center" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                              }}
+                            >
+                              <Btn
+                                type="button"
+                                onClick={() => openHistory(f)}
+                                title="Ver historial"
+                                variant="default"
+                                style={{
+                                  minWidth: 88,
+                                  justifyContent: "center",
+                                  padding: "6px 10px",
+                                  margin: "0 auto",
+                                  fontSize: 12,
+                                  borderRadius: 9,
+                                  gap: 5,
+                                }}
+                              >
+                                <i className="fa-solid fa-clock-rotate-left" />
+                                Historial
+                              </Btn>
+                            </div>
+                          </td>
+                        ) : null}
 
                         {canShowActionsColumn ? (
                           <td style={S.td}>
@@ -1315,7 +1535,14 @@ export default function AdminForms() {
                     ))
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={canShowActionsColumn ? 5 : 4}>
+                      <td
+                        style={S.td}
+                        colSpan={
+                          4 +
+                          (canViewFormsHistory ? 1 : 0) +
+                          (canShowActionsColumn ? 1 : 0)
+                        }
+                      >
                         Sin formularios
                       </td>
                     </tr>
@@ -1473,6 +1700,126 @@ export default function AdminForms() {
 
             <div style={S.modalFooter}>
               <Btn type="button" onClick={closePreviewModal}>
+                Cerrar
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openHistoryModal && (
+        <div style={S.modalOverlay} onClick={closeHistoryModal}>
+          <div
+            style={S.historyModal}
+            className="forms-history-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={S.modalHeader}>
+              <div>
+                <h3 style={S.modalTitle}>
+                  Historial de formulario
+                  {historyForm?.title ? ` - ${historyForm.title}` : ""}
+                </h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                  {historyForm?.title || "Formulario"}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                style={S.xBtn}
+                onClick={closeHistoryModal}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={S.modalBody}>
+              {historyLoading ? (
+                <div style={{ color: "#475569", fontWeight: 800 }}>Cargando historial...</div>
+              ) : historyError ? (
+                <div style={{ color: "#b91c1c", fontWeight: 800 }}>{historyError}</div>
+              ) : enumeratedHistoryItems.length ? (
+                enumeratedHistoryItems.map((item) => {
+                  const meta = getHistoryActionMeta(item.action);
+                  const usersList = Array.isArray(item?.details?.users)
+                    ? item.details.users
+                    : [];
+
+                  return (
+                    <div key={item.id} style={S.historyCard}>
+                      <div style={S.historyCardHeader}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Badge variant={meta.tone}>{meta.label}</Badge>
+                            <Badge variant="default">{formatDate(item.created_at)}</Badge>
+                          </div>
+
+                          <div style={{ fontSize: 13, color: "#334155" }}>
+                            <b>Por:</b> {item.actor?.name || "Sistema"}{" "}
+                            {item.actor?.email ? `(${item.actor.email})` : ""}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={S.historyCardBody}>
+                        <div style={S.historyGrid}>
+                          <div style={S.historyFieldBox}>
+                            <div style={S.historyFieldLabel}>Formulario</div>
+                            <div style={{ fontWeight: 800, color: "#0f172a" }}>
+                              {item?.snapshot?.title || historyForm?.title || "—"}
+                            </div>
+                          </div>
+
+                          <div style={S.historyFieldBox}>
+                            <div style={S.historyFieldLabel}>Estado resultante</div>
+                            <div>
+                              <Badge variant={statusBadgeVariant(item?.snapshot?.status)}>
+                                {item?.snapshot?.status || "—"}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+
+                        {item.action === "assigned_users" || item.action === "unassigned_users" ? (
+                          <>
+                            <div style={S.historySectionTitle}>
+                              {item.action === "assigned_users"
+                                ? "Usuarios agregados a la asignación"
+                                : "Usuarios retirados de la asignación"}
+                            </div>
+                            {renderHistoryUsers(usersList)}
+                          </>
+                        ) : (
+                          <div style={{ color: "#475569", lineHeight: 1.6 }}>
+                            {item.action === "published"
+                              ? "Se publicó el formulario y quedó disponible para usuarios con asignación."
+                              : item.action === "unpublished"
+                              ? "Se despublicó el formulario y volvió a estado de borrador."
+                              : "Movimiento registrado."}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ color: "#64748b", fontWeight: 700 }}>
+                  Este formulario todavía no tiene movimientos registrados.
+                </div>
+              )}
+            </div>
+
+            <div style={S.modalFooter}>
+              <Btn type="button" onClick={closeHistoryModal}>
                 Cerrar
               </Btn>
             </div>

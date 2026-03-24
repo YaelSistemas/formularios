@@ -1,0 +1,42 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('form_histories', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('form_id')
+                ->nullable()
+                ->constrained('forms')
+                ->nullOnDelete();
+
+            $table->foreignId('user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->string('action', 30); 
+            // published, unpublished, assigned_users, unassigned_users
+
+            $table->json('snapshot')->nullable();
+            $table->json('details')->nullable();
+
+            $table->timestamps();
+
+            $table->index(['form_id', 'created_at']);
+            $table->index(['user_id']);
+            $table->index(['action']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('form_histories');
+    }
+};

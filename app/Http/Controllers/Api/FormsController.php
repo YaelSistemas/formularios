@@ -4,14 +4,45 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Form;
+use App\Models\FormHistory;
 use App\Support\Forms\FormRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FormsController extends Controller
 {
     public function __construct(
         protected FormRegistry $formRegistry
     ) {
+    }
+
+    protected function isAdminUser($user): bool
+    {
+        return $user && method_exists($user, 'hasRole') && $user->hasRole('Administrador');
+    }
+
+    protected function serializeFormSnapshot(Form $form): array
+    {
+        return [
+            'title' => trim((string) $form->title),
+            'status' => trim((string) $form->status),
+        ];
+    }
+
+    protected function createHistoryEntry(
+        int $formId,
+        ?int $actorId,
+        string $action,
+        array $snapshot,
+        ?array $details = null
+    ): void {
+        FormHistory::create([
+            'form_id' => $formId,
+            'user_id' => $actorId,
+            'action' => $action,
+            'snapshot' => $snapshot,
+            'details' => $details,
+        ]);
     }
 
     /**
@@ -145,11 +176,25 @@ class FormsController extends Controller
             return response()->json(['message' => $pubErr], 422);
         }
 
-        $form->payload = $payload;
-        $form->status = 'PUBLICADO';
-        $form->save();
+        $authUser = $request->user();
 
-        $resp = $form->loadCount([
+        DB::transaction(function () use ($form, $payload, $authUser) {
+            $form->payload = $payload;
+            $form->status = 'PUBLICADO';
+            $form->save();
+
+            $this->createHistoryEntry(
+                formId: (int) $form->id,
+                actorId: $authUser?->id,
+                action: 'published',
+                snapshot: $this->serializeFormSnapshot($form->fresh()),
+                details: null
+            );
+        });
+
+        $freshForm = $form->fresh();
+
+        $resp = $freshForm->loadCount([
             'submissions',
             'assignedUsers as assignments_count',
         ])->toArray();
@@ -167,10 +212,70 @@ class FormsController extends Controller
             return response()->json(['message' => 'No encontrado.'], 404);
         }
 
-        $form->status = 'BORRADOR';
-        $form->save();
+        $authUser = $request->user();
 
-        return response()->json(['ok' => true, 'form' => $form]);
+        DB::transaction(function () use ($form, $authUser) {
+            $form->status = 'BORRADOR';
+            $form->save();
+
+            $this->createHistoryEntry(
+                formId: (int) $form->id,
+                actorId: $authUser?->id,
+                action: 'unpublished',
+                snapshot: $this->serializeFormSnapshot($form->fresh()),
+                details: null
+            );
+        });
+
+        return response()->json(['ok' => true, 'form' => $form->fresh()]);
+    }
+
+    public function history(Request $request, Form $form)
+    {
+        $this->syncCodeForms($request->user()?->id);
+
+        if (!filled(data_get($form->payload, '_code_key'))) {
+            return response()->json(['message' => 'No encontrado.'], 404);
+        }
+
+        $authUser = $request->user();
+
+        if (!$this->isAdminUser($authUser)) {
+            return response()->json([
+                'message' => 'No tienes permiso para ver el historial de formularios.',
+            ], 403);
+        }
+
+        $items = FormHistory::query()
+            ->with(['actor:id,name,email'])
+            ->where('form_id', $form->id)
+            ->whereIn('action', [
+                'published',
+                'unpublished',
+                'assigned_users',
+                'unassigned_users',
+            ])
+            ->oldest()
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'action' => $row->action,
+                    'snapshot' => $row->snapshot,
+                    'details' => $row->details ?? [],
+                    'actor' => $row->actor ? [
+                        'id' => $row->actor->id,
+                        'name' => $row->actor->name,
+                        'email' => $row->actor->email,
+                    ] : null,
+                    'created_at' => $row->created_at,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'history' => $items,
+        ]);
     }
 
     public function adminIndex(Request $request)

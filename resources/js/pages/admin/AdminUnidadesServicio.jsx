@@ -55,6 +55,7 @@ export default function AdminUnidadesServicio() {
   const canEditUnidades = hasPermission("unidades_servicio.edit");
   const canDeleteUnidades = hasPermission("unidades_servicio.delete");
   const canShowActionsColumn = canEditUnidades || canDeleteUnidades;
+  const canViewUnidadHistory = isAdmin;
 
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
@@ -117,6 +118,12 @@ export default function AdminUnidadesServicio() {
   const [deletingId, setDeletingId] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
+  const [openHistoryModal, setOpenHistoryModal] = useState(false);
+  const [historyUnidad, setHistoryUnidad] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyError, setHistoryError] = useState("");
+
   const unidadHasAssignedUsers = (row) => {
     if (!row) return false;
 
@@ -175,7 +182,7 @@ export default function AdminUnidadesServicio() {
   }, [qDraft]);
 
   useEffect(() => {
-    if (openForm) return;
+    if (openForm || openHistoryModal) return;
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
@@ -189,7 +196,7 @@ export default function AdminUnidadesServicio() {
     } catch {
       //
     }
-  }, [loading, rows, meta.last_page, meta.total, openForm]);
+  }, [loading, rows, meta.last_page, meta.total, openForm, openHistoryModal]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -231,6 +238,36 @@ export default function AdminUnidadesServicio() {
     setSaving(false);
     setErr("");
     setFieldErrors({});
+  };
+
+  const closeHistoryModal = () => {
+    setOpenHistoryModal(false);
+    setHistoryUnidad(null);
+    setHistoryItems([]);
+    setHistoryError("");
+    setHistoryLoading(false);
+  };
+
+  const openHistory = async (r) => {
+    if (!canViewUnidadHistory) {
+      setErr("No tienes permiso para ver el historial de unidades de servicio.");
+      return;
+    }
+
+    setHistoryUnidad(r);
+    setHistoryItems([]);
+    setHistoryError("");
+    setOpenHistoryModal(true);
+    setHistoryLoading(true);
+
+    try {
+      const data = await apiGet(`/admin/unidades-servicio/${r.id}/history`);
+      setHistoryItems(Array.isArray(data?.history) ? data.history : []);
+    } catch (e) {
+      setHistoryError(e?.message || "Error cargando historial de la unidad de servicio");
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const validateForm = () => {
@@ -318,6 +355,117 @@ export default function AdminUnidadesServicio() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return "—";
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      return d.toLocaleString();
+    } catch {
+      return String(value);
+    }
+  };
+
+  const enumeratedHistoryItems = useMemo(() => {
+    const priority = {
+      created: 1,
+      updated: 2,
+      deleted: 3,
+    };
+
+    const sorted = [...historyItems].sort((a, b) => {
+      const aPriority = priority[a?.action] || 99;
+      const bPriority = priority[b?.action] || 99;
+
+      if (aPriority !== bPriority) return aPriority - bPriority;
+
+      const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+
+      return aDate - bDate;
+    });
+
+    let updateCounter = 0;
+
+    return sorted.map((item) => {
+      if (item.action === "updated") {
+        updateCounter += 1;
+        return {
+          ...item,
+          updateNumber: updateCounter,
+        };
+      }
+
+      return {
+        ...item,
+        updateNumber: null,
+      };
+    });
+  }, [historyItems]);
+
+  const getHistoryActionMeta = (action, updateNumber = null) => {
+    if (action === "created") {
+      return {
+        label: "Creación",
+        tone: "success",
+      };
+    }
+
+    if (action === "updated") {
+      return {
+        label: `Edición ${updateNumber ?? ""}`.trim(),
+        tone: "info",
+      };
+    }
+
+    if (action === "deleted") {
+      return {
+        label: "Eliminación",
+        tone: "danger",
+      };
+    }
+
+    return {
+      label: action || "Movimiento",
+      tone: "default",
+    };
+  };
+
+  const renderHistoryValue = (type, value) => {
+    if (type === "boolean") {
+      const active =
+        value === true || value === 1 || String(value).toLowerCase() === "true";
+      return <Badge active={active}>{active ? "Activo" : "Inactivo"}</Badge>;
+    }
+
+    if (Array.isArray(value)) {
+      if (!value.length) return <span style={{ color: "#94a3b8" }}>—</span>;
+
+      return (
+        <div style={S.historyValueWrap}>
+          {value.map((item, idx) => (
+            <Badge key={`${idx}-${item}`} tone="default">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
+
+    if (value === null || value === undefined || value === "") {
+      return <span style={{ color: "#94a3b8" }}>—</span>;
+    }
+
+    if (
+      String(value).toLowerCase() === "activo" ||
+      String(value).toLowerCase() === "inactivo"
+    ) {
+      return <Badge active={String(value).toLowerCase() === "activo"}>{String(value)}</Badge>;
+    }
+
+    return <span style={{ color: "#0f172a", fontWeight: 700 }}>{String(value)}</span>;
   };
 
   const Card = ({ children, style }) => (
@@ -409,6 +557,30 @@ export default function AdminUnidadesServicio() {
       border = "#fdba74";
       background = "#fff7ed";
       color = "#c2410c";
+    }
+
+    if (tone === "default") {
+      border = "#e2e8f0";
+      background = "#f8fafc";
+      color = "#0f172a";
+    }
+
+    if (tone === "info") {
+      border = "#93c5fd";
+      background = "#eff6ff";
+      color = "#1e40af";
+    }
+
+    if (tone === "success") {
+      border = "#86efac";
+      background = "#ecfdf5";
+      color = "#166534";
+    }
+
+    if (tone === "danger") {
+      border = "#fecaca";
+      background = "#fef2f2";
+      color = "#b91c1c";
     }
 
     return (
@@ -516,7 +688,7 @@ export default function AdminUnidadesServicio() {
     },
     table: {
       width: "100%",
-      minWidth: 760,
+      minWidth: canViewUnidadHistory ? 980 : 760,
       borderCollapse: "separate",
       borderSpacing: 0,
       background: "#fff",
@@ -563,6 +735,16 @@ export default function AdminUnidadesServicio() {
     modal: {
       width: "100%",
       maxWidth: 820,
+      maxHeight: "90vh",
+      overflowY: "auto",
+      background: "#fff",
+      borderRadius: 18,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 25px 60px rgba(0,0,0,.18)",
+    },
+    historyModal: {
+      width: "100%",
+      maxWidth: 960,
       maxHeight: "90vh",
       overflowY: "auto",
       background: "#fff",
@@ -669,6 +851,59 @@ export default function AdminUnidadesServicio() {
       background: "#fff",
       boxShadow: "0 1px 3px rgba(0,0,0,.22)",
       transition: "all 0.2s ease",
+    },
+    historyCard: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+      background: "#fff",
+      overflow: "hidden",
+    },
+    historyCardHeader: {
+      padding: "14px 16px",
+      borderBottom: "1px solid #eef2f7",
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      background: "#f8fafc",
+    },
+    historyCardBody: {
+      padding: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+    },
+    historyGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: 12,
+    },
+    historyFieldBox: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 12,
+      background: "#fff",
+      padding: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
+    historyFieldLabel: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 800,
+    },
+    historySectionTitle: {
+      fontSize: 13,
+      color: "#334155",
+      fontWeight: 900,
+      marginBottom: 2,
+    },
+    historyValueWrap: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      alignItems: "center",
     },
     responsiveStyleTag: `
       @media (max-width: 860px) {
@@ -812,6 +1047,9 @@ export default function AdminUnidadesServicio() {
                     <th style={S.th}>Nombre</th>
                     <th style={S.th}>Descripción</th>
                     <th style={S.th}>Estado</th>
+                    {canViewUnidadHistory ? (
+                      <th style={{ ...S.th, width: 160 }}>Historial</th>
+                    ) : null}
                     {canShowActionsColumn ? (
                       <th style={{ ...S.th, width: 160 }}>Acciones</th>
                     ) : null}
@@ -827,11 +1065,13 @@ export default function AdminUnidadesServicio() {
                           <td style={S.td}>
                             <div style={{ fontWeight: 800 }}>{r.nombre}</div>
                           </td>
+
                           <td style={S.td}>
                             <div style={{ color: "#475569", maxWidth: 320, margin: "0 auto" }}>
                               {r.descripcion || "—"}
                             </div>
                           </td>
+
                           <td style={S.td}>
                             <div
                               style={{
@@ -845,11 +1085,40 @@ export default function AdminUnidadesServicio() {
                                 {r.activo ? "Activo" : "Inactivo"}
                               </Badge>
 
-                              {inUse ? (
-                                <Badge tone="warning">En uso</Badge>
-                              ) : null}
+                              {inUse ? <Badge tone="warning">En uso</Badge> : null}
                             </div>
                           </td>
+
+                          {canViewUnidadHistory ? (
+                            <td style={{ ...S.td, textAlign: "center" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Btn
+                                  type="button"
+                                  onClick={() => openHistory(r)}
+                                  title="Ver historial"
+                                  variant="default"
+                                  style={{
+                                    minWidth: 88,
+                                    justifyContent: "center",
+                                    padding: "6px 10px",
+                                    margin: "0 auto",
+                                    fontSize: 12,
+                                    borderRadius: 9,
+                                    gap: 5,
+                                  }}
+                                >
+                                  <i className="fa-solid fa-clock-rotate-left" />
+                                  Historial
+                                </Btn>
+                              </div>
+                            </td>
+                          ) : null}
 
                           {canShowActionsColumn ? (
                             <td style={S.td}>
@@ -872,7 +1141,11 @@ export default function AdminUnidadesServicio() {
                                     disabled={deletingId === r.id || inUse}
                                     onClick={() => remove(r)}
                                     variant="danger"
-                                    title={inUse ? "No se puede eliminar porque está asignada a usuarios" : "Eliminar"}
+                                    title={
+                                      inUse
+                                        ? "No se puede eliminar porque está asignada a usuarios"
+                                        : "Eliminar"
+                                    }
                                   >
                                     <i className="fa-solid fa-trash" />
                                   </IconBtn>
@@ -885,7 +1158,14 @@ export default function AdminUnidadesServicio() {
                     })
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={canShowActionsColumn ? 4 : 3}>
+                      <td
+                        style={S.td}
+                        colSpan={
+                          3 +
+                          (canViewUnidadHistory ? 1 : 0) +
+                          (canShowActionsColumn ? 1 : 0)
+                        }
+                      >
                         Sin unidades de servicio registradas.
                       </td>
                     </tr>
@@ -1002,6 +1282,166 @@ export default function AdminUnidadesServicio() {
                 </Btn>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {openHistoryModal && (
+        <div style={S.modalOverlay} onClick={closeHistoryModal}>
+          <div
+            style={S.historyModal}
+            className="us-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={S.modalHeader}>
+              <div>
+                <h3 style={S.modalTitle}>
+                  Historial de unidad de servicio
+                  {historyUnidad?.nombre ? ` - ${historyUnidad.nombre}` : ""}
+                </h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                  {historyUnidad?.nombre || "—"}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                style={S.xBtn}
+                onClick={closeHistoryModal}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={S.modalBody}>
+              {historyLoading ? (
+                <div style={{ color: "#475569", fontWeight: 700 }}>Cargando historial...</div>
+              ) : historyError ? (
+                <div style={{ color: "#b91c1c", fontWeight: 800 }}>{historyError}</div>
+              ) : enumeratedHistoryItems.length ? (
+                enumeratedHistoryItems.map((item) => {
+                  const metaAction = getHistoryActionMeta(item.action, item.updateNumber);
+                  const changes = Array.isArray(item.changes) ? item.changes : [];
+                  const snapshot =
+                    item.snapshot && typeof item.snapshot === "object" ? item.snapshot : null;
+
+                  return (
+                    <div key={item.id} style={S.historyCard}>
+                      <div style={S.historyCardHeader}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Badge tone={metaAction.tone}>{metaAction.label}</Badge>
+                            <Badge tone="default">{formatDateTime(item.created_at)}</Badge>
+                          </div>
+
+                          <div style={{ fontSize: 13, color: "#334155" }}>
+                            <b>Por:</b> {item.actor?.name || "Sistema"}{" "}
+                            {item.actor?.email ? `(${item.actor.email})` : ""}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={S.historyCardBody}>
+                        {item.action === "created" ? (
+                          <>
+                            <div style={S.historySectionTitle}>Datos iniciales</div>
+                            <div style={S.historyGrid}>
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Nombre</div>
+                                {renderHistoryValue("text", snapshot?.nombre)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Descripción</div>
+                                {renderHistoryValue("text", snapshot?.descripcion)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Estado</div>
+                                {renderHistoryValue("text", snapshot?.estado)}
+                              </div>
+                            </div>
+                          </>
+                        ) : item.action === "updated" ? (
+                          <>
+                            <div style={S.historySectionTitle}>Cambios realizados</div>
+
+                            {changes.length ? (
+                              <div style={S.historyGrid}>
+                                {changes.map((change, idx) => (
+                                  <div key={`${item.id}-change-${idx}`} style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>{change.label}</div>
+
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        color: "#64748b",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      Antes
+                                    </div>
+                                    {renderHistoryValue(change.type, change.old)}
+
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        color: "#64748b",
+                                        fontWeight: 800,
+                                        marginTop: 4,
+                                      }}
+                                    >
+                                      Ahora
+                                    </div>
+                                    {renderHistoryValue(change.type, change.new)}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ color: "#64748b" }}>
+                                No se detectaron cambios para mostrar.
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div style={S.historySectionTitle}>Datos al momento de eliminar</div>
+                            <div style={S.historyGrid}>
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Nombre</div>
+                                {renderHistoryValue("text", snapshot?.nombre)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Descripción</div>
+                                {renderHistoryValue("text", snapshot?.descripcion)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Estado</div>
+                                {renderHistoryValue("text", snapshot?.estado)}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ color: "#64748b", fontWeight: 700 }}>
+                  Esta unidad de servicio todavía no tiene movimientos registrados.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

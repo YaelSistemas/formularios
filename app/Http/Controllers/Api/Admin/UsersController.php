@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\UserHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -85,6 +86,42 @@ class UsersController extends Controller
         return response()->json($users);
     }
 
+    public function history(Request $request, User $user)
+    {
+        $authUser = $request->user();
+
+        if (!$authUser || !$authUser->hasRole('Administrador')) {
+            return response()->json([
+                'message' => 'No tienes permiso para ver el historial de usuarios.',
+            ], 403);
+        }
+
+        $items = UserHistory::query()
+            ->with(['actor:id,name,email'])
+            ->where('user_id', $user->id)
+            ->oldest()
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'action' => $row->action,
+                    'snapshot' => $row->snapshot,
+                    'changes' => $row->changes ?? [],
+                    'actor' => $row->actor ? [
+                        'id' => $row->actor->id,
+                        'name' => $row->actor->name,
+                        'email' => $row->actor->email,
+                    ] : null,
+                    'created_at' => $row->created_at,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'history' => $items,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $messages = [
@@ -156,6 +193,22 @@ class UsersController extends Controller
             'grupos:id,nombre,nombre_mostrar,activo',
             'unidadesServicio:id,nombre,descripcion,activo',
         ]);
+
+        $this->recordUserHistory(
+            user: $user,
+            actor: $request->user(),
+            action: 'created',
+            snapshot: $this->buildUserSnapshot($user),
+            changes: [
+                [
+                    'field' => 'password',
+                    'label' => 'Contraseña',
+                    'type' => 'password',
+                    'old' => null,
+                    'new' => 'Establecida',
+                ],
+            ],
+        );
 
         return response()->json([
             'ok' => true,
@@ -248,11 +301,15 @@ class UsersController extends Controller
             'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
         ], $messages);
 
+        $this->loadUserRelations($user);
+        $beforeSnapshot = $this->buildUserSnapshot($user);
+        $passwordChanged = !empty($data['password'] ?? null);
+
         $user->name = trim($data['name']);
         $user->email = trim($data['email']);
         $user->activo = (bool) $data['activo'];
 
-        if (!empty($data['password'])) {
+        if ($passwordChanged) {
             $user->password = Hash::make($data['password']);
         }
 
@@ -268,6 +325,19 @@ class UsersController extends Controller
             'grupos:id,nombre,nombre_mostrar,activo',
             'unidadesServicio:id,nombre,descripcion,activo',
         ]);
+
+        $afterSnapshot = $this->buildUserSnapshot($user);
+        $changes = $this->buildUserChanges($beforeSnapshot, $afterSnapshot, $passwordChanged);
+
+        if (!empty($changes)) {
+            $this->recordUserHistory(
+                user: $user,
+                actor: $request->user(),
+                action: 'updated',
+                snapshot: $afterSnapshot,
+                changes: $changes,
+            );
+        }
 
         return response()->json([
             'ok' => true,
@@ -318,6 +388,17 @@ class UsersController extends Controller
             ], 422);
         }
 
+        $this->loadUserRelations($user);
+        $beforeDeleteSnapshot = $this->buildUserSnapshot($user);
+
+        $this->recordUserHistory(
+            user: $user,
+            actor: $request->user(),
+            action: 'deleted',
+            snapshot: $beforeDeleteSnapshot,
+            changes: null,
+        );
+
         $user->delete();
 
         return response()->json([
@@ -332,6 +413,133 @@ class UsersController extends Controller
 
         return response()->json([
             'roles' => $roles,
+        ]);
+    }
+
+    private function loadUserRelations(User $user): User
+    {
+        return $user->load([
+            'empresas:id,nombre,razon_social,activo',
+            'grupos:id,nombre,nombre_mostrar,activo',
+            'unidadesServicio:id,nombre,descripcion,activo',
+            'roles:id,name',
+        ]);
+    }
+
+    private function buildUserSnapshot(User $user): array
+    {
+        $this->loadUserRelations($user);
+
+        return [
+            'name' => $user->name,
+            'email' => $user->email,
+            'roles' => $user->getRoleNames()->sort()->values()->all(),
+            'unidades_servicio' => $user->unidadesServicio
+                ->map(fn ($us) => $us->nombre)
+                ->filter()
+                ->sort()
+                ->values()
+                ->all(),
+            'empresas' => $user->empresas
+                ->map(fn ($e) => $e->nombre)
+                ->filter()
+                ->sort()
+                ->values()
+                ->all(),
+            'grupos' => $user->grupos
+                ->map(fn ($g) => $g->nombre_mostrar ?: $g->nombre)
+                ->filter()
+                ->sort()
+                ->values()
+                ->all(),
+            'activo' => (bool) ($user->activo ?? true),
+        ];
+    }
+
+    private function userFieldMeta(): array
+    {
+        return [
+            'name' => ['label' => 'Nombre', 'type' => 'text'],
+            'email' => ['label' => 'Correo', 'type' => 'text'],
+            'roles' => ['label' => 'Rol', 'type' => 'list'],
+            'unidades_servicio' => ['label' => 'Unidad de servicio', 'type' => 'list'],
+            'empresas' => ['label' => 'Empresa', 'type' => 'list'],
+            'grupos' => ['label' => 'Grupo', 'type' => 'list'],
+            'activo' => ['label' => 'Estado', 'type' => 'boolean'],
+        ];
+    }
+
+    private function normalizeForComparison($value)
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        $normalized = array_map(fn ($item) => $this->normalizeForComparison($item), $value);
+
+        if (array_is_list($normalized)) {
+            usort($normalized, function ($a, $b) {
+                return strcmp(json_encode($a), json_encode($b));
+            });
+        } else {
+            ksort($normalized);
+        }
+
+        return $normalized;
+    }
+
+    private function valuesDiffer($old, $new): bool
+    {
+        return json_encode($this->normalizeForComparison($old)) !==
+            json_encode($this->normalizeForComparison($new));
+    }
+
+    private function buildUserChanges(array $before, array $after, bool $passwordChanged = false): array
+    {
+        $changes = [];
+        $meta = $this->userFieldMeta();
+
+        foreach ($meta as $field => $config) {
+            $old = $before[$field] ?? null;
+            $new = $after[$field] ?? null;
+
+            if ($this->valuesDiffer($old, $new)) {
+                $changes[] = [
+                    'field' => $field,
+                    'label' => $config['label'],
+                    'type' => $config['type'],
+                    'old' => $old,
+                    'new' => $new,
+                ];
+            }
+        }
+
+        if ($passwordChanged) {
+            $changes[] = [
+                'field' => 'password',
+                'label' => 'Contraseña',
+                'type' => 'password',
+                'old' => null,
+                'new' => 'Actualizada',
+            ];
+        }
+
+        return $changes;
+    }
+
+    private function recordUserHistory(
+        User $user,
+        ?User $actor,
+        string $action,
+        array $snapshot,
+        ?array $changes = null
+    ): void {
+        UserHistory::create([
+            'user_id' => $user->id,
+            'actor_user_id' => $actor?->id,
+            'action' => $action,
+            'snapshot' => $snapshot,
+            'changes' => $changes,
         ]);
     }
 }

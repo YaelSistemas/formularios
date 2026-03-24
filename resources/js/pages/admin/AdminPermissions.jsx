@@ -55,6 +55,7 @@ export default function AdminPermissions() {
   const canEditPermissions = hasPermission("permisos.edit");
   const canDeletePermissions = hasPermission("permisos.delete");
   const canShowActionsColumn = canEditPermissions || canDeletePermissions;
+  const canViewPermissionHistory = isAdmin;
 
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
@@ -113,6 +114,12 @@ export default function AdminPermissions() {
   const [deletingPermId, setDeletingPermId] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
+  const [openHistoryModal, setOpenHistoryModal] = useState(false);
+  const [historyPermission, setHistoryPermission] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyError, setHistoryError] = useState("");
+
   const loadPermissions = async () => {
     setErr("");
     setLoadingPerms(true);
@@ -163,7 +170,7 @@ export default function AdminPermissions() {
   }, [qDraft]);
 
   useEffect(() => {
-    if (openPermModal) return;
+    if (openPermModal || openHistoryModal) return;
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
@@ -177,7 +184,7 @@ export default function AdminPermissions() {
     } catch {
       //
     }
-  }, [loadingPerms, permissions, meta.last_page, meta.total, openPermModal]);
+  }, [loadingPerms, permissions, meta.last_page, meta.total, openPermModal, openHistoryModal]);
 
   const resetPermForm = () => {
     setEditingPermId(null);
@@ -215,6 +222,36 @@ export default function AdminPermissions() {
     setSavingPermModal(false);
     setErr("");
     setFieldErrors({});
+  };
+
+  const closeHistoryModal = () => {
+    setOpenHistoryModal(false);
+    setHistoryPermission(null);
+    setHistoryItems([]);
+    setHistoryError("");
+    setHistoryLoading(false);
+  };
+
+  const openHistory = async (p) => {
+    if (!canViewPermissionHistory) {
+      setErr("No tienes permiso para ver el historial de permisos.");
+      return;
+    }
+
+    setHistoryPermission(p);
+    setHistoryItems([]);
+    setHistoryError("");
+    setOpenHistoryModal(true);
+    setHistoryLoading(true);
+
+    try {
+      const data = await apiGet(`/admin/permissions/${p.id}/history`);
+      setHistoryItems(Array.isArray(data?.history) ? data.history : []);
+    } catch (e) {
+      setHistoryError(e?.message || "Error cargando historial del permiso");
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const validatePermForm = () => {
@@ -301,6 +338,110 @@ export default function AdminPermissions() {
     } finally {
       setDeletingPermId(null);
     }
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return "—";
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      return d.toLocaleString();
+    } catch {
+      return String(value);
+    }
+  };
+
+  const enumeratedHistoryItems = useMemo(() => {
+    const priority = {
+      created: 1,
+      updated: 2,
+      deleted: 3,
+    };
+
+    const sorted = [...historyItems].sort((a, b) => {
+      const aPriority = priority[a?.action] || 99;
+      const bPriority = priority[b?.action] || 99;
+
+      if (aPriority !== bPriority) return aPriority - bPriority;
+
+      const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+
+      return aDate - bDate;
+    });
+
+    let updateCounter = 0;
+
+    return sorted.map((item) => {
+      if (item.action === "updated") {
+        updateCounter += 1;
+        return {
+          ...item,
+          updateNumber: updateCounter,
+        };
+      }
+
+      return {
+        ...item,
+        updateNumber: null,
+      };
+    });
+  }, [historyItems]);
+
+  const getHistoryActionMeta = (action, updateNumber = null) => {
+    if (action === "created") {
+      return {
+        label: "Creación",
+        tone: "success",
+      };
+    }
+
+    if (action === "updated") {
+      return {
+        label: `Edición ${updateNumber ?? ""}`.trim(),
+        tone: "info",
+      };
+    }
+
+    if (action === "deleted") {
+      return {
+        label: "Eliminación",
+        tone: "danger",
+      };
+    }
+
+    return {
+      label: action || "Movimiento",
+      tone: "default",
+    };
+  };
+
+  const renderHistoryValue = (type, value) => {
+    if (type === "boolean") {
+      const active =
+        value === true || value === 1 || String(value).toLowerCase() === "true";
+      return <Badge tone={active ? "success" : "danger"}>{active ? "Sí" : "No"}</Badge>;
+    }
+
+    if (Array.isArray(value)) {
+      if (!value.length) return <span style={{ color: "#94a3b8" }}>—</span>;
+
+      return (
+        <div style={S.historyValueWrap}>
+          {value.map((item, idx) => (
+            <Badge key={`${idx}-${item}`} tone="default">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
+
+    if (value === null || value === undefined || value === "") {
+      return <span style={{ color: "#94a3b8" }}>—</span>;
+    }
+
+    return <span style={{ color: "#0f172a", fontWeight: 700 }}>{String(value)}</span>;
   };
 
   const Card = ({ children, style }) => (
@@ -391,6 +532,8 @@ export default function AdminPermissions() {
       formatWarn: { bg: "#fff7ed", border: "#fdba74", fg: "#c2410c" },
       warning: { bg: "#fef2f2", border: "#fecaca", fg: "#b91c1c" },
       info: { bg: "#eff6ff", border: "#93c5fd", fg: "#1e40af" },
+      success: { bg: "#ecfdf5", border: "#86efac", fg: "#166534" },
+      danger: { bg: "#fef2f2", border: "#fecaca", fg: "#b91c1c" },
     };
 
     const t = tones[tone] || tones.default;
@@ -488,7 +631,7 @@ export default function AdminPermissions() {
     },
     table: {
       width: "100%",
-      minWidth: 760,
+      minWidth: canViewPermissionHistory ? 920 : 760,
       borderCollapse: "separate",
       borderSpacing: 0,
       background: "#fff",
@@ -535,6 +678,16 @@ export default function AdminPermissions() {
     modal: {
       width: "100%",
       maxWidth: 760,
+      maxHeight: "90vh",
+      overflowY: "auto",
+      background: "#fff",
+      borderRadius: 18,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 25px 60px rgba(0,0,0,.18)",
+    },
+    historyModal: {
+      width: "100%",
+      maxWidth: 960,
       maxHeight: "90vh",
       overflowY: "auto",
       background: "#fff",
@@ -614,6 +767,59 @@ export default function AdminPermissions() {
       justifyContent: "center",
       gap: 6,
       flexWrap: "wrap",
+    },
+    historyCard: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+      background: "#fff",
+      overflow: "hidden",
+    },
+    historyCardHeader: {
+      padding: "14px 16px",
+      borderBottom: "1px solid #eef2f7",
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      background: "#f8fafc",
+    },
+    historyCardBody: {
+      padding: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+    },
+    historyGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: 12,
+    },
+    historyFieldBox: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 12,
+      background: "#fff",
+      padding: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
+    historyFieldLabel: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 800,
+    },
+    historySectionTitle: {
+      fontSize: 13,
+      color: "#334155",
+      fontWeight: 900,
+      marginBottom: 2,
+    },
+    historyValueWrap: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      alignItems: "center",
     },
     responsiveStyleTag: `
       @media (max-width: 860px) {
@@ -754,6 +960,9 @@ export default function AdminPermissions() {
                     <th style={S.th}>Permiso</th>
                     <th style={S.th}>Formato</th>
                     <th style={S.th}>Roles asignados</th>
+                    {canViewPermissionHistory ? (
+                      <th style={{ ...S.th, width: 160 }}>Historial</th>
+                    ) : null}
                     {canShowActionsColumn ? (
                       <th style={{ ...S.th, width: 140 }}>Acciones</th>
                     ) : null}
@@ -780,10 +989,42 @@ export default function AdminPermissions() {
                           <td style={S.td}>
                             <div style={S.badgesWrap}>
                               <Badge tone={hasRoles ? "warning" : "info"}>
-                                {Number(p.roles_count || 0)} rol{Number(p.roles_count || 0) === 1 ? "" : "es"}
+                                {Number(p.roles_count || 0)} rol
+                                {Number(p.roles_count || 0) === 1 ? "" : "es"}
                               </Badge>
                             </div>
                           </td>
+
+                          {canViewPermissionHistory ? (
+                            <td style={{ ...S.td, textAlign: "center" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Btn
+                                  type="button"
+                                  onClick={() => openHistory(p)}
+                                  title="Ver historial"
+                                  variant="default"
+                                  style={{
+                                    minWidth: 88,
+                                    justifyContent: "center",
+                                    padding: "6px 10px",
+                                    margin: "0 auto",
+                                    fontSize: 12,
+                                    borderRadius: 9,
+                                    gap: 5,
+                                  }}
+                                >
+                                  <i className="fa-solid fa-clock-rotate-left" />
+                                  Historial
+                                </Btn>
+                              </div>
+                            </td>
+                          ) : null}
 
                           {canShowActionsColumn ? (
                             <td style={S.td}>
@@ -827,7 +1068,14 @@ export default function AdminPermissions() {
                     })
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={canShowActionsColumn ? 4 : 3}>
+                      <td
+                        style={S.td}
+                        colSpan={
+                          3 +
+                          (canViewPermissionHistory ? 1 : 0) +
+                          (canShowActionsColumn ? 1 : 0)
+                        }
+                      >
                         Sin permisos registrados.
                       </td>
                     </tr>
@@ -842,10 +1090,7 @@ export default function AdminPermissions() {
             </div>
 
             <div style={S.pagination} className="perms-pagination-mobile">
-              <Btn
-                disabled={!canPrev}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
+              <Btn disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                 Anterior
               </Btn>
 
@@ -853,10 +1098,7 @@ export default function AdminPermissions() {
                 Mostrando página <b>{page}</b> de <b>{meta.last_page}</b>
               </div>
 
-              <Btn
-                disabled={!canNext}
-                onClick={() => setPage((p) => p + 1)}
-              >
+              <Btn disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
                 Siguiente
               </Btn>
             </div>
@@ -917,6 +1159,146 @@ export default function AdminPermissions() {
                 </Btn>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {openHistoryModal && (
+        <div style={S.modalOverlay} onClick={closeHistoryModal}>
+          <div
+            style={S.historyModal}
+            className="perms-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={S.modalHeader}>
+              <div>
+                <h3 style={S.modalTitle}>
+                  Historial de permiso{" "}
+                  {historyPermission?.name ? `- ${historyPermission.name}` : ""}
+                </h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                  {historyPermission?.name || "—"}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                style={S.xBtn}
+                onClick={closeHistoryModal}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={S.modalBody}>
+              {historyLoading ? (
+                <div style={{ color: "#475569", fontWeight: 700 }}>Cargando historial...</div>
+              ) : historyError ? (
+                <div style={{ color: "#b91c1c", fontWeight: 800 }}>{historyError}</div>
+              ) : enumeratedHistoryItems.length ? (
+                enumeratedHistoryItems.map((item) => {
+                  const metaAction = getHistoryActionMeta(item.action, item.updateNumber);
+                  const changes = Array.isArray(item.changes) ? item.changes : [];
+                  const snapshot =
+                    item.snapshot && typeof item.snapshot === "object" ? item.snapshot : null;
+
+                  return (
+                    <div key={item.id} style={S.historyCard}>
+                      <div style={S.historyCardHeader}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Badge tone={metaAction.tone}>{metaAction.label}</Badge>
+                            <Badge tone="default">{formatDateTime(item.created_at)}</Badge>
+                          </div>
+
+                          <div style={{ fontSize: 13, color: "#334155" }}>
+                            <b>Por:</b> {item.actor?.name || "Sistema"}{" "}
+                            {item.actor?.email ? `(${item.actor.email})` : ""}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={S.historyCardBody}>
+                        {item.action === "created" ? (
+                          <>
+                            <div style={S.historySectionTitle}>Datos iniciales</div>
+                            <div style={S.historyGrid}>
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Nombre</div>
+                                {renderHistoryValue("text", snapshot?.name)}
+                              </div>
+                            </div>
+                          </>
+                        ) : item.action === "updated" ? (
+                          <>
+                            <div style={S.historySectionTitle}>Cambios realizados</div>
+
+                            {changes.length ? (
+                              <div style={S.historyGrid}>
+                                {changes.map((change, idx) => (
+                                  <div key={`${item.id}-change-${idx}`} style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>{change.label}</div>
+
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        color: "#64748b",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      Antes
+                                    </div>
+                                    {renderHistoryValue(change.type, change.old)}
+
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        color: "#64748b",
+                                        fontWeight: 800,
+                                        marginTop: 4,
+                                      }}
+                                    >
+                                      Ahora
+                                    </div>
+                                    {renderHistoryValue(change.type, change.new)}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ color: "#64748b" }}>
+                                No se detectaron cambios para mostrar.
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div style={S.historySectionTitle}>Datos al momento de eliminar</div>
+                            <div style={S.historyGrid}>
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Nombre</div>
+                                {renderHistoryValue("text", snapshot?.name)}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ color: "#64748b", fontWeight: 700 }}>
+                  Este permiso todavía no tiene movimientos registrados.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

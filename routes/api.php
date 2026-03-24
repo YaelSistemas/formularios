@@ -80,6 +80,10 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/users', [UsersController::class, 'index'])
             ->middleware('perm:usuarios.view');
 
+            // Historial de Usuarios
+            Route::get('/users/{user}/history', [UsersController::class, 'history'])
+                ->middleware('perm:usuarios.view');
+
         Route::post('/users', [UsersController::class, 'store'])
             ->middleware('perm:usuarios.create');
 
@@ -92,6 +96,10 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         // Roles CRUD
         Route::get('/roles-list', [RolesController::class, 'index'])
             ->middleware('perm:roles.view');
+
+            // Historial de Roles
+            Route::get('/roles-list/{role}/history', [RolesController::class, 'history'])
+                ->middleware('perm:roles.view');
 
         Route::get('/roles-list/{role}', [RolesController::class, 'show'])
             ->middleware('perm:roles.edit');
@@ -108,6 +116,10 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         // Permissions CRUD
         Route::get('/permissions', [PermissionsController::class, 'index'])
             ->middleware('perm:permisos.view');
+
+            // Historial de Permisos
+            Route::get('/permissions/{permission}/history', [PermissionsController::class, 'history'])
+                ->middleware('perm:permisos.view');
 
         Route::post('/permissions', [PermissionsController::class, 'store'])
             ->middleware('perm:permisos.create');
@@ -129,6 +141,10 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/empresas', [EmpresasController::class, 'index'])
             ->middleware('perm:empresas.view');
 
+            // Historial de Empresas
+            Route::get('/empresas/{empresa}/history', [EmpresasController::class, 'history'])
+                ->middleware('perm:empresas.view');
+
         Route::post('/empresas', [EmpresasController::class, 'store'])
             ->middleware('perm:empresas.create');
 
@@ -142,6 +158,10 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/grupos', [GruposController::class, 'index'])
             ->middleware('perm:grupos.view');
 
+            // Historial de Grupos
+            Route::get('/grupos/{grupo}/history', [GruposController::class, 'history'])
+                ->middleware('perm:grupos.view');
+
         Route::post('/grupos', [GruposController::class, 'store'])
             ->middleware('perm:grupos.create');
 
@@ -154,6 +174,10 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         // Unidades de servicio
         Route::get('/unidades-servicio', [UnidadesServicioController::class, 'index'])
             ->middleware('perm:unidades_servicio.view');
+
+            // Historial de Unidades de Servicio
+            Route::get('/unidades-servicio/{unidades_servicio}/history', [UnidadesServicioController::class, 'history'])
+                ->middleware('perm:unidades_servicio.view');
 
         Route::post('/unidades-servicio', [UnidadesServicioController::class, 'store'])
             ->middleware('perm:unidades_servicio.create');
@@ -170,6 +194,10 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
 
         Route::get('/forms/{form}', [FormsController::class, 'show'])
             ->middleware('perm:formularios.admin.view');
+
+            // Historial de Formularios Admin
+            Route::get('/forms/{form}/history', [FormsController::class, 'history'])
+                ->middleware('perm:formularios.admin.view');
 
         // Asignaciones de formularios
         Route::get('/forms/{form}/assignments', [AdminFormAssignmentsController::class, 'index'])

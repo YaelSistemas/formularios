@@ -291,6 +291,7 @@ export default function AdminUsers() {
   const canEditUsers = hasPermission("usuarios.edit");
   const canDeleteUsers = hasPermission("usuarios.delete");
   const canShowActionsColumn = canEditUsers || canDeleteUsers;
+  const canViewUserHistory = isAdmin;
 
   const myUserId = Number(me?.id || 0);
 
@@ -343,6 +344,31 @@ export default function AdminUsers() {
 
   const [fieldErrors, setFieldErrors] = useState({});
 
+  const [openHistoryModal, setOpenHistoryModal] = useState(false);
+  const [historyUser, setHistoryUser] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyError, setHistoryError] = useState("");
+
+  const enumeratedHistoryItems = useMemo(() => {
+    let updateCounter = 0;
+  
+    return historyItems.map((item) => {
+      if (item.action === "updated") {
+        updateCounter += 1;
+        return {
+          ...item,
+          updateNumber: updateCounter,
+        };
+      }
+  
+      return {
+        ...item,
+        updateNumber: null,
+      };
+    });
+  }, [historyItems]);
+
   const canPrev = useMemo(() => page > 1, [page]);
   const canNext = useMemo(() => page < (meta.last_page || 1), [page, meta.last_page]);
 
@@ -380,10 +406,15 @@ export default function AdminUsers() {
         apiGet("/admin/grupos?per_page=1000&page=1&q="),
         apiGet("/admin/unidades-servicio?per_page=1000&page=1&q="),
       ]);
-
-      setEmpresasAll(Array.isArray(eData?.data) ? eData.data : []);
-      setGruposAll(Array.isArray(gData?.data) ? gData.data : []);
-      setUnidadesServicioAll(Array.isArray(usData?.data) ? usData.data : []);
+  
+      const onlyActive = (items) =>
+        (Array.isArray(items) ? items : []).filter(
+          (item) => item?.activo === true || Number(item?.activo) === 1
+        );
+  
+      setEmpresasAll(onlyActive(eData?.data));
+      setGruposAll(onlyActive(gData?.data));
+      setUnidadesServicioAll(onlyActive(usData?.data));
     } finally {
       setLoadingCats(false);
     }
@@ -440,7 +471,7 @@ export default function AdminUsers() {
   }, [qDraft]);
 
   useEffect(() => {
-    if (openForm) return;
+    if (openForm || openHistoryModal) return;
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
@@ -454,7 +485,7 @@ export default function AdminUsers() {
     } catch {
       //
     }
-  }, [loadingUsers, users, meta.last_page, meta.total, openForm]);
+  }, [loadingUsers, users, meta.last_page, meta.total, openForm, openHistoryModal]);
 
   const resetUserForm = () => {
     setEditingId(null);
@@ -529,6 +560,36 @@ export default function AdminUsers() {
     setSaving(false);
     setErr("");
     setFieldErrors({});
+  };
+
+  const closeHistoryModal = () => {
+    setOpenHistoryModal(false);
+    setHistoryUser(null);
+    setHistoryItems([]);
+    setHistoryError("");
+    setHistoryLoading(false);
+  };
+
+  const openHistory = async (u) => {
+    if (!canViewUserHistory) {
+      setErr("No tienes permiso para ver el historial de usuarios.");
+      return;
+    }
+
+    setHistoryUser(u);
+    setHistoryItems([]);
+    setHistoryError("");
+    setOpenHistoryModal(true);
+    setHistoryLoading(true);
+
+    try {
+      const data = await apiGet(`/admin/users/${u.id}/history`);
+      setHistoryItems(Array.isArray(data?.history) ? data.history : []);
+    } catch (e) {
+      setHistoryError(e?.message || "Error cargando historial del usuario");
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const validateForm = () => {
@@ -747,6 +808,10 @@ export default function AdminUsers() {
     const tones = {
       default: { bg: "#f8fafc", border: "#e2e8f0", fg: "#0f172a" },
       role: { bg: "#f1f5f9", border: "#cbd5e1", fg: "#334155" },
+      success: { bg: "#ecfdf5", border: "#86efac", fg: "#166534" },
+      danger: { bg: "#fef2f2", border: "#fecaca", fg: "#b91c1c" },
+      info: { bg: "#eff6ff", border: "#93c5fd", fg: "#1d4ed8" },
+      warn: { bg: "#fffbeb", border: "#fde68a", fg: "#92400e" },
     };
 
     const t = tones[tone] || tones.default;
@@ -839,7 +904,7 @@ export default function AdminUsers() {
     },
     table: {
       width: "100%",
-      minWidth: 980,
+      minWidth: canViewUserHistory ? 1120 : 980,
       borderCollapse: "separate",
       borderSpacing: 0,
       background: "#fff",
@@ -886,6 +951,16 @@ export default function AdminUsers() {
     modal: {
       width: "100%",
       maxWidth: 760,
+      maxHeight: "90vh",
+      overflowY: "auto",
+      background: "#fff",
+      borderRadius: 18,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 25px 60px rgba(0,0,0,.18)",
+    },
+    historyModal: {
+      width: "100%",
+      maxWidth: 980,
       maxHeight: "90vh",
       overflowY: "auto",
       background: "#fff",
@@ -1003,6 +1078,59 @@ export default function AdminUsers() {
       flexWrap: "wrap",
       justifyContent: "center",
     },
+    historyCard: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+      background: "#fff",
+      overflow: "hidden",
+    },
+    historyCardHeader: {
+      padding: "14px 16px",
+      borderBottom: "1px solid #eef2f7",
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      background: "#f8fafc",
+    },
+    historyCardBody: {
+      padding: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+    },
+    historyGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: 12,
+    },
+    historyFieldBox: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 12,
+      background: "#fff",
+      padding: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
+    historyFieldLabel: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 800,
+    },
+    historySectionTitle: {
+      fontSize: 13,
+      color: "#334155",
+      fontWeight: 900,
+      marginBottom: 2,
+    },
+    historyValueWrap: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      alignItems: "center",
+    },
     responsiveStyleTag: `
       @media (max-width: 860px) {
         .users-filter-row {
@@ -1078,6 +1206,76 @@ export default function AdminUsers() {
         {a ? "Activo" : "Inactivo"}
       </span>
     );
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return "—";
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      return d.toLocaleString();
+    } catch {
+      return String(value);
+    }
+  };
+
+  const getHistoryActionMeta = (action, updateNumber = null) => {
+    if (action === "created") {
+      return {
+        label: "Creación",
+        tone: "success",
+      };
+    }
+  
+    if (action === "updated") {
+      return {
+        label: `Edición ${updateNumber ?? ""}`.trim(),
+        tone: "info",
+      };
+    }
+  
+    if (action === "deleted") {
+      return {
+        label: "Eliminación",
+        tone: "danger",
+      };
+    }
+  
+    return {
+      label: action || "Movimiento",
+      tone: "default",
+    };
+  };
+
+  const renderHistoryValue = (type, value) => {
+    if (type === "boolean") {
+      const active = value === true || value === 1 || String(value).toLowerCase() === "true";
+      return <Badge tone={active ? "success" : "danger"}>{active ? "Activo" : "Inactivo"}</Badge>;
+    }
+
+    if (type === "password") {
+      return <Badge tone="warn">{value || "Actualizada"}</Badge>;
+    }
+
+    if (Array.isArray(value)) {
+      if (!value.length) return <span style={{ color: "#94a3b8" }}>—</span>;
+
+      return (
+        <div style={S.historyValueWrap}>
+          {value.map((item, idx) => (
+            <Badge key={`${idx}-${item}`} tone="default">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
+
+    if (value === null || value === undefined || value === "") {
+      return <span style={{ color: "#94a3b8" }}>—</span>;
+    }
+
+    return <span style={{ color: "#0f172a", fontWeight: 700 }}>{String(value)}</span>;
   };
 
   return (
@@ -1199,6 +1397,7 @@ export default function AdminUsers() {
                     <th style={S.th}>Empresa</th>
                     <th style={S.th}>Grupo</th>
                     <th style={S.th}>Estado</th>
+                    {canViewUserHistory ? <th style={{ ...S.th, width: 160 }}>Historial</th> : null}
                     {canShowActionsColumn ? <th style={{ ...S.th, width: 120 }}>Acciones</th> : null}
                   </tr>
                 </thead>
@@ -1250,6 +1449,37 @@ export default function AdminUsers() {
 
                         <td style={S.td}>{activeBadge(u)}</td>
 
+                        {canViewUserHistory ? (
+                          <td style={{ ...S.td, textAlign: "center" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                              }}
+                            >
+                              <Btn
+                                type="button"
+                                onClick={() => openHistory(u)}
+                                title="Ver historial"
+                                variant="default"
+                                style={{
+                                  minWidth: 88,
+                                  justifyContent: "center",
+                                  padding: "6px 10px",
+                                  margin: "0 auto",
+                                  fontSize: 12,
+                                  borderRadius: 9,
+                                  gap: 5,
+                                }}
+                              >
+                                <i className="fa-solid fa-clock-rotate-left" />
+                                Historial
+                              </Btn>
+                            </div>
+                          </td>
+                        ) : null}
+
                         {canShowActionsColumn ? (
                           <td style={S.td}>
                             <div style={{ display: "inline-flex", gap: 8, justifyContent: "center" }}>
@@ -1276,7 +1506,14 @@ export default function AdminUsers() {
                     ))
                   ) : (
                     <tr>
-                      <td style={S.td} colSpan={canShowActionsColumn ? 8 : 7}>
+                      <td
+                        style={S.td}
+                        colSpan={
+                          7 +
+                          (canViewUserHistory ? 1 : 0) +
+                          (canShowActionsColumn ? 1 : 0)
+                        }
+                      >
                         Sin usuarios registrados.
                       </td>
                     </tr>
@@ -1509,6 +1746,203 @@ export default function AdminUsers() {
                 </Btn>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {openHistoryModal && (
+        <div style={S.modalOverlay} onClick={closeHistoryModal}>
+          <div
+            style={S.historyModal}
+            className="users-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={S.modalHeader}>
+              <div>
+                <h3 style={S.modalTitle}>
+                  Historial de usuario {historyUser?.name ? `- ${historyUser.name}` : ""}
+                </h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                  {historyUser?.email || "—"}
+                </div>
+              </div>
+
+              <button type="button" style={S.xBtn} onClick={closeHistoryModal} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+
+            <div style={S.modalBody}>
+              {historyLoading ? (
+                <div style={{ color: "#475569", fontWeight: 700 }}>
+                  Cargando historial...
+                </div>
+              ) : historyError ? (
+                <div style={{ color: "#b91c1c", fontWeight: 800 }}>{historyError}</div>
+              ) : enumeratedHistoryItems.length ? (
+                    enumeratedHistoryItems.map((item) => {
+                      const metaAction = getHistoryActionMeta(item.action, item.updateNumber);
+                  const changes = Array.isArray(item.changes) ? item.changes : [];
+                  const snapshot = item.snapshot && typeof item.snapshot === "object" ? item.snapshot : null;
+
+                  return (
+                    <div key={item.id} style={S.historyCard}>
+                      <div style={S.historyCardHeader}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <Badge tone={metaAction.tone}>{metaAction.label}</Badge>
+                            <Badge tone="default">
+                              {formatDateTime(item.created_at)}
+                            </Badge>
+                          </div>
+
+                          <div style={{ fontSize: 13, color: "#334155" }}>
+                            <b>Por:</b> {item.actor?.name || "Sistema"}{" "}
+                            {item.actor?.email ? `(${item.actor.email})` : ""}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={S.historyCardBody}>
+                        {item.action === "created" ? (
+                          <>
+                            <div style={S.historySectionTitle}>Datos iniciales</div>
+                            <div style={S.historyGrid}>
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Nombre</div>
+                                {renderHistoryValue("text", snapshot?.name)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Correo</div>
+                                {renderHistoryValue("text", snapshot?.email)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Rol</div>
+                                {renderHistoryValue("list", snapshot?.roles)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Unidad de servicio</div>
+                                {renderHistoryValue("list", snapshot?.unidades_servicio)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Empresa</div>
+                                {renderHistoryValue("list", snapshot?.empresas)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Grupo</div>
+                                {renderHistoryValue("list", snapshot?.grupos)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Estado</div>
+                                {renderHistoryValue("boolean", snapshot?.activo)}
+                              </div>
+
+                              {changes.some((c) => c.field === "password") ? (
+                                <div style={S.historyFieldBox}>
+                                  <div style={S.historyFieldLabel}>Contraseña</div>
+                                  {renderHistoryValue("password", "Establecida")}
+                                </div>
+                              ) : null}
+                            </div>
+                          </>
+                        ) : item.action === "updated" ? (
+                          <>
+                            <div style={S.historySectionTitle}>Cambios realizados</div>
+
+                            {changes.length ? (
+                              <div style={S.historyGrid}>
+                                {changes.map((change, idx) => (
+                                  <div key={`${item.id}-change-${idx}`} style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>{change.label}</div>
+
+                                    <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>
+                                      Antes
+                                    </div>
+                                    {renderHistoryValue(change.type, change.old)}
+
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        color: "#64748b",
+                                        fontWeight: 800,
+                                        marginTop: 4,
+                                      }}
+                                    >
+                                      Ahora
+                                    </div>
+                                    {renderHistoryValue(change.type, change.new)}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ color: "#64748b" }}>
+                                No se detectaron cambios para mostrar.
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div style={S.historySectionTitle}>Datos al momento de eliminar</div>
+                            <div style={S.historyGrid}>
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Nombre</div>
+                                {renderHistoryValue("text", snapshot?.name)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Correo</div>
+                                {renderHistoryValue("text", snapshot?.email)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Rol</div>
+                                {renderHistoryValue("list", snapshot?.roles)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Unidad de servicio</div>
+                                {renderHistoryValue("list", snapshot?.unidades_servicio)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Empresa</div>
+                                {renderHistoryValue("list", snapshot?.empresas)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Grupo</div>
+                                {renderHistoryValue("list", snapshot?.grupos)}
+                              </div>
+
+                              <div style={S.historyFieldBox}>
+                                <div style={S.historyFieldLabel}>Estado</div>
+                                {renderHistoryValue("boolean", snapshot?.activo)}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ color: "#64748b", fontWeight: 700 }}>
+                  No hay historial para mostrar.
+                </div>
+              )}
+            </div>
+
+            <div style={S.modalFooter}>
+              <Btn type="button" onClick={closeHistoryModal}>
+                Cerrar
+              </Btn>
+            </div>
           </div>
         </div>
       )}
