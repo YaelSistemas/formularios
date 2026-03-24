@@ -202,14 +202,17 @@ export default function AdminRoles() {
 
   const loadPermissionsCatalog = async () => {
     try {
-      const data = await apiGet("/admin/permissions");
-      if (Array.isArray(data?.permissions)) {
-        return data.permissions;
-      }
-      if (Array.isArray(data?.data)) {
-        return data.data;
-      }
-      return [];
+      const data = await apiGet("/admin/permissions?per_page=100&page=1&q=");
+  
+      const raw =
+        Array.isArray(data?.permissions) ? data.permissions :
+        Array.isArray(data?.data) ? data.data :
+        [];
+  
+      return raw
+        .map((p) => (typeof p === "string" ? p : p?.name))
+        .filter(Boolean)
+        .sort((a, b) => String(a).localeCompare(String(b)));
     } catch {
       return [];
     }
@@ -272,18 +275,15 @@ export default function AdminRoles() {
       setErr("No tienes permiso para crear roles.");
       return;
     }
-
+  
     resetRoleForm();
     setRoleMode("create");
     setOpenRoleModal(true);
     setLoadingRoleDetail(true);
-
+  
     try {
       const perms = await loadPermissionsCatalog();
-      const normalized = perms
-        .map((p) => (typeof p === "string" ? p : p?.name))
-        .filter(Boolean);
-      setAllPermissions(normalized);
+      setAllPermissions(perms);
     } finally {
       setLoadingRoleDetail(false);
     }

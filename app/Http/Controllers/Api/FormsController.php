@@ -55,26 +55,27 @@ class FormsController extends Controller
     public function index(Request $request)
     {
         $this->syncCodeForms($request->user()?->id);
-
+    
         $user = $request->user();
-
+        $isAdmin = $user && $user->hasRole('Administrador');
+    
         $query = Form::query()
             ->withCount('submissions')
             ->withCount(['assignedUsers as assignments_count'])
-            ->orderByDesc('id');
-
-        if (!($user && $user->hasRole('Administrador'))) {
-            $query->where('status', 'PUBLICADO')
-                ->whereHas('assignedUsers', function ($sub) use ($user) {
-                    $sub->where('users.id', $user->id);
-                });
+            ->orderByDesc('id')
+            ->where('status', 'PUBLICADO');
+    
+        if (!$isAdmin) {
+            $query->whereHas('assignedUsers', function ($sub) use ($user) {
+                $sub->where('users.id', $user->id);
+            });
         }
-
+    
         $forms = $query
             ->get(['id', 'title', 'status', 'created_at', 'payload'])
             ->filter(fn ($form) => filled(data_get($form->payload, '_code_key')))
             ->values();
-
+    
         return response()->json(['forms' => $forms]);
     }
 
@@ -84,32 +85,36 @@ class FormsController extends Controller
     public function show(Request $request, Form $form)
     {
         $this->syncCodeForms($request->user()?->id);
-
+    
         if (!filled(data_get($form->payload, '_code_key'))) {
             return response()->json(['message' => 'No encontrado.'], 404);
         }
-
+    
         $user = $request->user();
-
-        if (!($user && $user->hasRole('Administrador'))) {
-            if ($form->status !== 'PUBLICADO') {
-                return response()->json(['message' => 'No encontrado.'], 404);
-            }
-
+        $isAdmin = $user && $user->hasRole('Administrador');
+        $isAdminRoute = $request->is('api/admin/forms/*');
+    
+        // En la vista de usuario, TODOS solo pueden ver formularios PUBLICADOS
+        if (!$isAdminRoute && $form->status !== 'PUBLICADO') {
+            return response()->json(['message' => 'No encontrado.'], 404);
+        }
+    
+        // En la vista de usuario, el usuario normal además debe estar asignado
+        if (!$isAdminRoute && !$isAdmin) {
             if (!$this->userCanAccessForm($user->id, $form)) {
                 return response()->json(['message' => 'No autorizado para este formulario.'], 403);
             }
         }
-
+    
         $payload = $this->normalizePayload($form->payload ?? []);
-
+    
         $resp = $form->loadCount([
             'submissions',
             'assignedUsers as assignments_count',
         ])->toArray();
-
+    
         $resp['payload'] = $payload;
-
+    
         return response()->json(['form' => $resp]);
     }
 

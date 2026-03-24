@@ -450,9 +450,10 @@ export default function AdminUsers() {
   useEffect(() => {
     (async () => {
       try {
-        await loadRolesNames();
-        await loadCatalogs();
-        await loadUsers();
+        await Promise.all([
+          loadRolesNames(),
+          loadCatalogs(),
+        ]);
       } catch {
         //
       }
