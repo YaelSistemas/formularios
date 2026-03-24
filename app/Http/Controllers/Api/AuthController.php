@@ -29,7 +29,14 @@ class AuthController extends Controller
             ]);
         }
 
-        // ✅ 1 sesión activa por usuario (opcional, pero te sirve para PWA)
+        // Validar si el usuario está inactivo
+        if (!(bool) $user->activo) {
+            return response()->json([
+                'message' => 'Tu usuario no tiene acceso en este momento. Comunícate con tu administrador o con el equipo de Sistemas.',
+            ], 403);
+        }
+
+        // 1 sesión activa por usuario
         $user->tokens()->delete();
 
         $token = $user->createToken('pwa')->plainTextToken;
@@ -50,6 +57,15 @@ class AuthController extends Controller
 
         // Refresca relaciones por si cambiaron permisos/roles
         $user->loadMissing(['roles', 'permissions']);
+
+        // Si el usuario fue desactivado después de iniciar sesión
+        if (!(bool) $user->activo) {
+            $user->tokens()->delete();
+
+            return response()->json([
+                'message' => 'Tu usuario no tiene acceso en este momento. Comunícate con tu administrador o con el equipo de Sistemas.',
+            ], 403);
+        }
 
         return response()->json([
             'user' => $this->userPayload($user),
@@ -79,7 +95,11 @@ class AuthController extends Controller
             'name'        => $user->name,
             'email'       => $user->email,
 
-            // arrays limpios (no Collections)
+            // estado del usuario
+            'activo'      => (bool) $user->activo,
+            'active'      => (bool) $user->activo,
+
+            // arrays limpios
             'roles'       => $user->getRoleNames()->values()->all(),
             'permissions' => $user->getAllPermissions()->pluck('name')->values()->all(),
 

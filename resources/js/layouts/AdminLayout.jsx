@@ -107,7 +107,7 @@ export default function AdminLayout() {
       to: "/admin/unidades-servicio",
       title: "Unidades de servicio",
       label: "Unidades de servicio",
-      icon: "fa-solid fa-layer-group",
+      icon: "fa-solid fa-building-user",
       active: location.pathname.startsWith("/admin/unidades-servicio"),
     },
     canViewEmpresas && {
@@ -201,7 +201,7 @@ export default function AdminLayout() {
     try {
       await apiPost("/logout", {});
     } catch {
-      // ignore
+      //
     } finally {
       kickToLogin();
     }
@@ -252,6 +252,17 @@ export default function AdminLayout() {
     justifyContent: "center",
     fontSize: 18,
   };
+
+  const navTextStyle = (label) => ({
+    display: showDesktopText ? "block" : "none",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    minWidth: 0,
+    lineHeight: label === "Unidades de servicio" ? "16px" : "normal",
+    fontSize: label === "Unidades de servicio" ? 13 : 14,
+    letterSpacing: label === "Unidades de servicio" ? "-0.1px" : "normal",
+  });
 
   const bottomNavScrollItemStyle = (active) => ({
     minWidth: 86,
@@ -436,23 +447,10 @@ export default function AdminLayout() {
       flex: "0 0 auto",
     },
 
-    navLabel: {
-      display: showDesktopText ? "inline" : "none",
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-    },
-
-    mainWrap: {
-      marginLeft: effectiveSidebarWidth,
-      transition: "margin-left .18s ease",
-      minHeight: "calc(100vh - 56px)",
-    },
-
     main: {
       marginLeft: effectiveSidebarWidth,
       transition: "margin-left .18s ease",
-      width: "calc(100% - " + effectiveSidebarWidth + "px)",
+      width: `calc(100% - ${effectiveSidebarWidth}px)`,
       padding: isMobile ? "12px 12px 96px 12px" : 16,
       maxWidth: "100%",
       boxSizing: "border-box",
@@ -600,7 +598,7 @@ export default function AdminLayout() {
                   <span style={navIconWrapStyle}>
                     <i className={item.icon} />
                   </span>
-                  <span style={S.navLabel}>{item.label}</span>
+                  <span style={navTextStyle(item.label)}>{item.label}</span>
                 </NavLink>
               ))}
             </nav>
@@ -615,7 +613,7 @@ export default function AdminLayout() {
                 <span style={navIconWrapStyle}>
                   <i className="fa-solid fa-arrow-left" />
                 </span>
-                <span style={S.navLabel}>Panel Usuario</span>
+                <span style={navTextStyle("Panel Usuario")}>Panel Usuario</span>
               </button>
             </div>
           </div>
@@ -643,6 +641,12 @@ export default function AdminLayout() {
                   <div style={{ marginTop: 2, fontSize: 12, color: "#334155" }}>
                     <b>Rol:</b> {roleLabel}
                   </div>
+
+                  {me?.email ? (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                      {me.email}
+                    </div>
+                  ) : null}
 
                   <button
                     type="button"
@@ -687,6 +691,12 @@ export default function AdminLayout() {
                   <div style={{ marginTop: 2, fontSize: 12, color: "#334155" }}>
                     <b>Rol:</b> {roleLabel}
                   </div>
+
+                  {me?.email ? (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                      {me.email}
+                    </div>
+                  ) : null}
 
                   <button
                     type="button"

@@ -12,9 +12,9 @@ export default function Login() {
     if (!user) return [];
 
     const directPermissions = Array.isArray(user.permissions)
-      ? user.permissions.map((p) =>
-          typeof p === "string" ? p : p?.name
-        ).filter(Boolean)
+      ? user.permissions
+          .map((p) => (typeof p === "string" ? p : p?.name))
+          .filter(Boolean)
       : [];
 
     return [...new Set(directPermissions)];
@@ -24,9 +24,9 @@ export default function Login() {
     if (!user) return [];
 
     const rolesFromArray = Array.isArray(user.roles)
-      ? user.roles.map((r) =>
-          typeof r === "string" ? r : r?.name
-        ).filter(Boolean)
+      ? user.roles
+          .map((r) => (typeof r === "string" ? r : r?.name))
+          .filter(Boolean)
       : [];
 
     const roleSingle = user.role
@@ -47,11 +47,32 @@ export default function Login() {
     return permissions.includes(permission);
   };
 
-  const getRedirectPath = (user) => {
-    if (isAdmin(user) || hasPermission(user, "admin.panel.view")) {
-      return "/admin";
-    }
+  const isInactiveUser = (user) => {
+    if (!user || typeof user !== "object") return false;
 
+    if (user.active === false) return true;
+    if (user.is_active === false) return true;
+    if (user.status === false) return true;
+    if (user.enabled === false) return true;
+
+    const statusValue = String(user.status ?? "").trim().toLowerCase();
+    const stateValue = String(user.state ?? "").trim().toLowerCase();
+
+    if (statusValue && ["inactive", "inactivo", "0"].includes(statusValue)) return true;
+    if (stateValue && ["inactive", "inactivo", "0"].includes(stateValue)) return true;
+
+    return false;
+  };
+
+  const inactiveMessage =
+    "Tu usuario no tiene acceso en este momento. Comunícate con tu administrador o con el equipo de Sistemas.";
+
+  const clearSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  };
+
+  const getRedirectPath = () => {
     return "/forms";
   };
 
@@ -64,11 +85,16 @@ export default function Login() {
         const data = await apiMe();
         const user = data?.user || data;
 
+        if (isInactiveUser(user)) {
+          clearSession();
+          setErr(inactiveMessage);
+          return;
+        }
+
         localStorage.setItem("user", JSON.stringify(user));
-        window.location.href = getRedirectPath(user);
+        window.location.href = getRedirectPath();
       } catch {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearSession();
       }
     })();
   }, []);
@@ -84,12 +110,17 @@ export default function Login() {
         password,
       });
 
+      if (isInactiveUser(user)) {
+        clearSession();
+        setErr(inactiveMessage);
+        return;
+      }
+
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
-      window.location.href = getRedirectPath(user);
+      window.location.href = getRedirectPath();
     } catch (ex) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      clearSession();
       setErr(ex?.message || "Error al iniciar sesión");
     } finally {
       setLoading(false);
@@ -141,6 +172,7 @@ export default function Login() {
       color: "#b91c1c",
       padding: "8px 10px",
       fontSize: 13,
+      lineHeight: 1.5,
     },
     row: { marginBottom: 12 },
     actions: { display: "flex", justifyContent: "flex-end", paddingTop: 8 },

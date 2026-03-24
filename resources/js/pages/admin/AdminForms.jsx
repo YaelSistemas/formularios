@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPost } from "../../services/api";
+import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "../user/forms/layouts/SST_POP_TA_07_FO_01_Inspeccion_de_Compresor";
+import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "../user/forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -699,10 +701,10 @@ export default function AdminForms() {
       fontWeight: 800,
     },
     previewRightBody: {
-      padding: 14,
+      padding: 0,
       overflowY: "auto",
       maxHeight: 520,
-      background: "#fff",
+      background: "#f8fafc",
     },
     roInput: {
       width: "100%",
@@ -786,6 +788,30 @@ export default function AdminForms() {
     return s;
   };
 
+  const normalizeCodeKey = (value) => String(value || "").trim().toLowerCase();
+
+  const buildPreviewAnswers = (fields = []) => {
+    const result = {};
+
+    fields.forEach((f) => {
+      if (!f?.id) return;
+
+      switch (f.type) {
+        case "checkbox":
+          result[f.id] = false;
+          break;
+        case "table":
+          result[f.id] = [];
+          break;
+        default:
+          result[f.id] = "";
+          break;
+      }
+    });
+
+    return result;
+  };
+
   const PreviewRenderer = ({ form }) => {
     const fields = Array.isArray(form?.payload?.fields) ? form.payload.fields : [];
     if (!fields.length) {
@@ -793,7 +819,7 @@ export default function AdminForms() {
     }
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 14 }}>
         {fields.map((f) => {
           const label = f?.label || "Campo";
           const type = f?.type || "text";
@@ -884,7 +910,7 @@ export default function AdminForms() {
             );
           }
 
-          if (type === "select") {
+          if (type === "select" || type === "list") {
             const opts = Array.isArray(f?.options) ? f.options : [];
             return (
               <div key={f.id}>
@@ -921,6 +947,29 @@ export default function AdminForms() {
                   {label} {required ? <span style={{ color: "#dc2626" }}>*</span> : null}
                 </div>
                 <textarea disabled rows={3} style={S.roInput} placeholder="—" />
+              </div>
+            );
+          }
+
+          if (type === "signature") {
+            return (
+              <div key={f.id}>
+                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>
+                  {label} {required ? <span style={{ color: "#dc2626" }}>*</span> : null}
+                </div>
+                <div
+                  style={{
+                    border: "1px dashed #cbd5e1",
+                    borderRadius: 12,
+                    background: "#f8fafc",
+                    padding: 14,
+                    textAlign: "center",
+                    color: "#64748b",
+                    fontSize: 13,
+                  }}
+                >
+                  Sin firma capturada
+                </div>
               </div>
             );
           }
@@ -981,6 +1030,43 @@ export default function AdminForms() {
     );
   };
 
+  const FORM_VISUAL_PREVIEWS = {
+    sst_pop_ta_07_fo_01_inspeccion_de_compresor:
+      SST_POP_TA_07_FO_01_Inspeccion_de_Compresor,
+
+    sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil:
+      SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil,
+  };
+
+  const FormVisualPreview = ({ form, onBack }) => {
+    const fields = Array.isArray(form?.payload?.fields) ? form.payload.fields : [];
+    const codeKey = normalizeCodeKey(form?.payload?._code_key);
+    const PreviewComponent = FORM_VISUAL_PREVIEWS[codeKey];
+    const previewAnswers = useMemo(() => buildPreviewAnswers(fields), [fields]);
+
+    if (!PreviewComponent) {
+      return <PreviewRenderer form={form} />;
+    }
+
+    return (
+      <PreviewComponent
+        form={form}
+        fields={fields}
+        answers={previewAnswers}
+        setVal={() => {}}
+        saving={false}
+        isOnline={true}
+        msg=""
+        setMsg={() => {}}
+        onBack={onBack}
+        onSubmit={() => {}}
+        readOnly={true}
+        responseMeta={null}
+        isEditing={false}
+      />
+    );
+  };
+
   const filteredUsers = useMemo(() => {
     const term = assignmentSearch.trim().toLowerCase();
     if (!term) return users;
@@ -990,7 +1076,10 @@ export default function AdminForms() {
       const email = String(u?.email || "").toLowerCase();
 
       const roles = Array.isArray(u?.roles)
-        ? u.roles.map((r) => String(typeof r === "string" ? r : r?.name || "")).join(" ").toLowerCase()
+        ? u.roles
+            .map((r) => String(typeof r === "string" ? r : r?.name || ""))
+            .join(" ")
+            .toLowerCase()
         : String(u?.role || u?.role_name || "").toLowerCase();
 
       const empresas = Array.isArray(u?.empresas)
@@ -1375,7 +1464,7 @@ export default function AdminForms() {
                       <i className="fa-solid fa-ellipsis-vertical" />
                     </div>
                     <div style={S.previewRightBody}>
-                      <PreviewRenderer form={previewForm} />
+                      <FormVisualPreview form={previewForm} onBack={closePreviewModal} />
                     </div>
                   </div>
                 </div>

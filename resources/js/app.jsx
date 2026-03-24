@@ -6,7 +6,6 @@ import Login from "./pages/Login";
 
 // Panel normal
 import AppLayout from "./layouts/AppLayout";
-import DashboardHome from "./pages/user/DashboardHome";
 import FormsIndex from "./pages/user/FormsIndex";
 
 // Admin
@@ -147,7 +146,7 @@ function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<DashboardHome />} />
+          <Route index element={<Navigate to="/forms" replace />} />
           <Route path="forms" element={<FormsIndex />} />
         </Route>
 

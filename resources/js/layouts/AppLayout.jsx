@@ -255,6 +255,12 @@ export default function AppLayout() {
       padding: "0 12px",
     },
 
+    sidebarFooter: {
+      padding: "10px 8px 12px",
+      borderTop: "1px solid #e5e7eb",
+      background: "#fff",
+    },
+
     topbar: {
       height: 56,
       background: "#fff",
@@ -309,6 +315,10 @@ export default function AppLayout() {
       alignItems: "center",
       gap: 10,
       minWidth: 0,
+      cursor: "pointer",
+      background: "transparent",
+      border: "none",
+      padding: 0,
     },
 
     logo: {
@@ -429,6 +439,21 @@ export default function AppLayout() {
     window.location.href = "/admin";
   };
 
+  const handleFormsGo = () => {
+    navigate("/forms");
+  };
+
+  const handleProfileGo = () => {
+    setUserMenuOpen(false);
+
+    if (canViewAdminPanel) {
+      window.location.href = "/admin";
+      return;
+    }
+
+    navigate("/forms");
+  };
+
   return (
     <div style={S.page}>
       {!isMobile ? (
@@ -451,9 +476,15 @@ export default function AppLayout() {
               </svg>
             </button>
 
-            <div style={S.logoRow}>
+            <button
+              type="button"
+              onClick={handleFormsGo}
+              style={S.logoRow}
+              title="Ir a Formularios"
+              aria-label="Ir a Formularios"
+            >
               <img src="/images/Logo-vysisa.png" alt="VYSISA" style={S.logo} />
-            </div>
+            </button>
           </div>
 
           <nav style={S.nav}>
@@ -467,8 +498,10 @@ export default function AppLayout() {
               </span>
               <span style={S.navLabel}>Formularios</span>
             </NavLink>
+          </nav>
 
-            {canViewAdminPanel ? (
+          {canViewAdminPanel ? (
+            <div style={S.sidebarFooter}>
               <button
                 type="button"
                 onClick={handleAdminGo}
@@ -480,8 +513,8 @@ export default function AppLayout() {
                 </span>
                 <span style={S.navLabel}>Panel Admin</span>
               </button>
-            ) : null}
-          </nav>
+            </div>
+          ) : null}
         </aside>
       ) : null}
 
@@ -518,12 +551,9 @@ export default function AppLayout() {
                   <button
                     type="button"
                     style={S.menuBtn}
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      navigate("/app/profile");
-                    }}
+                    onClick={handleProfileGo}
                   >
-                    Ver perfil (opcional)
+                    Panel Admin
                   </button>
 
                   <button type="button" style={S.dangerBtn} onClick={onLogout}>
@@ -573,12 +603,9 @@ export default function AppLayout() {
                   <button
                     type="button"
                     style={S.menuBtn}
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      navigate("/app/profile");
-                    }}
+                    onClick={handleProfileGo}
                   >
-                    Ver perfil (opcional)
+                    Panel Admin
                   </button>
 
                   <button type="button" style={S.dangerBtn} onClick={onLogout}>
