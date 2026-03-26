@@ -3,6 +3,7 @@ import { apiGet, apiPost } from "../../services/api";
 import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "../user/forms/layouts/SST_POP_TA_07_FO_01_Inspeccion_de_Compresor";
 import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "../user/forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
 import SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar from "../user/forms/layouts/SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar";
+import SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte from "../user/forms/layouts/SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1218,6 +1219,9 @@ export default function AdminForms() {
   };
 
   const FORM_VISUAL_PREVIEWS = {
+    sst_pop_ta_05_fo_02_inspeccion_de_equipo_de_oxicorte:
+      SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte,
+      
     sst_pop_ta_05_fo_03_checklist_maquina_de_soldar:
       SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar,
 

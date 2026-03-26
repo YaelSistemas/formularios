@@ -521,11 +521,16 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sst_pop_ta_05_fo_03_checklist_maquina_de_soldar') {
                             $storedPath = $this->storeSignatureForChecklistMaquinaDeSoldar($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sst_pop_ta_05_fo_02_inspeccion_de_equipo_de_oxicorte') {
+                            $storedPath = $this->storeSignatureForInspeccionEquipoOxicorte($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
                                 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil',
                                 'sst_pop_ta_07_fo_01_inspeccion_de_compresor',
+                                'sst_pop_ta_05_fo_02_inspeccion_de_equipo_de_oxicorte',
                                 'sst_pop_ta_05_fo_03_checklist_maquina_de_soldar',
                             ], true)
                         ) {
@@ -837,6 +842,40 @@ class FormSubmissionsController extends Controller
         $directory = match ($fieldId) {
             'firma_supervisor' => $baseDirectory . '/Supervisor',
             default => $baseDirectory,
+        };
+    
+        $fileName = 'firma_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . Str::random(8) . '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        Storage::disk('public')->put($relativePath, $binary);
+    
+        return $relativePath;
+    }
+
+    /**
+     * Guarda la firma como PNG físico para la inspección de equipo de oxicorte.
+     */
+    private function storeSignatureForInspeccionEquipoOxicorte(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SSTPOPTA05FO02_InspeccionEquipoOxicorte';
+    
+        $directory = match ($fieldId) {
+            'firma_supervisor' => $baseDirectory . '/Supervisor',
+            default => $baseDirectory . '/Inspector',
         };
     
         $fileName = 'firma_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . Str::random(8) . '.png';

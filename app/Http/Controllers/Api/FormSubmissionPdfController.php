@@ -59,6 +59,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil'
                 => 'pdf.forms.SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil',
 
+            'sst_pop_ta_05_fo_02_inspeccion_de_equipo_de_oxicorte'
+                => 'pdf.forms.SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte',
+
             'sst_pop_ta_05_fo_03_checklist_maquina_de_soldar'
                 => 'pdf.forms.SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar',
 
