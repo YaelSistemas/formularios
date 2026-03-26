@@ -29,6 +29,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const [tableModalError, setTableModalError] = useState("");
   const [tableModalErrorFieldId, setTableModalErrorFieldId] = useState(null);
 
+  const [formFieldError, setFormFieldError] = useState("");
+  const [formFieldErrorId, setFormFieldErrorId] = useState(null);
+
   const [signatureModal, setSignatureModal] = useState({
     open: false,
     field: null,
@@ -49,6 +52,10 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const tableFieldWrapRefs = useRef({});
   const tableErrorTimerRef = useRef(null);
 
+  const formFieldRefs = useRef({});
+  const formFieldWrapRefs = useRef({});
+  const formErrorTimerRef = useRef(null);
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", onResize);
@@ -59,6 +66,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     return () => {
       if (tableErrorTimerRef.current) {
         clearTimeout(tableErrorTimerRef.current);
+      }
+      if (formErrorTimerRef.current) {
+        clearTimeout(formErrorTimerRef.current);
       }
     };
   }, []);
@@ -135,6 +145,50 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       setTableModalError("");
       setTableModalErrorFieldId(null);
       tableErrorTimerRef.current = null;
+    }, 3000);
+  };
+
+  const clearFormFieldError = () => {
+    setFormFieldError("");
+    setFormFieldErrorId(null);
+
+    if (formErrorTimerRef.current) {
+      clearTimeout(formErrorTimerRef.current);
+      formErrorTimerRef.current = null;
+    }
+  };
+
+  const showFormFieldError = (fieldId, message) => {
+    setMsg("");
+    setFormFieldError(message);
+    setFormFieldErrorId(fieldId);
+
+    if (formErrorTimerRef.current) {
+      clearTimeout(formErrorTimerRef.current);
+    }
+
+    requestAnimationFrame(() => {
+      const wrapEl = formFieldWrapRefs.current[fieldId];
+      const inputEl = formFieldRefs.current[fieldId];
+
+      if (wrapEl?.scrollIntoView) {
+        wrapEl.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+
+      setTimeout(() => {
+        if (inputEl?.focus) {
+          inputEl.focus();
+        }
+      }, 180);
+    });
+
+    formErrorTimerRef.current = setTimeout(() => {
+      setFormFieldError("");
+      setFormFieldErrorId(null);
+      formErrorTimerRef.current = null;
     }, 3000);
   };
 
@@ -270,6 +324,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
   const openSignatureModal = (field) => {
     if (readOnly) return;
+    if (formFieldErrorId === field?.id) {
+      clearFormFieldError();
+    }
     setSignatureModal({ open: true, field });
   };
 
@@ -400,6 +457,11 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
     const dataUrl = canvas.toDataURL("image/png");
     setVal(field.id, dataUrl);
+
+    if (formFieldErrorId === field.id) {
+      clearFormFieldError();
+    }
+
     setMsg("");
     closeSignatureModal();
   };
@@ -407,27 +469,40 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const removeSignature = (fieldId) => {
     if (readOnly) return;
     setVal(fieldId, "");
+
+    if (formFieldErrorId === fieldId) {
+      clearFormFieldError();
+    }
   };
 
   const renderBasicInput = (f) => {
+    const hasFormError = formFieldErrorId === f.id;
+
     const commonStyle = {
       width: "100%",
       padding: isMobile ? 11 : 10,
       borderRadius: 12,
-      border: "1px solid #d1d5db",
+      border: hasFormError ? "1px solid #fb923c" : "1px solid #d1d5db",
       background: readOnly ? "#f8fafc" : "#fff",
       fontSize: isMobile ? 16 : 14,
       color: "#111827",
       outline: "none",
       boxSizing: "border-box",
       minHeight: isMobile ? 46 : "auto",
+      boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
     };
 
     if (f.type === "textarea") {
       return (
         <textarea
+          ref={(el) => {
+            formFieldRefs.current[f.id] = el;
+          }}
           value={answers[f.id] ?? ""}
-          onChange={(e) => setVal(f.id, e.target.value)}
+          onChange={(e) => {
+            setVal(f.id, e.target.value);
+            if (formFieldErrorId === f.id) clearFormFieldError();
+          }}
           rows={4}
           disabled={readOnly}
           style={{ ...commonStyle, resize: "vertical" }}
@@ -439,9 +514,15 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       return (
         <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
           <input
+            ref={(el) => {
+              formFieldRefs.current[f.id] = el;
+            }}
             type="checkbox"
             checked={!!answers[f.id]}
-            onChange={(e) => setVal(f.id, e.target.checked)}
+            onChange={(e) => {
+              setVal(f.id, e.target.checked);
+              if (formFieldErrorId === f.id) clearFormFieldError();
+            }}
             disabled={readOnly}
           />
           <span>Marcar</span>
@@ -453,8 +534,14 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       const opts = Array.isArray(f.options) ? f.options : [];
       return (
         <select
+          ref={(el) => {
+            formFieldRefs.current[f.id] = el;
+          }}
           value={answers[f.id] ?? ""}
-          onChange={(e) => setVal(f.id, e.target.value)}
+          onChange={(e) => {
+            setVal(f.id, e.target.value);
+            if (formFieldErrorId === f.id) clearFormFieldError();
+          }}
           disabled={readOnly}
           style={commonStyle}
         >
@@ -487,11 +574,21 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 }}
               >
                 <input
+                  ref={(el) => {
+                    if (el && answers[f.id] === opt) {
+                      formFieldRefs.current[f.id] = el;
+                    } else if (el && !formFieldRefs.current[f.id]) {
+                      formFieldRefs.current[f.id] = el;
+                    }
+                  }}
                   type="radio"
                   name={f.id}
                   value={opt}
                   checked={answers[f.id] === opt}
-                  onChange={(e) => setVal(f.id, e.target.value)}
+                  onChange={(e) => {
+                    setVal(f.id, e.target.value);
+                    if (formFieldErrorId === f.id) clearFormFieldError();
+                  }}
                   disabled={readOnly}
                 />
                 <span>{opt}</span>
@@ -518,10 +615,11 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
           {signatureSrc ? (
             <div
               style={{
-                border: "1px solid #d1d5db",
+                border: hasFormError ? "1px solid #fb923c" : "1px solid #d1d5db",
                 borderRadius: 12,
                 background: "#fff",
                 padding: 10,
+                boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
               }}
             >
               <img
@@ -539,13 +637,14 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
           ) : (
             <div
               style={{
-                border: "1px dashed #cbd5e1",
+                border: hasFormError ? "1px solid #fb923c" : "1px dashed #cbd5e1",
                 borderRadius: 12,
                 background: "#f8fafc",
                 padding: isMobile ? 14 : 16,
                 textAlign: "center",
                 color: "#64748b",
                 fontSize: isMobile ? 14 : 14,
+                boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
               }}
             >
               Sin firma capturada
@@ -555,17 +654,21 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
           {!readOnly ? (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
+                ref={(el) => {
+                  formFieldRefs.current[f.id] = el;
+                }}
                 type="button"
                 onClick={() => openSignatureModal(f)}
                 style={{
                   borderRadius: 12,
-                  border: "1px solid #c7d2fe",
-                  background: "#eef2ff",
-                  color: "#1e40af",
+                  border: hasFormError ? "1px solid #fb923c" : "1px solid #c7d2fe",
+                  background: hasFormError ? "#fff7ed" : "#eef2ff",
+                  color: hasFormError ? "#9a3412" : "#1e40af",
                   padding: isMobile ? "10px 14px" : "10px 12px",
                   cursor: "pointer",
                   fontWeight: 800,
                   fontSize: isMobile ? 14 : 14,
+                  boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
                 }}
               >
                 {value ? "Volver a firmar" : "Capturar firma"}
@@ -606,9 +709,15 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
     return (
       <input
+        ref={(el) => {
+          formFieldRefs.current[f.id] = el;
+        }}
         type={htmlType}
         value={answers[f.id] ?? ""}
-        onChange={(e) => setVal(f.id, e.target.value)}
+        onChange={(e) => {
+          setVal(f.id, e.target.value);
+          if (formFieldErrorId === f.id) clearFormFieldError();
+        }}
         disabled={readOnly}
         style={commonStyle}
       />
@@ -1028,26 +1137,104 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     border: isMobile ? "1px solid #eef2f7" : "none",
   };
 
-  const validateBeforeSubmit = () => {
-    if (!taller || String(answers[taller.id] ?? "").trim() === "") {
-      setMsg("Debes seleccionar el Taller.");
-      scrollToTopSafe();
-      return false;
+  const getOuterFieldBlockStyle = (fieldId) => {
+    const hasError = formFieldErrorId === fieldId;
+
+    return {
+      ...fieldBlockStyle,
+      padding: hasError ? "10px" : fieldBlockStyle.padding,
+      borderRadius: hasError ? 12 : fieldBlockStyle.borderRadius,
+      background: hasError ? "#fff7ed" : fieldBlockStyle.background,
+      border: hasError ? "1px solid #fdba74" : fieldBlockStyle.border,
+      transition: "all 0.2s ease",
+    };
+  };
+
+  const renderOuterRequiredField = (f) => {
+    if (!f) return null;
+
+    return (
+      <div
+        ref={(el) => {
+          formFieldWrapRefs.current[f.id] = el;
+        }}
+        style={getOuterFieldBlockStyle(f.id)}
+      >
+        <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
+          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+        </label>
+
+        {formFieldErrorId === f.id && formFieldError ? (
+          <div
+            style={{
+              borderRadius: 10,
+              border: "1px solid #fdba74",
+              background: "#fff7ed",
+              color: "#9a3412",
+              padding: "8px 10px",
+              fontSize: 13,
+              lineHeight: 1.4,
+              fontWeight: 700,
+            }}
+          >
+            {formFieldError}
+          </div>
+        ) : null}
+
+        {renderField(f)}
+      </div>
+    );
+  };
+
+  const validateSimpleRequiredField = (field, emptyMessage = null) => {
+    if (!field) return false;
+
+    const value = answers[field.id];
+
+    if (field.type === "signature") {
+      if (!value || String(value).trim() === "") {
+        showFormFieldError(field.id, emptyMessage || `Falta responder: ${field.label}`);
+        return false;
+      }
+      return true;
     }
 
-    if (!nombreInspector || String(answers[nombreInspector.id] ?? "").trim() === "") {
-      setMsg("Debes capturar el Nombre del inspector.");
-      scrollToTopSafe();
+    if (isEmptyValue(value, field.type)) {
+      showFormFieldError(field.id, emptyMessage || `Falta responder: ${field.label}`);
       return false;
     }
 
     if (
-      !firmaInspector ||
-      !answers[firmaInspector.id] ||
-      String(answers[firmaInspector.id]).trim() === ""
+      field.type === "select" ||
+      field.type === "list" ||
+      field.type === "radio"
     ) {
-      setMsg("Debes capturar la Firma del inspector.");
-      scrollToTopSafe();
+      const opts = Array.isArray(field.options) ? field.options : [];
+      if (opts.length && !opts.includes(value)) {
+        showFormFieldError(
+          field.id,
+          `Selecciona una opción válida para: ${field.label}`
+        );
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const validateBeforeSubmit = () => {
+    clearFormFieldError();
+    setMsg("");
+
+    if (!validateSimpleRequiredField(taller)) {
+      return false;
+    }
+
+    if (!validateSimpleRequiredField(nombreInspector)) {
+      return false;
+    }
+
+    if (!validateSimpleRequiredField(firmaInspector)) {
       return false;
     }
 
@@ -1406,32 +1593,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
               ))}
             </div>
 
-            {taller ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{taller.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(taller)}
-              </div>
-            ) : null}
-
-            {nombreInspector ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{nombreInspector.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(nombreInspector)}
-              </div>
-            ) : null}
-
-            {firmaInspector ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{firmaInspector.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(firmaInspector)}
-              </div>
-            ) : null}
+            {renderOuterRequiredField(taller)}
+            {renderOuterRequiredField(nombreInspector)}
+            {renderOuterRequiredField(firmaInspector)}
 
             {indicacionesToggle ? (
               <div

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
   form,
@@ -19,6 +19,9 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
     indicaciones_toggle: false,
   });
 
+  const [formFieldError, setFormFieldError] = useState("");
+  const [formFieldErrorId, setFormFieldErrorId] = useState(null);
+
   const [signatureModal, setSignatureModal] = useState({
     open: false,
     field: null,
@@ -35,10 +38,22 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
   const lastPointRef = useRef({ x: 0, y: 0 });
   const topRef = useRef(null);
 
+  const formFieldRefs = useRef({});
+  const formFieldWrapRefs = useRef({});
+  const formErrorTimerRef = useRef(null);
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (formErrorTimerRef.current) {
+        clearTimeout(formErrorTimerRef.current);
+      }
+    };
   }, []);
 
   const scrollToTopSafe = () => {
@@ -56,392 +71,14 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
     }));
   };
 
-  const openSignatureModal = (field) => {
-    if (readOnly) return;
-    setSignatureModal({ open: true, field });
-  };
+  const clearFormFieldError = () => {
+    setFormFieldError("");
+    setFormFieldErrorId(null);
 
-  const closeSignatureModal = () => {
-    setSignatureModal({ open: false, field: null });
-  };
-
-  const resizeSignatureCanvas = () => {
-    const canvas = signatureCanvasRef.current;
-    const wrapper = signatureWrapperRef.current;
-    if (!canvas || !wrapper) return;
-
-    const prevData = canvas.toDataURL("image/png");
-    const rect = wrapper.getBoundingClientRect();
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-
-    canvas.width = Math.max(rect.width * ratio, 1);
-    canvas.height = Math.max(220 * ratio, 1);
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `220px`;
-
-    const ctx = canvas.getContext("2d");
-    ctx.scale(ratio, ratio);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#111827";
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, rect.width, 220);
-
-    if (prevData && prevData !== "data:,") {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, rect.width, 220);
-      };
-      img.src = prevData;
+    if (formErrorTimerRef.current) {
+      clearTimeout(formErrorTimerRef.current);
+      formErrorTimerRef.current = null;
     }
-  };
-
-  useEffect(() => {
-    if (!signatureModal.open) return;
-
-    const t = setTimeout(() => {
-      resizeSignatureCanvas();
-    }, 0);
-
-    const onResize = () => resizeSignatureCanvas();
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [signatureModal.open]);
-
-  const getCanvasPoint = (event) => {
-    const canvas = signatureCanvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-
-    const rect = canvas.getBoundingClientRect();
-
-    if (event.touches && event.touches.length) {
-      return {
-        x: event.touches[0].clientX - rect.left,
-        y: event.touches[0].clientY - rect.top,
-      };
-    }
-
-    return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-  };
-
-  const startDrawing = (event) => {
-    if (readOnly) return;
-
-    const canvas = signatureCanvasRef.current;
-    if (!canvas) return;
-
-    drawingRef.current = true;
-    const point = getCanvasPoint(event);
-    lastPointRef.current = point;
-
-    const ctx = canvas.getContext("2d");
-    ctx.beginPath();
-    ctx.moveTo(point.x, point.y);
-  };
-
-  const draw = (event) => {
-    if (!drawingRef.current || readOnly) return;
-
-    const canvas = signatureCanvasRef.current;
-    if (!canvas) return;
-
-    const point = getCanvasPoint(event);
-    const ctx = canvas.getContext("2d");
-
-    ctx.beginPath();
-    ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-    ctx.lineTo(point.x, point.y);
-    ctx.stroke();
-
-    lastPointRef.current = point;
-  };
-
-  const stopDrawing = () => {
-    drawingRef.current = false;
-  };
-
-  const clearSignatureCanvas = () => {
-    if (readOnly) return;
-
-    const canvas = signatureCanvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, rect.width, rect.height);
-  };
-
-  const saveSignature = () => {
-    const field = signatureModal.field;
-    const canvas = signatureCanvasRef.current;
-    if (!field || !canvas) return;
-
-    const dataUrl = canvas.toDataURL("image/png");
-    setVal(field.id, dataUrl);
-    setMsg("");
-    closeSignatureModal();
-  };
-
-  const removeSignature = (fieldId) => {
-    if (readOnly) return;
-    setVal(fieldId, "");
-  };
-
-  const renderBasicInput = (f) => {
-    const commonStyle = {
-      width: "100%",
-      padding: isMobile ? 11 : 10,
-      borderRadius: 12,
-      border: "1px solid #d1d5db",
-      background: readOnly ? "#f8fafc" : "#fff",
-      fontSize: isMobile ? 16 : 14,
-      color: "#111827",
-      outline: "none",
-      boxSizing: "border-box",
-      minHeight: isMobile ? 46 : "auto",
-    };
-
-    if (f.type === "static_text") {
-      return (
-        <div
-          style={{
-            color: "#111827",
-            fontSize: isMobile ? 14 : 14,
-            lineHeight: 1.6,
-            whiteSpace: "pre-line",
-          }}
-        >
-          {f.text || ""}
-        </div>
-      );
-    }
-
-    if (f.type === "textarea") {
-      return (
-        <textarea
-          value={answers[f.id] ?? ""}
-          onChange={(e) => setVal(f.id, e.target.value)}
-          rows={4}
-          disabled={readOnly}
-          style={{ ...commonStyle, resize: "vertical" }}
-        />
-      );
-    }
-
-    if (f.type === "checkbox") {
-      return (
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <input
-            type="checkbox"
-            checked={!!answers[f.id]}
-            onChange={(e) => setVal(f.id, e.target.checked)}
-            disabled={readOnly}
-          />
-          <span>Marcar</span>
-        </label>
-      );
-    }
-
-    if (f.type === "select" || f.type === "list") {
-      const opts = Array.isArray(f.options) ? f.options : [];
-      return (
-        <select
-          value={answers[f.id] ?? ""}
-          onChange={(e) => setVal(f.id, e.target.value)}
-          disabled={readOnly}
-          style={commonStyle}
-        >
-          <option value="">-- Selecciona --</option>
-          {opts.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-      );
-    }
-
-    if (f.type === "radio") {
-      const opts = Array.isArray(f.options) ? f.options : [];
-      return (
-        <div style={{ display: "grid", gap: 8 }}>
-          {opts.length ? (
-            opts.map((opt) => (
-              <label
-                key={opt}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: isMobile ? "10px 12px" : 0,
-                  borderRadius: isMobile ? 12 : 0,
-                  border: isMobile ? "1px solid #e5e7eb" : "none",
-                  background: isMobile ? "#fff" : "transparent",
-                }}
-              >
-                <input
-                  type="radio"
-                  name={f.id}
-                  value={opt}
-                  checked={answers[f.id] === opt}
-                  onChange={(e) => setVal(f.id, e.target.value)}
-                  disabled={readOnly}
-                />
-                <span>{opt}</span>
-              </label>
-            ))
-          ) : (
-            <div style={{ fontSize: 12, opacity: 0.7 }}>Sin opciones</div>
-          )}
-        </div>
-      );
-    }
-
-    if (f.type === "signature") {
-      const value = answers[f.id] || "";
-      const signatureSrc =
-        typeof value === "string" && value.startsWith("data:image")
-          ? value
-          : typeof value === "string" &&
-            value.startsWith("/storage/")
-          ? value
-          : typeof value === "string" && value !== ""
-          ? `/storage/${String(value).replace(/^\/+/, "")}`
-          : "";
-
-      return (
-        <div style={{ display: "grid", gap: 10 }}>
-          {signatureSrc ? (
-            <div
-              style={{
-                border: "1px solid #d1d5db",
-                borderRadius: 12,
-                background: "#fff",
-                padding: 10,
-              }}
-            >
-              <img
-                src={signatureSrc}
-                alt="Firma capturada"
-                style={{
-                  display: "block",
-                  maxWidth: "100%",
-                  maxHeight: 140,
-                  objectFit: "contain",
-                  margin: "0 auto",
-                }}
-              />
-            </div>
-          ) : (
-            <div
-              style={{
-                border: "1px dashed #cbd5e1",
-                borderRadius: 12,
-                background: "#f8fafc",
-                padding: isMobile ? 14 : 16,
-                textAlign: "center",
-                color: "#64748b",
-                fontSize: isMobile ? 14 : 14,
-              }}
-            >
-              Sin firma capturada
-            </div>
-          )}
-
-          {!readOnly ? (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => openSignatureModal(f)}
-                style={{
-                  borderRadius: 12,
-                  border: "1px solid #c7d2fe",
-                  background: "#eef2ff",
-                  color: "#1e40af",
-                  padding: isMobile ? "10px 14px" : "10px 12px",
-                  cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: isMobile ? 14 : 14,
-                }}
-              >
-                {value ? "Volver a firmar" : "Capturar firma"}
-              </button>
-
-              {value ? (
-                <button
-                  type="button"
-                  onClick={() => removeSignature(f.id)}
-                  style={{
-                    borderRadius: 12,
-                    border: "1px solid #fecaca",
-                    background: "#fef2f2",
-                    color: "#b91c1c",
-                    padding: isMobile ? "10px 14px" : "10px 12px",
-                    cursor: "pointer",
-                    fontWeight: 800,
-                    fontSize: isMobile ? 14 : 14,
-                  }}
-                >
-                  Eliminar firma
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      );
-    }
-
-    const htmlType =
-      f.type === "number"
-        ? "number"
-        : f.type === "date"
-        ? "date"
-        : f.type === "datetime"
-        ? "datetime-local"
-        : "text";
-
-    return (
-      <input
-        type={htmlType}
-        value={answers[f.id] ?? ""}
-        onChange={(e) => setVal(f.id, e.target.value)}
-        disabled={readOnly}
-        style={commonStyle}
-      />
-    );
-  };
-
-  const renderField = (f) => {
-    if (f.type === "fixed_image") {
-      const url = f.url || "";
-      if (!url) return null;
-
-      return (
-        <div style={{ textAlign: "center" }}>
-          <img
-            src={url}
-            alt={f.label || "Imagen"}
-            style={{
-              maxWidth: "100%",
-              width: isMobile ? 250 : 420,
-              borderRadius: 10,
-            }}
-          />
-        </div>
-      );
-    }
-
-    return renderBasicInput(f);
   };
 
   const getField = (id) => fields.find((f) => f.id === id);
@@ -574,6 +211,519 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
 
   const isCollapsed = !!collapsedSections[indicacionesToggle?.id];
 
+  const indicacionesFieldIds = useMemo(() => {
+    const ids = [numeroSerie?.id, tipoModelo?.id];
+
+    checklistItems.forEach((item) => {
+      if (item?.status?.id) ids.push(item.status.id);
+      if (item?.obs?.id) ids.push(item.obs.id);
+    });
+
+    return new Set(ids.filter(Boolean));
+  }, [numeroSerie, tipoModelo, checklistItems]);
+
+  const showFormFieldError = (fieldId, message) => {
+    setMsg("");
+    setFormFieldError(message);
+    setFormFieldErrorId(fieldId);
+
+    if (formErrorTimerRef.current) {
+      clearTimeout(formErrorTimerRef.current);
+    }
+
+    const mustOpenSection =
+      !!fieldId &&
+      isCollapsed &&
+      indicacionesToggle?.id &&
+      indicacionesFieldIds.has(fieldId);
+
+    if (mustOpenSection) {
+      setCollapsedSections((prev) => ({
+        ...prev,
+        [indicacionesToggle.id]: false,
+      }));
+    }
+
+    const runScrollAndFocus = () => {
+      const wrapEl = formFieldWrapRefs.current[fieldId];
+      const inputEl = formFieldRefs.current[fieldId];
+
+      if (wrapEl?.scrollIntoView) {
+        wrapEl.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+
+      setTimeout(() => {
+        if (inputEl?.focus) {
+          inputEl.focus();
+        }
+      }, 180);
+    };
+
+    if (mustOpenSection) {
+      setTimeout(() => {
+        requestAnimationFrame(runScrollAndFocus);
+      }, 80);
+    } else {
+      requestAnimationFrame(runScrollAndFocus);
+    }
+
+    formErrorTimerRef.current = setTimeout(() => {
+      setFormFieldError("");
+      setFormFieldErrorId(null);
+      formErrorTimerRef.current = null;
+    }, 3000);
+  };
+
+  const openSignatureModal = (field) => {
+    if (readOnly) return;
+    if (formFieldErrorId === field?.id) {
+      clearFormFieldError();
+    }
+    setSignatureModal({ open: true, field });
+  };
+
+  const closeSignatureModal = () => {
+    setSignatureModal({ open: false, field: null });
+  };
+
+  const resizeSignatureCanvas = () => {
+    const canvas = signatureCanvasRef.current;
+    const wrapper = signatureWrapperRef.current;
+    if (!canvas || !wrapper) return;
+
+    const prevData = canvas.toDataURL("image/png");
+    const rect = wrapper.getBoundingClientRect();
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+
+    canvas.width = Math.max(rect.width * ratio, 1);
+    canvas.height = Math.max(220 * ratio, 1);
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `220px`;
+
+    const ctx = canvas.getContext("2d");
+    ctx.scale(ratio, ratio);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#111827";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, 220);
+
+    if (prevData && prevData !== "data:,") {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, rect.width, 220);
+      };
+      img.src = prevData;
+    }
+  };
+
+  useEffect(() => {
+    if (!signatureModal.open) return;
+
+    const t = setTimeout(() => {
+      resizeSignatureCanvas();
+    }, 0);
+
+    const onResize = () => resizeSignatureCanvas();
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [signatureModal.open]);
+
+  const getCanvasPoint = (event) => {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+
+    if (event.touches && event.touches.length) {
+      return {
+        x: event.touches[0].clientX - rect.left,
+        y: event.touches[0].clientY - rect.top,
+      };
+    }
+
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (event) => {
+    if (readOnly) return;
+
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+
+    drawingRef.current = true;
+    const point = getCanvasPoint(event);
+    lastPointRef.current = point;
+
+    const ctx = canvas.getContext("2d");
+    ctx.beginPath();
+    ctx.moveTo(point.x, point.y);
+  };
+
+  const draw = (event) => {
+    if (!drawingRef.current || readOnly) return;
+
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+
+    const point = getCanvasPoint(event);
+    const ctx = canvas.getContext("2d");
+
+    ctx.beginPath();
+    ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+
+    lastPointRef.current = point;
+  };
+
+  const stopDrawing = () => {
+    drawingRef.current = false;
+  };
+
+  const clearSignatureCanvas = () => {
+    if (readOnly) return;
+
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+  };
+
+  const saveSignature = () => {
+    const field = signatureModal.field;
+    const canvas = signatureCanvasRef.current;
+    if (!field || !canvas) return;
+
+    const dataUrl = canvas.toDataURL("image/png");
+    setVal(field.id, dataUrl);
+
+    if (formFieldErrorId === field.id) {
+      clearFormFieldError();
+    }
+
+    setMsg("");
+    closeSignatureModal();
+  };
+
+  const removeSignature = (fieldId) => {
+    if (readOnly) return;
+    setVal(fieldId, "");
+
+    if (formFieldErrorId === fieldId) {
+      clearFormFieldError();
+    }
+  };
+
+  const isEmptyValue = (value, type) => {
+    if (type === "checkbox") return value !== true;
+    return value === null || value === undefined || String(value).trim() === "";
+  };
+
+  const renderBasicInput = (f) => {
+    const hasFormError = formFieldErrorId === f.id;
+
+    const commonStyle = {
+      width: "100%",
+      padding: isMobile ? 11 : 10,
+      borderRadius: 12,
+      border: hasFormError ? "1px solid #fb923c" : "1px solid #d1d5db",
+      background: readOnly ? "#f8fafc" : "#fff",
+      fontSize: isMobile ? 16 : 14,
+      color: "#111827",
+      outline: "none",
+      boxSizing: "border-box",
+      minHeight: isMobile ? 46 : "auto",
+      boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
+    };
+
+    if (f.type === "static_text") {
+      return (
+        <div
+          style={{
+            color: "#111827",
+            fontSize: isMobile ? 14 : 14,
+            lineHeight: 1.6,
+            whiteSpace: "pre-line",
+          }}
+        >
+          {f.text || ""}
+        </div>
+      );
+    }
+
+    if (f.type === "textarea") {
+      return (
+        <textarea
+          ref={(el) => {
+            formFieldRefs.current[f.id] = el;
+          }}
+          value={answers[f.id] ?? ""}
+          onChange={(e) => {
+            setVal(f.id, e.target.value);
+            if (formFieldErrorId === f.id) clearFormFieldError();
+          }}
+          rows={4}
+          disabled={readOnly}
+          style={{ ...commonStyle, resize: "vertical" }}
+        />
+      );
+    }
+
+    if (f.type === "checkbox") {
+      return (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <input
+            ref={(el) => {
+              formFieldRefs.current[f.id] = el;
+            }}
+            type="checkbox"
+            checked={!!answers[f.id]}
+            onChange={(e) => {
+              setVal(f.id, e.target.checked);
+              if (formFieldErrorId === f.id) clearFormFieldError();
+            }}
+            disabled={readOnly}
+          />
+          <span>Marcar</span>
+        </label>
+      );
+    }
+
+    if (f.type === "select" || f.type === "list") {
+      const opts = Array.isArray(f.options) ? f.options : [];
+      return (
+        <select
+          ref={(el) => {
+            formFieldRefs.current[f.id] = el;
+          }}
+          value={answers[f.id] ?? ""}
+          onChange={(e) => {
+            setVal(f.id, e.target.value);
+            if (formFieldErrorId === f.id) clearFormFieldError();
+          }}
+          disabled={readOnly}
+          style={commonStyle}
+        >
+          <option value="">-- Selecciona --</option>
+          {opts.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    if (f.type === "radio") {
+      const opts = Array.isArray(f.options) ? f.options : [];
+      return (
+        <div style={{ display: "grid", gap: 8 }}>
+          {opts.length ? (
+            opts.map((opt) => (
+              <label
+                key={opt}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: isMobile ? "10px 12px" : 0,
+                  borderRadius: isMobile ? 12 : 0,
+                  border: isMobile ? "1px solid #e5e7eb" : "none",
+                  background: isMobile ? "#fff" : "transparent",
+                }}
+              >
+                <input
+                  ref={(el) => {
+                    if (el && answers[f.id] === opt) {
+                      formFieldRefs.current[f.id] = el;
+                    } else if (el && !formFieldRefs.current[f.id]) {
+                      formFieldRefs.current[f.id] = el;
+                    }
+                  }}
+                  type="radio"
+                  name={f.id}
+                  value={opt}
+                  checked={answers[f.id] === opt}
+                  onChange={(e) => {
+                    setVal(f.id, e.target.value);
+                    if (formFieldErrorId === f.id) clearFormFieldError();
+                  }}
+                  disabled={readOnly}
+                />
+                <span>{opt}</span>
+              </label>
+            ))
+          ) : (
+            <div style={{ fontSize: 12, opacity: 0.7 }}>Sin opciones</div>
+          )}
+        </div>
+      );
+    }
+
+    if (f.type === "signature") {
+      const value = answers[f.id] || "";
+      const signatureSrc =
+        typeof value === "string" && value.startsWith("data:image")
+          ? value
+          : typeof value === "string" && value.startsWith("/storage/")
+          ? value
+          : typeof value === "string" && value !== ""
+          ? `/storage/${String(value).replace(/^\/+/, "")}`
+          : "";
+
+      return (
+        <div style={{ display: "grid", gap: 10 }}>
+          {signatureSrc ? (
+            <div
+              style={{
+                border: hasFormError ? "1px solid #fb923c" : "1px solid #d1d5db",
+                borderRadius: 12,
+                background: "#fff",
+                padding: 10,
+                boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
+              }}
+            >
+              <img
+                src={signatureSrc}
+                alt="Firma capturada"
+                style={{
+                  display: "block",
+                  maxWidth: "100%",
+                  maxHeight: 140,
+                  objectFit: "contain",
+                  margin: "0 auto",
+                }}
+              />
+            </div>
+          ) : (
+            <div
+              style={{
+                border: hasFormError ? "1px solid #fb923c" : "1px dashed #cbd5e1",
+                borderRadius: 12,
+                background: "#f8fafc",
+                padding: isMobile ? 14 : 16,
+                textAlign: "center",
+                color: "#64748b",
+                fontSize: isMobile ? 14 : 14,
+                boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
+              }}
+            >
+              Sin firma capturada
+            </div>
+          )}
+
+          {!readOnly ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                ref={(el) => {
+                  formFieldRefs.current[f.id] = el;
+                }}
+                type="button"
+                onClick={() => openSignatureModal(f)}
+                style={{
+                  borderRadius: 12,
+                  border: hasFormError ? "1px solid #fb923c" : "1px solid #c7d2fe",
+                  background: hasFormError ? "#fff7ed" : "#eef2ff",
+                  color: hasFormError ? "#9a3412" : "#1e40af",
+                  padding: isMobile ? "10px 14px" : "10px 12px",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: isMobile ? 14 : 14,
+                  boxShadow: hasFormError ? "0 0 0 3px rgba(251,146,60,0.12)" : "none",
+                }}
+              >
+                {value ? "Volver a firmar" : "Capturar firma"}
+              </button>
+
+              {value ? (
+                <button
+                  type="button"
+                  onClick={() => removeSignature(f.id)}
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid #fecaca",
+                    background: "#fef2f2",
+                    color: "#b91c1c",
+                    padding: isMobile ? "10px 14px" : "10px 12px",
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    fontSize: isMobile ? 14 : 14,
+                  }}
+                >
+                  Eliminar firma
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
+    const htmlType =
+      f.type === "number"
+        ? "number"
+        : f.type === "date"
+        ? "date"
+        : f.type === "datetime"
+        ? "datetime-local"
+        : "text";
+
+    return (
+      <input
+        ref={(el) => {
+          formFieldRefs.current[f.id] = el;
+        }}
+        type={htmlType}
+        value={answers[f.id] ?? ""}
+        onChange={(e) => {
+          setVal(f.id, e.target.value);
+          if (formFieldErrorId === f.id) clearFormFieldError();
+        }}
+        disabled={readOnly}
+        style={commonStyle}
+      />
+    );
+  };
+
+  const renderField = (f) => {
+    if (f.type === "fixed_image") {
+      const url = f.url || "";
+      if (!url) return null;
+
+      return (
+        <div style={{ textAlign: "center" }}>
+          <img
+            src={url}
+            alt={f.label || "Imagen"}
+            style={{
+              maxWidth: "100%",
+              width: isMobile ? 250 : 420,
+              borderRadius: 10,
+            }}
+          />
+        </div>
+      );
+    }
+
+    return renderBasicInput(f);
+  };
+
   const topButtonStyle = {
     borderRadius: 12,
     border: "1px solid #d1d5db",
@@ -616,67 +766,198 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
     gap: 12,
   };
 
+  const getOuterFieldBlockStyle = (fieldId) => {
+    const hasError = formFieldErrorId === fieldId;
+
+    return {
+      ...fieldBlockStyle,
+      padding: hasError ? "10px" : fieldBlockStyle.padding,
+      borderRadius: hasError ? 12 : fieldBlockStyle.borderRadius,
+      background: hasError ? "#fff7ed" : fieldBlockStyle.background,
+      border: hasError ? "1px solid #fdba74" : fieldBlockStyle.border,
+      transition: "all 0.2s ease",
+    };
+  };
+
+  const getInnerFieldBlockStyle = (fieldId) => {
+    const hasError = formFieldErrorId === fieldId;
+
+    return {
+      display: "grid",
+      gap: 6,
+      padding: hasError ? "10px" : 0,
+      borderRadius: 12,
+      background: hasError ? "#fff7ed" : "transparent",
+      border: hasError ? "1px solid #fdba74" : "1px solid transparent",
+      transition: "all 0.2s ease",
+    };
+  };
+
+  const renderFieldErrorMessage = (fieldId) => {
+    if (formFieldErrorId !== fieldId || !formFieldError) return null;
+
+    return (
+      <div
+        style={{
+          borderRadius: 10,
+          border: "1px solid #fdba74",
+          background: "#fff7ed",
+          color: "#9a3412",
+          padding: "8px 10px",
+          fontSize: 13,
+          lineHeight: 1.4,
+          fontWeight: 700,
+        }}
+      >
+        {formFieldError}
+      </div>
+    );
+  };
+
+  const renderOuterRequiredField = (f) => {
+    if (!f) return null;
+
+    return (
+      <div
+        ref={(el) => {
+          formFieldWrapRefs.current[f.id] = el;
+        }}
+        style={getOuterFieldBlockStyle(f.id)}
+      >
+        <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
+          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+        </label>
+
+        {renderFieldErrorMessage(f.id)}
+        {renderField(f)}
+      </div>
+    );
+  };
+
+  const renderInnerRequiredField = (f, labelText) => {
+    if (!f) return null;
+
+    return (
+      <div
+        ref={(el) => {
+          formFieldWrapRefs.current[f.id] = el;
+        }}
+        style={getInnerFieldBlockStyle(f.id)}
+      >
+        <label style={{ fontSize: 14, color: "#0f172a", lineHeight: 1.4 }}>
+          <b>{labelText || f.label}</b> <span style={{ color: "crimson" }}>*</span>
+        </label>
+
+        {renderFieldErrorMessage(f.id)}
+        {renderField(f)}
+      </div>
+    );
+  };
+
+  const validateSimpleRequiredField = (field, emptyMessage = null) => {
+    if (!field) return false;
+
+    const value = answers[field.id];
+
+    if (field.type === "signature") {
+      if (!value || String(value).trim() === "") {
+        showFormFieldError(field.id, emptyMessage || `Falta responder: ${field.label}`);
+        return false;
+      }
+      return true;
+    }
+
+    if (isEmptyValue(value, field.type)) {
+      showFormFieldError(field.id, emptyMessage || `Falta responder: ${field.label}`);
+      return false;
+    }
+
+    if (
+      field.type === "select" ||
+      field.type === "list" ||
+      field.type === "radio"
+    ) {
+      const opts = Array.isArray(field.options) ? field.options : [];
+      if (opts.length && !opts.includes(value)) {
+        showFormFieldError(
+          field.id,
+          `Selecciona una opción válida para: ${field.label}`
+        );
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const validateBeforeSubmit = () => {
-    if (!taller || String(answers[taller.id] ?? "").trim() === "") {
-      setMsg("Debes seleccionar el Taller.");
-      scrollToTopSafe();
-      return false;
-    }
+    clearFormFieldError();
+    setMsg("");
 
-    if (!nombreInspector || String(answers[nombreInspector.id] ?? "").trim() === "") {
-      setMsg("Debes capturar el Nombre del inspector.");
-      scrollToTopSafe();
+    if (!validateSimpleRequiredField(taller, "Debes seleccionar el Taller.")) {
       return false;
     }
 
     if (
-      !firmaInspector ||
-      !answers[firmaInspector.id] ||
-      String(answers[firmaInspector.id]).trim() === ""
+      !validateSimpleRequiredField(
+        nombreInspector,
+        "Debes capturar el Nombre del inspector."
+      )
     ) {
-      setMsg("Debes capturar la Firma del inspector.");
-      scrollToTopSafe();
-      return false;
-    }
-
-    if (!nombreSupervisor || String(answers[nombreSupervisor.id] ?? "").trim() === "") {
-      setMsg("Debes capturar el Nombre del supervisor.");
-      scrollToTopSafe();
       return false;
     }
 
     if (
-      !firmaSupervisor ||
-      !answers[firmaSupervisor.id] ||
-      String(answers[firmaSupervisor.id]).trim() === ""
+      !validateSimpleRequiredField(
+        firmaInspector,
+        "Debes capturar la Firma del inspector."
+      )
     ) {
-      setMsg("Debes capturar la Firma del supervisor.");
-      scrollToTopSafe();
       return false;
     }
 
-    if (!numeroSerie || String(answers[numeroSerie.id] ?? "").trim() === "") {
-      setMsg("Debes capturar el No. de Serie.");
-      scrollToTopSafe();
+    if (
+      !validateSimpleRequiredField(
+        nombreSupervisor,
+        "Debes capturar el Nombre del supervisor."
+      )
+    ) {
       return false;
     }
 
-    if (!tipoModelo || String(answers[tipoModelo.id] ?? "").trim() === "") {
-      setMsg("Debes capturar el Tipo y modelo de maquina.");
-      scrollToTopSafe();
+    if (
+      !validateSimpleRequiredField(
+        firmaSupervisor,
+        "Debes capturar la Firma del supervisor."
+      )
+    ) {
+      return false;
+    }
+
+    if (!validateSimpleRequiredField(numeroSerie, "Debes capturar el No. de Serie.")) {
+      return false;
+    }
+
+    if (
+      !validateSimpleRequiredField(
+        tipoModelo,
+        "Debes capturar el Tipo y modelo de maquina."
+      )
+    ) {
       return false;
     }
 
     for (const item of checklistItems) {
-      if (!item.status || String(answers[item.status.id] ?? "").trim() === "") {
-        setMsg(`Debes responder: ${item.label}.`);
-        scrollToTopSafe();
+      if (!validateSimpleRequiredField(item.status, `Debes responder: ${item.label}.`)) {
         return false;
       }
 
-      if (!item.obs || String(answers[item.obs.id] ?? "").trim() === "") {
-        setMsg(`Debes capturar las observaciones de: ${item.label}.`);
-        scrollToTopSafe();
+      if (
+        !validateSimpleRequiredField(
+          item.obs,
+          `Debes capturar las observaciones de: ${item.label}.`
+        )
+      ) {
         return false;
       }
     }
@@ -987,50 +1268,11 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
               ))}
             </div>
 
-            {taller ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{taller.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(taller)}
-              </div>
-            ) : null}
-
-            {nombreInspector ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{nombreInspector.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(nombreInspector)}
-              </div>
-            ) : null}
-
-            {firmaInspector ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{firmaInspector.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(firmaInspector)}
-              </div>
-            ) : null}
-
-            {nombreSupervisor ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{nombreSupervisor.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(nombreSupervisor)}
-              </div>
-            ) : null}
-
-            {firmaSupervisor ? (
-              <div style={fieldBlockStyle}>
-                <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-                  <b>{firmaSupervisor.label}</b> <span style={{ color: "crimson" }}>*</span>
-                </label>
-                {renderField(firmaSupervisor)}
-              </div>
-            ) : null}
+            {renderOuterRequiredField(taller)}
+            {renderOuterRequiredField(nombreInspector)}
+            {renderOuterRequiredField(firmaInspector)}
+            {renderOuterRequiredField(nombreSupervisor)}
+            {renderOuterRequiredField(firmaSupervisor)}
 
             {indicacionesToggle ? (
               <div
@@ -1099,53 +1341,16 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
                       </div>
                     ) : null}
 
-                    {numeroSerie ? (
-                      <div style={fieldBlockStyle}>
-                        <label style={{ fontSize: 14, color: "#0f172a", lineHeight: 1.4 }}>
-                          <b>{numeroSerie.label}</b> <span style={{ color: "crimson" }}>*</span>
-                        </label>
-                        {renderField(numeroSerie)}
-                      </div>
-                    ) : null}
-
-                    {tipoModelo ? (
-                      <div style={fieldBlockStyle}>
-                        <label style={{ fontSize: 14, color: "#0f172a", lineHeight: 1.4 }}>
-                          <b>{tipoModelo.label}</b> <span style={{ color: "crimson" }}>*</span>
-                        </label>
-                        {renderField(tipoModelo)}
-                      </div>
-                    ) : null}
+                    {renderInnerRequiredField(numeroSerie)}
+                    {renderInnerRequiredField(tipoModelo)}
 
                     <div style={{ display: "grid", gap: 14 }}>
                       {checklistItems.map((item) => (
                         <div key={item.key} style={itemCardStyle}>
-                          <div
-                            style={{
-                              fontWeight: 800,
-                              color: "#0f172a",
-                              lineHeight: 1.45,
-                              fontSize: isMobile ? 14 : 14,
-                            }}
-                          >
-                            {item.label} <span style={{ color: "crimson" }}>*</span>
-                          </div>
-
-                          {item.status ? renderField(item.status) : null}
+                          {renderInnerRequiredField(item.status, item.label)}
 
                           {item.obs ? (
-                            <div style={{ display: "grid", gap: 6 }}>
-                              <label
-                                style={{
-                                  fontSize: 14,
-                                  color: "#0f172a",
-                                  lineHeight: 1.4,
-                                }}
-                              >
-                                <b>Observaciones</b> <span style={{ color: "crimson" }}>*</span>
-                              </label>
-                              {renderField(item.obs)}
-                            </div>
+                            renderInnerRequiredField(item.obs, "Observaciones")
                           ) : null}
                         </div>
                       ))}
