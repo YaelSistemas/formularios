@@ -258,6 +258,7 @@ export default function FormsIndex() {
   });
 
   const token = useMemo(() => localStorage.getItem("token"), []);
+  const currentUserId = Number(me?.id || 0);
 
   const permissionSet = useMemo(() => {
     const raw = me?.permissions;
@@ -408,6 +409,35 @@ export default function FormsIndex() {
     setErr(e?.message || fallback);
   };
 
+  const warmOfflineData = async (rows) => {
+    if (!navigator.onLine) return;
+    if (!currentUserId) return;
+
+    for (const form of rows) {
+      try {
+        const detailData = await apiGet(`/forms/${form.id}`);
+        const detailForm = detailData?.form || null;
+        if (detailForm) {
+          await cacheFormDetail(currentUserId, detailForm);
+        }
+      } catch {
+        // ignore
+      }
+
+      if (canViewSubmissions) {
+        try {
+          const subsData = await apiGet(`/forms/${form.id}/submissions`);
+          const subsRows = Array.isArray(subsData?.submissions)
+            ? subsData.submissions
+            : [];
+          await cacheFormSubmissions(currentUserId, form.id, subsRows);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  };
+
   const loadForms = async () => {
     setErr("");
     setLoadingForms(true);
@@ -419,9 +449,10 @@ export default function FormsIndex() {
       setForms(rows);
       setOfflineMode(false);
 
-      await cacheFormsCatalog(rows);
+      await cacheFormsCatalog(currentUserId, rows);
+      warmOfflineData(rows).catch(() => null);
     } catch (e) {
-      const cached = await getCachedFormsCatalog();
+      const cached = await getCachedFormsCatalog(currentUserId);
 
       if (cached.length > 0) {
         setForms(cached);
@@ -448,10 +479,10 @@ export default function FormsIndex() {
       setOfflineMode(false);
 
       if (form) {
-        await cacheFormDetail(form);
+        await cacheFormDetail(currentUserId, form);
       }
     } catch (e) {
-      const cached = await getCachedFormDetail(id);
+      const cached = await getCachedFormDetail(currentUserId, id);
 
       if (cached) {
         setDetail(cached);
@@ -477,9 +508,9 @@ export default function FormsIndex() {
       setSubs(rows);
       setOfflineMode(false);
 
-      await cacheFormSubmissions(id, rows);
+      await cacheFormSubmissions(currentUserId, id, rows);
     } catch (e) {
-      const cached = await getCachedFormSubmissions(id);
+      const cached = await getCachedFormSubmissions(currentUserId, id);
 
       if (cached.length > 0) {
         setSubs(cached);
@@ -494,11 +525,6 @@ export default function FormsIndex() {
   };
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
     (async () => {
       setLoading(true);
 

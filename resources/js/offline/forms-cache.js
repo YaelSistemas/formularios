@@ -4,48 +4,115 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export async function cacheFormsCatalog(forms = []) {
+function normalizeUserId(userId) {
+  return Number(userId || 0);
+}
+
+// ==========================
+// CATÁLOGO
+// ==========================
+export async function cacheFormsCatalog(userId, forms = []) {
+  const uid = normalizeUserId(userId);
+  if (!uid) return;
+
   const rows = Array.isArray(forms) ? forms : [];
 
   await db.transaction("rw", db.forms_catalog, async () => {
-    await db.forms_catalog.clear();
+    const existing = await db.forms_catalog
+      .where("user_id")
+      .equals(uid)
+      .toArray();
+
+    for (const row of existing) {
+      await db.forms_catalog.delete(row.id);
+    }
 
     for (const form of rows) {
       if (!form?.id) continue;
 
-      await db.forms_catalog.put({
-        ...form,
+      await db.forms_catalog.add({
+        user_id: uid,
+        form_id: Number(form.id),
+        name: form.title || form.name || `Formulario ${form.id}`,
+        form,
         updated_at: nowIso(),
       });
     }
   });
 }
 
-export async function getCachedFormsCatalog() {
-  return db.forms_catalog.orderBy("name").toArray();
+export async function getCachedFormsCatalog(userId) {
+  const uid = normalizeUserId(userId);
+  if (!uid) return [];
+
+  const rows = await db.forms_catalog
+    .where("user_id")
+    .equals(uid)
+    .toArray();
+
+  return rows
+    .map((r) => r.form)
+    .filter(Boolean)
+    .sort((a, b) =>
+      String(a.title || "").localeCompare(String(b.title || ""))
+    );
 }
 
-export async function cacheFormDetail(form) {
-  if (!form?.id) return;
+// ==========================
+// DETALLE
+// ==========================
+export async function cacheFormDetail(userId, form) {
+  const uid = normalizeUserId(userId);
+  if (!uid || !form?.id) return;
 
-  await db.form_details.put({
-    id: form.id,
+  const existing = await db.form_details
+    .where("[user_id+form_id]")
+    .equals([uid, Number(form.id)])
+    .first();
+
+  if (existing?.id) {
+    await db.form_details.update(existing.id, {
+      form,
+      updated_at: nowIso(),
+    });
+    return;
+  }
+
+  await db.form_details.add({
+    user_id: uid,
+    form_id: Number(form.id),
     form,
     updated_at: nowIso(),
   });
 }
 
-export async function getCachedFormDetail(id) {
-  const row = await db.form_details.get(Number(id));
+export async function getCachedFormDetail(userId, formId) {
+  const uid = normalizeUserId(userId);
+  if (!uid) return null;
+
+  const row = await db.form_details
+    .where("[user_id+form_id]")
+    .equals([uid, Number(formId)])
+    .first();
+
   return row?.form || null;
 }
 
-export async function cacheFormSubmissions(formId, submissions = []) {
-  const numericFormId = Number(formId);
+// ==========================
+// SUBMISSIONS
+// ==========================
+export async function cacheFormSubmissions(userId, formId, submissions = []) {
+  const uid = normalizeUserId(userId);
+  const fid = Number(formId);
+  if (!uid || !fid) return;
+
   const rows = Array.isArray(submissions) ? submissions : [];
 
   await db.transaction("rw", db.form_submissions, async () => {
-    const existing = await db.form_submissions.where("form_id").equals(numericFormId).toArray();
+    const existing = await db.form_submissions
+      .where("[user_id+form_id]")
+      .equals([uid, fid])
+      .toArray();
 
     for (const row of existing) {
       if (row.pending_sync) continue;
@@ -53,8 +120,9 @@ export async function cacheFormSubmissions(formId, submissions = []) {
     }
 
     for (const sub of rows) {
-      await db.form_submissions.put({
-        form_id: numericFormId,
+      await db.form_submissions.add({
+        user_id: uid,
+        form_id: fid,
         remote_id: sub.id ?? null,
         local_uuid: null,
         consecutive: sub.consecutive ?? null,
@@ -68,39 +136,58 @@ export async function cacheFormSubmissions(formId, submissions = []) {
   });
 }
 
-export async function getCachedFormSubmissions(formId) {
+export async function getCachedFormSubmissions(userId, formId) {
+  const uid = normalizeUserId(userId);
+  if (!uid) return [];
+
   const rows = await db.form_submissions
-    .where("form_id")
-    .equals(Number(formId))
-    .reverse()
-    .sortBy("created_at");
+    .where("[user_id+form_id]")
+    .equals([uid, Number(formId)])
+    .toArray();
 
-  return rows.map((row) => {
-    if (row.submission) return row.submission;
+  return rows
+    .sort((a, b) =>
+      String(b.created_at || "").localeCompare(String(a.created_at || ""))
+    )
+    .map((row) => {
+      if (row.submission) return row.submission;
 
-    return {
-      id: row.remote_id ?? row.local_uuid,
-      consecutive: row.consecutive ?? "Pendiente",
-      answers: row.answers ?? {},
-      created_at: row.created_at,
-      offline_pending: !!row.pending_sync,
-      synced: !!row.synced,
-    };
-  });
+      return {
+        id: row.remote_id ?? row.local_uuid,
+        consecutive: row.consecutive ?? "Pendiente",
+        answers: row.answers ?? {},
+        created_at: row.created_at,
+        offline_pending: !!row.pending_sync,
+        synced: !!row.synced,
+      };
+    });
 }
 
-export async function saveOfflineSubmission(form, answers, localUuid = null) {
+// ==========================
+// GUARDAR OFFLINE
+// ==========================
+export async function saveOfflineSubmission(
+  userId,
+  form,
+  answers,
+  localUuid = null
+) {
+  const uid = normalizeUserId(userId);
   const formId = Number(form?.id);
-  if (!formId) return;
 
-  await db.form_submissions.put({
+  if (!uid || !formId) return;
+
+  const uuid = localUuid || `local_${Date.now()}`;
+
+  await db.form_submissions.add({
+    user_id: uid,
     form_id: formId,
     remote_id: null,
-    local_uuid: localUuid || `local_${Date.now()}`,
+    local_uuid: uuid,
     consecutive: "Pendiente",
     answers: { ...(answers || {}) },
     submission: {
-      id: localUuid || `local_${Date.now()}`,
+      id: uuid,
       consecutive: "Pendiente",
       answers: { ...(answers || {}) },
       created_at: nowIso(),

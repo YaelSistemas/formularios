@@ -48,6 +48,8 @@ export default function FormFill({
     }
   });
 
+  const currentUserId = Number(me?.id || 0);
+
   const permissionSet = useMemo(() => {
     const raw = me?.permissions;
     if (!Array.isArray(raw)) return new Set();
@@ -379,7 +381,7 @@ export default function FormFill({
         try {
           const localUuid = await enqueue("form_submission", offlinePayload);
 
-          await saveOfflineSubmission(form, answers, localUuid);
+          await saveOfflineSubmission(currentUserId, form, answers, localUuid);
           
           setMsg("");
           resetForm();

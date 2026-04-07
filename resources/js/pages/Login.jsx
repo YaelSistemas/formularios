@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { apiLogin, apiMe } from "../services/api";
+import {
+  clearOfflineSession,
+  getOfflineUser,
+  saveOfflineSession,
+} from "../offline/session";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -70,6 +75,7 @@ export default function Login() {
   const clearSession = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    clearOfflineSession();
   };
 
   const getRedirectPath = () => {
@@ -79,7 +85,18 @@ export default function Login() {
   useEffect(() => {
     (async () => {
       const token = localStorage.getItem("token");
-      if (!token) return;
+
+      if (!token) {
+        if (!navigator.onLine) {
+          const offlineUser = getOfflineUser();
+          if (offlineUser?.id) {
+            localStorage.setItem("user", JSON.stringify(offlineUser));
+            window.location.href = "/forms";
+            return;
+          }
+        }
+        return;
+      }
 
       try {
         const data = await apiMe();
@@ -92,8 +109,18 @@ export default function Login() {
         }
 
         localStorage.setItem("user", JSON.stringify(user));
+        saveOfflineSession(user);
         window.location.href = getRedirectPath();
       } catch {
+        if (!navigator.onLine) {
+          const offlineUser = getOfflineUser();
+          if (offlineUser?.id) {
+            localStorage.setItem("user", JSON.stringify(offlineUser));
+            window.location.href = "/forms";
+            return;
+          }
+        }
+
         clearSession();
       }
     })();
@@ -118,6 +145,7 @@ export default function Login() {
 
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
+      saveOfflineSession(user);
       window.location.href = getRedirectPath();
     } catch (ex) {
       clearSession();
@@ -143,98 +171,94 @@ export default function Login() {
       background: "#fff",
       border: "1px solid #e4e4e7",
       borderRadius: 8,
-      boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+      boxShadow: "0 2px 8px rgba(0,0,0,.04)",
       padding: 24,
     },
-    logoWrap: { display: "flex", justifyContent: "center", marginBottom: 18 },
-    logo: { height: 64, width: "auto", objectFit: "contain" },
+    title: {
+      margin: 0,
+      marginBottom: 8,
+      fontSize: 24,
+      lineHeight: 1.2,
+      color: "#18181b",
+      fontWeight: 700,
+    },
+    subtitle: {
+      margin: 0,
+      marginBottom: 20,
+      color: "#52525b",
+      fontSize: 14,
+    },
     label: {
       display: "block",
-      fontSize: 13,
-      fontWeight: 600,
-      color: "#3f3f46",
       marginBottom: 6,
+      color: "#27272a",
+      fontSize: 14,
+      fontWeight: 600,
     },
     input: {
       width: "100%",
-      borderRadius: 6,
+      boxSizing: "border-box",
       border: "1px solid #d4d4d8",
-      background: "#f8fafc",
-      padding: "10px 12px",
-      outline: "none",
+      borderRadius: 8,
+      padding: "12px 14px",
       fontSize: 14,
+      outline: "none",
+      background: "#fff",
+      color: "#18181b",
+      marginBottom: 14,
     },
-    err: {
-      marginBottom: 12,
-      borderRadius: 6,
-      border: "1px solid #fecaca",
+    button: {
+      width: "100%",
+      border: 0,
+      borderRadius: 8,
+      padding: "12px 14px",
+      background: loading ? "#94a3b8" : "#2563eb",
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: loading ? "not-allowed" : "pointer",
+    },
+    error: {
+      marginBottom: 14,
+      padding: 12,
+      borderRadius: 8,
       background: "#fef2f2",
       color: "#b91c1c",
-      padding: "8px 10px",
-      fontSize: 13,
-      lineHeight: 1.5,
+      border: "1px solid #fecaca",
+      fontSize: 14,
     },
-    row: { marginBottom: 12 },
-    actions: { display: "flex", justifyContent: "flex-end", paddingTop: 8 },
-    btn: {
-      border: "none",
-      borderRadius: 6,
-      background: "#1f2937",
-      color: "#fff",
-      padding: "10px 16px",
-      fontSize: 13,
-      fontWeight: 700,
-      cursor: "pointer",
-      letterSpacing: 0.3,
-    },
-    btnDisabled: { opacity: 0.6, cursor: "not-allowed" },
   };
 
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={styles.logoWrap}>
-          <img src="/images/Logo-vysisa.png" alt="VYSISA" style={styles.logo} />
-        </div>
+      <form onSubmit={onSubmit} style={styles.card}>
+        <h1 style={styles.title}>Iniciar sesión</h1>
+        <p style={styles.subtitle}>Accede a tus formularios asignados.</p>
 
-        {err ? <div style={styles.err}>{err}</div> : null}
+        {err ? <div style={styles.error}>{err}</div> : null}
 
-        <form onSubmit={onSubmit}>
-          <div style={styles.row}>
-            <label style={styles.label}>Correo electrónico</label>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              placeholder="correo@empresa.com"
-              style={styles.input}
-            />
-          </div>
+        <label style={styles.label}>Correo</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username"
+          style={styles.input}
+        />
 
-          <div style={styles.row}>
-            <label style={styles.label}>Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              style={styles.input}
-            />
-          </div>
+        <label style={styles.label}>Contraseña</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          style={styles.input}
+        />
 
-          <div style={styles.actions}>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{ ...styles.btn, ...(loading ? styles.btnDisabled : {}) }}
-            >
-              {loading ? "INICIANDO..." : "INICIAR SESIÓN"}
-            </button>
-          </div>
-        </form>
-      </div>
+        <button type="submit" disabled={loading} style={styles.button}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
+      </form>
     </div>
   );
 }

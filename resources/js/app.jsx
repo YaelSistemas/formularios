@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { setupAutoSync } from "./offline/sync";
+import { getOfflineUser } from "./offline/session";
 
 import Login from "./pages/Login";
 
@@ -77,10 +78,26 @@ function hasPermission(user, permission) {
   return permissions.includes(permission);
 }
 
+function canEnterOffline() {
+  if (typeof navigator !== "undefined" && navigator.onLine) return false;
+  const offlineUser = getOfflineUser();
+  return !!offlineUser?.id;
+}
+
 function RequireAuth({ children }) {
   const token = localStorage.getItem("token");
-  if (!token) return <Navigate to="/login" replace />;
-  return children;
+
+  if (token) return children;
+
+  if (canEnterOffline()) {
+    const offlineUser = getOfflineUser();
+    if (offlineUser) {
+      localStorage.setItem("user", JSON.stringify(offlineUser));
+    }
+    return children;
+  }
+
+  return <Navigate to="/login" replace />;
 }
 
 function RequireAdminPanelAccess({ children }) {
