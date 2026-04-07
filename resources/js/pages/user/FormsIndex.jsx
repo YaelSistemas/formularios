@@ -1,6 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiDelete, apiGet } from "../../services/api";
 import FormFill from "./FormFill";
+import {
+  cacheFormsCatalog,
+  getCachedFormsCatalog,
+  cacheFormDetail,
+  getCachedFormDetail,
+  cacheFormSubmissions,
+  getCachedFormSubmissions,
+} from "../../offline/forms-cache";
 
 function Card({ children, style }) {
   return (
@@ -198,6 +206,7 @@ export default function FormsIndex() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const [forms, setForms] = useState([]);
   const [loadingForms, setLoadingForms] = useState(false);
@@ -402,11 +411,25 @@ export default function FormsIndex() {
   const loadForms = async () => {
     setErr("");
     setLoadingForms(true);
+
     try {
       const data = await apiGet("/forms");
-      setForms(Array.isArray(data?.forms) ? data.forms : []);
+      const rows = Array.isArray(data?.forms) ? data.forms : [];
+
+      setForms(rows);
+      setOfflineMode(false);
+
+      await cacheFormsCatalog(rows);
     } catch (e) {
-      setAuthError(e, "Error cargando formularios");
+      const cached = await getCachedFormsCatalog();
+
+      if (cached.length > 0) {
+        setForms(cached);
+        setOfflineMode(true);
+        setErr("");
+      } else {
+        setAuthError(e, "Error cargando formularios");
+      }
     } finally {
       setLoadingForms(false);
     }
@@ -416,11 +439,27 @@ export default function FormsIndex() {
     setErr("");
     setLoadingDetail(true);
     setDetail(null);
+
     try {
       const data = await apiGet(`/forms/${id}`);
-      setDetail(data?.form || null);
+      const form = data?.form || null;
+
+      setDetail(form);
+      setOfflineMode(false);
+
+      if (form) {
+        await cacheFormDetail(form);
+      }
     } catch (e) {
-      setAuthError(e, "Error cargando detalle");
+      const cached = await getCachedFormDetail(id);
+
+      if (cached) {
+        setDetail(cached);
+        setOfflineMode(true);
+        setErr("");
+      } else {
+        setAuthError(e, "Error cargando detalle");
+      }
     } finally {
       setLoadingDetail(false);
     }
@@ -430,11 +469,25 @@ export default function FormsIndex() {
     setErr("");
     setLoadingSubs(true);
     setSubs([]);
+
     try {
       const data = await apiGet(`/forms/${id}/submissions`);
-      setSubs(Array.isArray(data?.submissions) ? data.submissions : []);
+      const rows = Array.isArray(data?.submissions) ? data.submissions : [];
+
+      setSubs(rows);
+      setOfflineMode(false);
+
+      await cacheFormSubmissions(id, rows);
     } catch (e) {
-      setAuthError(e, "Error cargando registros");
+      const cached = await getCachedFormSubmissions(id);
+
+      if (cached.length > 0) {
+        setSubs(cached);
+        setOfflineMode(true);
+        setErr("");
+      } else {
+        setAuthError(e, "Error cargando registros");
+      }
     } finally {
       setLoadingSubs(false);
     }
@@ -516,6 +569,32 @@ export default function FormsIndex() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [canViewSubmissions]);
+
+  useEffect(() => {
+    const onSyncComplete = async () => {
+      if (!navigator.onLine) return;
+
+      if (mode === "table") {
+        await loadForms();
+      }
+
+      if (selectedId) {
+        if (!detail) {
+          await loadDetail(selectedId);
+        }
+
+        if (canViewSubmissions) {
+          await loadSubmissions(selectedId);
+        }
+      }
+    };
+
+    window.addEventListener("offline-sync-complete", onSyncComplete);
+
+    return () => {
+      window.removeEventListener("offline-sync-complete", onSyncComplete);
+    };
+  }, [selectedId, mode, canViewSubmissions, detail]);
 
   const onFill = async (id) => {
     setMobileActions({ open: false, form: null });
@@ -657,7 +736,9 @@ export default function FormsIndex() {
       }
 
       await loadSubmissions(selectedId);
-      setSuccessMsg(`El registro ${submission.consecutive ?? submission.id} se eliminó correctamente.`);
+      setSuccessMsg(
+        `El registro ${submission.consecutive ?? submission.id} se eliminó correctamente.`
+      );
     } catch (e) {
       setAuthError(e, "Error eliminando registro");
     }
@@ -1253,6 +1334,22 @@ export default function FormsIndex() {
           </div>
         </div>
 
+        {offlineMode ? (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid #fdba74",
+              background: "#fff7ed",
+              color: "#9a3412",
+              fontWeight: 800,
+            }}
+          >
+            Estás viendo datos guardados en el dispositivo (modo offline).
+          </div>
+        ) : null}
+
         {err ? (
           <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 800 }}>
             {err}
@@ -1280,7 +1377,13 @@ export default function FormsIndex() {
       {mode === "table" ? (
         isMobile ? (
           <div style={{ display: "grid", gap: 12 }}>
-            {filteredForms.length ? (
+            {loadingForms ? (
+              <Card>
+                <div style={{ padding: "4px 0", color: "#64748b" }}>
+                  Cargando formularios...
+                </div>
+              </Card>
+            ) : filteredForms.length ? (
               filteredForms.map((f) => (
                 <Card
                   key={f.id}
@@ -1360,7 +1463,13 @@ export default function FormsIndex() {
           </div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
-            {filteredForms.length ? (
+            {loadingForms ? (
+              <Card>
+                <div style={{ padding: "4px 0", color: "#64748b" }}>
+                  Cargando formularios...
+                </div>
+              </Card>
+            ) : filteredForms.length ? (
               filteredForms.map((f) => (
                 <Card
                   key={f.id}
@@ -1449,7 +1558,7 @@ export default function FormsIndex() {
             ) : filteredSubs.length ? (
               filteredSubs.map((s) => (
                 <Card
-                  key={s.id}
+                  key={s.id || s.local_uuid || `${s.consecutive}-${s.created_at}`}
                   style={{
                     borderRadius: 16,
                     boxShadow: "0 6px 18px rgba(15,23,42,0.05)",
@@ -1492,6 +1601,24 @@ export default function FormsIndex() {
                         </div>
                       </div>
 
+                      {(s.offline_pending || s.pending_sync) ? (
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            width: "fit-content",
+                            padding: "4px 10px",
+                            borderRadius: 999,
+                            border: "1px solid #fdba74",
+                            background: "#fff7ed",
+                            color: "#9a3412",
+                            fontSize: 12,
+                            fontWeight: 800,
+                          }}
+                        >
+                          Pendiente de sincronizar
+                        </div>
+                      ) : null}
+
                       <div style={{ fontSize: 13, color: "#334155" }}>
                         <b>Usuario:</b> {getSubmissionUserName(s)}
                       </div>
@@ -1521,6 +1648,7 @@ export default function FormsIndex() {
                               padding: "9px 12px",
                               fontSize: 13,
                             }}
+                            disabled={!s?.id}
                           >
                             <i className="fa-solid fa-clock-rotate-left" />
                             Ver historial
@@ -1638,7 +1766,7 @@ export default function FormsIndex() {
                   </thead>
                   <tbody>
                     {filteredSubs.map((s) => (
-                      <tr key={s.id}>
+                      <tr key={s.id || s.local_uuid || `${s.consecutive}-${s.created_at}`}>
                         <td
                           style={{
                             padding: "12px 10px",
@@ -1649,7 +1777,32 @@ export default function FormsIndex() {
                             verticalAlign: "middle",
                           }}
                         >
-                          Registro {s.consecutive ?? s.id}
+                          <div
+                            style={{
+                              display: "grid",
+                              gap: 6,
+                              justifyItems: "center",
+                            }}
+                          >
+                            <div>Registro {s.consecutive ?? s.id}</div>
+
+                            {(s.offline_pending || s.pending_sync) ? (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  padding: "4px 10px",
+                                  borderRadius: 999,
+                                  border: "1px solid #fdba74",
+                                  background: "#fff7ed",
+                                  color: "#9a3412",
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                Pendiente de sincronizar
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
                         <td
                           style={{
@@ -1704,6 +1857,7 @@ export default function FormsIndex() {
                                 padding: "8px 12px",
                                 fontSize: 13,
                               }}
+                              disabled={!s?.id}
                             >
                               <i className="fa-solid fa-clock-rotate-left" />
                               Historial
@@ -1739,7 +1893,7 @@ export default function FormsIndex() {
                               </IconBtn>
                             ) : null}
 
-                            {canViewSubmissions ? (
+                            {canViewSubmissions && s?.id ? (
                               <IconBtn
                                 type="button"
                                 title="Ver/Descargar PDF"
@@ -1750,7 +1904,7 @@ export default function FormsIndex() {
                               </IconBtn>
                             ) : null}
 
-                            {canEditSubmission ? (
+                            {canEditSubmission && s?.id ? (
                               <IconBtn
                                 type="button"
                                 title="Editar registro"
@@ -1761,7 +1915,7 @@ export default function FormsIndex() {
                               </IconBtn>
                             ) : null}
 
-                            {canDeleteSubmission ? (
+                            {canDeleteSubmission && s?.id ? (
                               <IconBtn
                                 type="button"
                                 title="Eliminar registro"
@@ -1936,7 +2090,9 @@ export default function FormsIndex() {
                   lineHeight: 1.4,
                 }}
               >
-                Registro {mobileSubmissionActions.submission.consecutive ?? mobileSubmissionActions.submission.id}
+                Registro{" "}
+                {mobileSubmissionActions.submission.consecutive ??
+                  mobileSubmissionActions.submission.id}
               </div>
               <div
                 style={{
@@ -1962,6 +2118,7 @@ export default function FormsIndex() {
                     openHistoryModal(submission);
                   }}
                   style={{ justifyContent: "center", width: "100%" }}
+                  disabled={!mobileSubmissionActions.submission?.id}
                 >
                   <i className="fa-solid fa-clock-rotate-left" />
                   Ver historial
@@ -1982,7 +2139,7 @@ export default function FormsIndex() {
                 </Btn>
               ) : null}
 
-              {canViewSubmissions ? (
+              {canViewSubmissions && mobileSubmissionActions.submission?.id ? (
                 <Btn
                   type="button"
                   variant="danger"
@@ -1996,7 +2153,7 @@ export default function FormsIndex() {
                 </Btn>
               ) : null}
 
-              {canEditSubmission ? (
+              {canEditSubmission && mobileSubmissionActions.submission?.id ? (
                 <Btn
                   type="button"
                   variant="success"
@@ -2010,7 +2167,7 @@ export default function FormsIndex() {
                 </Btn>
               ) : null}
 
-              {canDeleteSubmission ? (
+              {canDeleteSubmission && mobileSubmissionActions.submission?.id ? (
                 <Btn
                   type="button"
                   variant="danger"
@@ -2100,7 +2257,9 @@ export default function FormsIndex() {
                     lineHeight: 1.3,
                   }}
                 >
-                  Historial del registro {historyModal.submission.consecutive ?? historyModal.submission.id}
+                  Historial del registro{" "}
+                  {historyModal.submission.consecutive ??
+                    historyModal.submission.id}
                 </div>
                 <div
                   style={{

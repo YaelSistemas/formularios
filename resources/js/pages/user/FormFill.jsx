@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiPost } from "../../services/api";
-import { enqueue, syncNow } from "../../offline/sync";
+import { enqueue } from "../../offline/sync";
+import { saveOfflineSubmission } from "../../offline/forms-cache";
 
 import DefaultFormLayout from "./forms/layouts/DefaultFormLayout";
 import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "./forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
@@ -161,23 +162,20 @@ export default function FormFill({
   useEffect(() => {
     const onOnline = () => {
       setIsOnline(true);
-      if (!readOnly && !isEditing) syncNow().catch(() => null);
     };
-
-    const onOffline = () => setIsOnline(false);
-
+  
+    const onOffline = () => {
+      setIsOnline(false);
+    };
+  
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
-
-    if (navigator.onLine && !readOnly && !isEditing) {
-      syncNow().catch(() => null);
-    }
-
+  
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [readOnly, isEditing]);
+  }, []);
 
   const setVal = (id, value) => {
     if (readOnly) return;
@@ -364,8 +362,6 @@ export default function FormFill({
         setMsg("");
         resetForm();
 
-        if (navigator.onLine) syncNow().catch(() => null);
-
         openSuccessModalAndBack(
           "Registro creado correctamente",
           "Las respuestas se guardaron exitosamente."
@@ -381,13 +377,16 @@ export default function FormFill({
 
       if (!isEditing && shouldQueueOffline(e2)) {
         try {
-          await enqueue("form_submission", offlinePayload);
+          const localUuid = await enqueue("form_submission", offlinePayload);
 
+          await saveOfflineSubmission(form, answers, localUuid);
+          
           setMsg("");
           resetForm();
-
-          if (navigator.onLine) syncNow().catch(() => null);
-
+          
+          // NO sincronizamos aquí
+          // el autosync se encarga
+          
           openSuccessModalAndBack(
             "Registro guardado offline",
             "Se guardó en el dispositivo y se sincronizará automáticamente cuando vuelva la conexión."

@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+import { setupAutoSync } from "./offline/sync";
 
 import Login from "./pages/Login";
 
@@ -21,6 +23,11 @@ import AdminForms from "./pages/admin/AdminForms";
 // PWA SW register (vite-plugin-pwa)
 import { registerSW } from "virtual:pwa-register";
 registerSW({ immediate: true });
+
+setupAutoSync({
+  intervalMs: 15000,
+  runOnStart: true,
+});
 
 function getStoredUser() {
   try {

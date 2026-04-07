@@ -13,8 +13,16 @@ function getToken() {
 }
 
 function safeUUID() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return "uuid_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return (
+    "uuid_" +
+    Math.random().toString(16).slice(2) +
+    "_" +
+    Date.now().toString(16)
+  );
 }
 
 function nowIso() {
@@ -52,6 +60,7 @@ async function postJson(url, body) {
 
   let data = null;
   const text = await res.text();
+
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -84,7 +93,6 @@ async function postJson(url, body) {
 function normalizeRecord(type, rec) {
   if (!rec) return { type, form_id: null, answers: {}, meta: null };
 
-  // formato recomendado
   if (rec.form_id || rec.answers || rec.meta) {
     return {
       type,
@@ -94,7 +102,6 @@ function normalizeRecord(type, rec) {
     };
   }
 
-  // formato compat: { payload: {...} }
   if (rec.payload && typeof rec.payload === "object") {
     return {
       type,
@@ -104,7 +111,6 @@ function normalizeRecord(type, rec) {
     };
   }
 
-  // último fallback
   return { type, form_id: null, answers: {}, meta: null };
 }
 
@@ -121,7 +127,6 @@ export async function enqueue(type, payload) {
   const uuid = safeUUID();
   const now = nowIso();
 
-  // guardamos el record completo para tenerlo offline
   await db.records.add({
     uuid,
     type,
@@ -130,7 +135,6 @@ export async function enqueue(type, payload) {
     synced: false,
   });
 
-  // outbox controla el estado de sincronización
   await db.outbox.add({
     uuid,
     type,
@@ -153,18 +157,17 @@ async function processOutboxItem(item) {
   const rec = await db.records.where("uuid").equals(item.uuid).first();
   if (!rec) throw new Error("No existe record para este uuid.");
 
-  // ✅ Mapea types a endpoints
   if (item.type === "form_submission") {
     const normalized = normalizeRecord(item.type, rec);
 
     const formId = normalized.form_id;
     if (!formId) throw new Error("record.form_id faltante");
 
-    // answers puede ser objeto; si viene null, mandamos {}
-    const answers = normalized.answers && typeof normalized.answers === "object" ? normalized.answers : {};
+    const answers =
+      normalized.answers && typeof normalized.answers === "object"
+        ? normalized.answers
+        : {};
 
-    // ✅ Endpoint real:
-    // POST /api/forms/{form}/submit
     await postJson(`/api/forms/${formId}/submit`, {
       answers,
       ...(normalized.meta ? { meta: normalized.meta } : {}),
@@ -178,48 +181,78 @@ async function processOutboxItem(item) {
 
 /**
  * =========================================
- * syncNow: sincroniza pending + error (si ya toca reintento)
+ * syncNow: sincroniza pending + error
  * =========================================
  */
 export async function syncNow() {
-  if (isSyncing) return { ok: true, synced: 0, skipped: 0, reason: "already_syncing" };
-  if (!navigator.onLine) return { ok: false, reason: "offline" };
+  if (isSyncing) {
+    return { ok: true, synced: 0, skipped: 0, reason: "already_syncing" };
+  }
+
+  if (!navigator.onLine) {
+    return { ok: false, reason: "offline" };
+  }
 
   isSyncing = true;
 
   try {
-    const items = await db.outbox.where("status").anyOf(["pending", "error"]).toArray();
-    if (!items.length) return { ok: true, synced: 0, skipped: 0 };
+    const items = await db.outbox
+      .where("status")
+      .anyOf(["pending", "error", "syncing"])
+      .toArray();
+
+    if (!items.length) {
+      return { ok: true, synced: 0, skipped: 0 };
+    }
 
     let syncedCount = 0;
     let skippedCount = 0;
 
-    items.sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+    items.sort((a, b) =>
+      String(a.created_at || "").localeCompare(String(b.created_at || ""))
+    );
 
     for (const item of items) {
-      if (item.status === "error" && !isDue(item.next_retry_at)) {
+      const fresh = await db.outbox.get(item.id);
+
+      if (!fresh) {
+        skippedCount++;
+        continue;
+      }
+
+      if (fresh.status === "syncing") {
+        skippedCount++;
+        continue;
+      }
+
+      if (fresh.status === "error" && !isDue(fresh.next_retry_at)) {
+        skippedCount++;
+        continue;
+      }
+
+      if (fresh.status !== "pending" && fresh.status !== "error") {
         skippedCount++;
         continue;
       }
 
       try {
-        await db.outbox.update(item.id, { status: "syncing", last_error: null });
-
-        await processOutboxItem(item);
-
         await db.outbox.update(item.id, {
-          status: "synced",
+          status: "syncing",
           last_error: null,
-          next_retry_at: null,
         });
 
-        await db.records.where("uuid").equals(item.uuid).modify({ synced: true });
+        await processOutboxItem(fresh);
+
+        await db.records.where("uuid").equals(fresh.uuid).modify({
+          synced: true,
+        });
+
+        await db.outbox.delete(item.id);
 
         syncedCount++;
       } catch (e) {
         const status = e?.status;
 
-        // Si es auth (401/403), detenemos reintentos hasta re-login
         if (status === 401 || status === 403) {
           await db.outbox.update(item.id, {
             status: "error",
@@ -227,10 +260,16 @@ export async function syncNow() {
             next_retry_at: null,
           });
 
-          return { ok: false, reason: "auth", synced: syncedCount, skipped: skippedCount };
+          return {
+            ok: false,
+            reason: "auth",
+            synced: syncedCount,
+            skipped: skippedCount,
+          };
         }
 
-        const prevRetry = Number(item.retry_count || 0);
+        const current = await db.outbox.get(item.id);
+        const prevRetry = Number(current?.retry_count || 0);
         const nextRetry = prevRetry + 1;
         const waitSeconds = getBackoffSeconds(prevRetry);
 
@@ -241,6 +280,14 @@ export async function syncNow() {
           next_retry_at: addSecondsIso(waitSeconds),
         });
       }
+    }
+
+    if (syncedCount > 0 && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("offline-sync-complete", {
+          detail: { synced: syncedCount },
+        })
+      );
     }
 
     return { ok: true, synced: syncedCount, skipped: skippedCount };
@@ -267,6 +314,7 @@ export function setupAutoSync({ intervalMs = 15000, runOnStart = true } = {}) {
   window.addEventListener("online", onOnline);
 
   let timer = null;
+
   if (intervalMs && intervalMs > 0) {
     timer = window.setInterval(() => {
       if (!navigator.onLine) return;
@@ -274,8 +322,8 @@ export function setupAutoSync({ intervalMs = 15000, runOnStart = true } = {}) {
     }, intervalMs);
   }
 
-  if (runOnStart) {
-    if (navigator.onLine) syncNow().catch(() => null);
+  if (runOnStart && navigator.onLine) {
+    syncNow().catch(() => null);
   }
 
   return () => {
@@ -284,4 +332,5 @@ export function setupAutoSync({ intervalMs = 15000, runOnStart = true } = {}) {
     setupAutoSync.__installed = false;
   };
 }
+
 setupAutoSync.__installed = false;

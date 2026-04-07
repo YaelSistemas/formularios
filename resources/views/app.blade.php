@@ -16,11 +16,6 @@
   <link rel="apple-touch-icon" href="/pwa-192.png">
   <link rel="manifest" href="/manifest.webmanifest">
 
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-  />
-
   @viteReactRefresh
   @vite(['resources/css/app.css', 'resources/js/app.jsx'])
 
