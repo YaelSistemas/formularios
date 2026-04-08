@@ -548,13 +548,15 @@ export default function AppLayout() {
                     </div>
                   ) : null}
 
-                  <button
-                    type="button"
-                    style={S.menuBtn}
-                    onClick={handleProfileGo}
-                  >
-                    Panel Admin
-                  </button>
+                  {canViewAdminPanel ? (
+                    <button
+                      type="button"
+                      style={S.menuBtn}
+                      onClick={handleProfileGo}
+                    >
+                      Panel Admin
+                    </button>
+                  ) : null}
 
                   <button type="button" style={S.dangerBtn} onClick={onLogout}>
                     Cerrar sesión
@@ -600,13 +602,15 @@ export default function AppLayout() {
                     </div>
                   ) : null}
 
-                  <button
-                    type="button"
-                    style={S.menuBtn}
-                    onClick={handleProfileGo}
-                  >
-                    Panel Admin
-                  </button>
+                  {canViewAdminPanel ? (
+                    <button
+                      type="button"
+                      style={S.menuBtn}
+                      onClick={handleProfileGo}
+                    >
+                      Panel Admin
+                    </button>
+                  ) : null}
 
                   <button type="button" style={S.dangerBtn} onClick={onLogout}>
                     Cerrar sesión
