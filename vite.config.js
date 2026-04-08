@@ -66,6 +66,11 @@ export default defineConfig({
         skipWaiting: true,
         navigateFallback: "/",
         navigateFallbackDenylist: [/^\/api\//],
+        additionalManifestEntries: [
+          { url: "/", revision: null },
+          { url: "/login", revision: null },
+          { url: "/forms", revision: null },
+        ],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}"],
         runtimeCaching: [
           {
