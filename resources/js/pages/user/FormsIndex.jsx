@@ -500,18 +500,21 @@ export default function FormsIndex() {
     setErr("");
     setLoadingSubs(true);
     setSubs([]);
-
+  
     try {
       const data = await apiGet(`/forms/${id}/submissions`);
       const rows = Array.isArray(data?.submissions) ? data.submissions : [];
-
-      setSubs(rows);
-      setOfflineMode(false);
-
+  
       await cacheFormSubmissions(currentUserId, id, rows);
+  
+      const merged = await getCachedFormSubmissions(currentUserId, id);
+  
+      setSubs(merged);
+      setOfflineMode(false);
+      setErr("");
     } catch (e) {
       const cached = await getCachedFormSubmissions(currentUserId, id);
-
+  
       if (cached.length > 0) {
         setSubs(cached);
         setOfflineMode(true);
@@ -621,6 +624,25 @@ export default function FormsIndex() {
       window.removeEventListener("offline-sync-complete", onSyncComplete);
     };
   }, [selectedId, mode, canViewSubmissions, detail]);
+
+  useEffect(() => {
+    const onOfflineRecordSaved = async (event) => {
+      const formId = Number(event?.detail?.formId || 0);
+  
+      if (!formId) return;
+      if (!selectedId) return;
+      if (Number(selectedId) !== formId) return;
+      if (mode !== "responses") return;
+  
+      await loadSubmissions(formId);
+    };
+  
+    window.addEventListener("offline-record-saved", onOfflineRecordSaved);
+  
+    return () => {
+      window.removeEventListener("offline-record-saved", onOfflineRecordSaved);
+    };
+  }, [selectedId, mode]);
 
   const onFill = async (id) => {
     setMobileActions({ open: false, form: null });
