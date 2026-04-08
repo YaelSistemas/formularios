@@ -3,6 +3,8 @@ import laravel from "laravel-vite-plugin";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+const buildRevision = `${Date.now()}`;
+
 export default defineConfig({
   server: {
     host: "0.0.0.0",
@@ -67,9 +69,9 @@ export default defineConfig({
         navigateFallback: "/",
         navigateFallbackDenylist: [/^\/api\//],
         additionalManifestEntries: [
-          { url: "/", revision: null },
-          { url: "/login", revision: null },
-          { url: "/forms", revision: null },
+          { url: "/", revision: buildRevision },
+          { url: "/login", revision: buildRevision },
+          { url: "/forms", revision: buildRevision },
         ],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}"],
         runtimeCaching: [
