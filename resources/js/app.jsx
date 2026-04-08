@@ -23,7 +23,17 @@ import AdminForms from "./pages/admin/AdminForms";
 
 // PWA SW register (vite-plugin-pwa)
 import { registerSW } from "virtual:pwa-register";
-registerSW({ immediate: true });
+
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    console.log("Nueva versión disponible");
+    updateSW(true);
+  },
+  onOfflineReady() {
+    console.log("La app ya está lista para usarse offline");
+  },
+});
 
 setupAutoSync({
   intervalMs: 15000,
