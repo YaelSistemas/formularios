@@ -382,6 +382,15 @@ export default function FormFill({
           const localUuid = await enqueue("form_submission", offlinePayload);
 
           await saveOfflineSubmission(currentUserId, form, answers, localUuid);
+
+          window.dispatchEvent(
+            new CustomEvent("offline-record-saved", {
+              detail: {
+                formId: form.id,
+                localUuid,
+              },
+            })
+          );
           
           setMsg("");
           resetForm();
