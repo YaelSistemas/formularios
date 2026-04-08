@@ -66,14 +66,21 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
+
+        // 👉 SPA fallback
         navigateFallback: "/",
         navigateFallbackDenylist: [/^\/api\//],
+
+        // 🔥 SOLO raíz (clave del fix)
         additionalManifestEntries: [
           { url: "/", revision: buildRevision },
-          { url: "/login", revision: buildRevision },
-          { url: "/forms", revision: buildRevision },
         ],
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}"],
+
+        // ❗ importante: NO cachear html aquí
+        globPatterns: [
+          "**/*.{js,css,ico,png,svg,woff,woff2,webmanifest}",
+        ],
+
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.mode === "navigate",
