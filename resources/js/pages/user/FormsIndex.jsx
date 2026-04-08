@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiDelete, apiGet } from "../../services/api";
+import ConnectionStatus from "../../components/ConnectionStatus";
 import FormFill from "./FormFill";
 import {
   cacheFormsCatalog,
@@ -1281,16 +1282,19 @@ export default function FormsIndex() {
             alignItems: "center",
           }}
         >
-          <div>
-            <h2 style={{ margin: 0 }}>
-              {mode === "responses" ? "Registros" : "Formularios"}
-            </h2>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-              {mode === "responses"
-                ? `Registros del formulario${
-                    detail?.title ? `: ${detail.title}` : ""
-                  }`
-                : "Selecciona un formulario para capturarlo o consultar sus registros."}
+          <div style={{ display: "grid", gap: 8 }}>
+            <ConnectionStatus />
+            <div>
+              <h2 style={{ margin: 0 }}>
+                {mode === "responses" ? "Registros" : "Formularios"}
+              </h2>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                {mode === "responses"
+                  ? `Registros del formulario${
+                      detail?.title ? `: ${detail.title}` : ""
+                    }`
+                  : "Selecciona un formulario para capturarlo o consultar sus registros."}
+              </div>
             </div>
           </div>
 
