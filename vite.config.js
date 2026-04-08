@@ -23,7 +23,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico"],
+      injectRegister: "auto",
+      includeAssets: [
+        "favicon.ico",
+        "pwa-192.png",
+        "pwa-512.png",
+        "pwa-512-maskable.png",
+      ],
       manifest: {
         name: "Formularios PWA",
         short_name: "Formularios",
@@ -35,24 +41,44 @@ export default defineConfig({
         icons: [
           { src: "/pwa-192.png", sizes: "192x192", type: "image/png" },
           { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/pwa-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+          {
+            src: "/pwa-512-maskable.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         navigateFallback: "/",
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        navigateFallbackDenylist: [/^\/api\//],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}"],
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "pages-cache",
+              networkTimeoutSeconds: 5,
+            },
+          },
           {
             urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",
               networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24,
+              },
             },
           },
         ],
       },
-    }),
+    })
   ],
 });
