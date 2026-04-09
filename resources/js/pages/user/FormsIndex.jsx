@@ -11,6 +11,12 @@ import {
   getCachedFormSubmissions,
 } from "../../offline/forms-cache";
 
+import {
+  openCachedSubmissionPdf,
+  cacheSubmissionPdfFromServer,
+  preloadVisibleSubmissionPdfs,
+} from "../../offline/pdf-cache";
+
 function Card({ children, style }) {
   return (
     <div
@@ -513,6 +519,13 @@ export default function FormsIndex() {
       setSubs(merged);
       setOfflineMode(false);
       setErr("");
+  
+      preloadVisibleSubmissionPdfs({
+        userId: currentUserId,
+        formId: id,
+        submissions: rows,
+        token,
+      }).catch(() => null);
     } catch (e) {
       const cached = await getCachedFormSubmissions(currentUserId, id);
   
@@ -795,113 +808,79 @@ export default function FormsIndex() {
 
   const onOpenSubmissionPdf = async (submission) => {
     setMobileSubmissionActions({ open: false, submission: null });
-
+  
     if (!canViewSubmissions) {
       setErr(noPermissionMessage("ver o descargar el PDF de este registro"));
       return;
     }
-
-    if (!selectedId || !submission?.id) {
+  
+    if (!selectedId) {
       setErr("No se pudo generar el PDF del registro.");
       return;
     }
-
-    const isStandalone =
-      window.matchMedia?.("(display-mode: standalone)")?.matches ||
-      window.navigator.standalone === true;
-
-    const isTouchMobile =
-      /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(
-        navigator.userAgent
+  
+    if (submission?.offline_pending || submission?.pending_sync || !submission?.id) {
+      setErr(
+        "Este registro aún no tiene PDF oficial porque sigue pendiente de sincronización."
       );
-
-    const shouldUseSameTabOnMobile = isMobile || isTouchMobile || isStandalone;
-
-    let pdfWindow = null;
-
+      return;
+    }
+  
+    const submissionId = Number(submission.id || 0);
+    if (!submissionId) {
+      setErr("No se pudo identificar el PDF del registro.");
+      return;
+    }
+  
     try {
       setErr("");
       setSuccessMsg("");
-
+  
+      if (!navigator.onLine) {
+        const opened = await openCachedSubmissionPdf(
+          currentUserId,
+          selectedId,
+          submissionId
+        );
+  
+        if (!opened) {
+          setErr(
+            "Este PDF no está disponible offline todavía. Conéctate una vez para que se guarde en el dispositivo."
+          );
+        }
+  
+        return;
+      }
+  
       const authToken = localStorage.getItem("token");
       if (!authToken) {
         kickToLogin();
         return;
       }
-
-      if (!shouldUseSameTabOnMobile) {
-        pdfWindow = window.open("about:blank", "_blank");
-      }
-
-      const response = await fetch(
-        `/api/forms/${selectedId}/submissions/${submission.id}/pdf`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            Accept: "application/pdf",
-          },
-        }
-      );
-
-      if (response.status === 401) {
-        if (pdfWindow) pdfWindow.close();
-        kickToLogin();
-        return;
-      }
-
-      if (response.status === 403) {
-        if (pdfWindow) pdfWindow.close();
-        setErr(
-          "No cuentas con los permisos necesarios para ver o descargar este PDF. Contacta a tu administrador o al equipo de Sistemas."
-        );
-        return;
-      }
-
-      if (!response.ok) {
-        if (pdfWindow) pdfWindow.close();
-
-        let message = "No se pudo abrir el PDF.";
-        try {
-          const contentType = response.headers.get("content-type") || "";
-          if (contentType.includes("application/json")) {
-            const data = await response.json();
-            message = data?.message || message;
-          } else {
-            const text = await response.text();
-            if (text) message = text;
-          }
-        } catch {
-          //
-        }
-
-        throw new Error(message);
-      }
-
-      const blob = await response.blob();
+  
+      const blob = await cacheSubmissionPdfFromServer({
+        userId: currentUserId,
+        formId: selectedId,
+        submissionId,
+        token: authToken,
+      });
+  
       const blobUrl = window.URL.createObjectURL(blob);
-
-      if (shouldUseSameTabOnMobile) {
-        window.location.href = blobUrl;
-      } else if (pdfWindow && !pdfWindow.closed) {
-        pdfWindow.location.replace(blobUrl);
-      } else {
-        window.open(blobUrl, "_blank");
-      }
-
+      window.location.href = blobUrl;
+  
       setTimeout(() => {
         window.URL.revokeObjectURL(blobUrl);
       }, 60000);
     } catch (e) {
-      if (pdfWindow && !pdfWindow.closed) {
-        try {
-          pdfWindow.close();
-        } catch {
-          //
-        }
+      const opened = await openCachedSubmissionPdf(
+        currentUserId,
+        selectedId,
+        submissionId
+      );
+  
+      if (!opened) {
+        setErr(e?.message || "Error al abrir el PDF.");
       }
-
-      setErr(e?.message || "Error al abrir el PDF.");
     }
   };
 
