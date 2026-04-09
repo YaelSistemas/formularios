@@ -171,7 +171,7 @@ function AdminIndexRedirect() {
 
 function App() {
   const [bootState, setBootState] = useState({
-    checking: true,
+    checking: false,
     running: false,
     progress: null,
   });
@@ -185,26 +185,12 @@ function App() {
         const token = localStorage.getItem("token");
 
         if (!user?.id || !token || !navigator.onLine) {
-          if (!cancelled) {
-            setBootState({
-              checking: false,
-              running: false,
-              progress: null,
-            });
-          }
           return;
         }
 
         const check = await shouldRunOfflineBootstrap();
 
         if (!check?.shouldRun) {
-          if (!cancelled) {
-            setBootState({
-              checking: false,
-              running: false,
-              progress: null,
-            });
-          }
           return;
         }
 
@@ -262,7 +248,7 @@ function App() {
     };
   }, []);
 
-  if (bootState.checking || bootState.running) {
+  if (bootState.running) {
     return <OfflineBootstrapScreen progress={bootState.progress} />;
   }
 
