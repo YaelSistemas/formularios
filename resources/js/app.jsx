@@ -1,9 +1,14 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { setupAutoSync } from "./offline/sync";
 import { getOfflineUser } from "./offline/session";
+import OfflineBootstrapScreen from "./components/OfflineBootstrapScreen";
+import {
+  shouldRunOfflineBootstrap,
+  runOfflineBootstrap,
+} from "./offline/bootstrap";
 
 import Login from "./pages/Login";
 
@@ -165,6 +170,102 @@ function AdminIndexRedirect() {
 }
 
 function App() {
+  const [bootState, setBootState] = useState({
+    checking: true,
+    running: false,
+    progress: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function boot() {
+      try {
+        const user = getStoredUser();
+        const token = localStorage.getItem("token");
+
+        if (!user?.id || !token || !navigator.onLine) {
+          if (!cancelled) {
+            setBootState({
+              checking: false,
+              running: false,
+              progress: null,
+            });
+          }
+          return;
+        }
+
+        const check = await shouldRunOfflineBootstrap();
+
+        if (!check?.shouldRun) {
+          if (!cancelled) {
+            setBootState({
+              checking: false,
+              running: false,
+              progress: null,
+            });
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setBootState({
+            checking: false,
+            running: true,
+            progress: {
+              formsDone: 0,
+              formsTotal: Number(check?.remoteMeta?.forms_count || 0),
+              recordsDone: 0,
+              recordsTotal: Number(check?.remoteMeta?.submissions_count || 0),
+              pdfsDone: 0,
+              pdfsTotal: Number(check?.remoteMeta?.pdfs_count || 0),
+              message: "Preparando datos offline...",
+            },
+          });
+        }
+
+        await runOfflineBootstrap({
+          userId: Number(user.id),
+          token,
+          onProgress: (progress) => {
+            if (cancelled) return;
+            setBootState({
+              checking: false,
+              running: true,
+              progress,
+            });
+          },
+        });
+
+        if (!cancelled) {
+          setBootState({
+            checking: false,
+            running: false,
+            progress: null,
+          });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setBootState({
+            checking: false,
+            running: false,
+            progress: null,
+          });
+        }
+      }
+    }
+
+    boot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (bootState.checking || bootState.running) {
+    return <OfflineBootstrapScreen progress={bootState.progress} />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>

@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\FormsController;
 use App\Http\Controllers\Api\FormSubmissionsController;
 use App\Http\Controllers\Api\FormSubmissionPdfController;
 use App\Http\Controllers\Api\AdminFormAssignmentsController;
+use App\Http\Controllers\Api\OfflineBootstrapController;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,6 +61,13 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('perm:formularios.delete');
 
     Route::get('/forms/{form}/submissions/{submission}/pdf', [FormSubmissionPdfController::class, 'show'])
+        ->middleware('perm:formularios.submissions.view');
+
+    // Vista para Descarga Offline
+    Route::get('/offline/bootstrap-meta', [OfflineBootstrapController::class, 'meta'])
+        ->middleware('perm:formularios.submissions.view');
+    
+    Route::get('/offline/bootstrap', [OfflineBootstrapController::class, 'bootstrap'])
         ->middleware('perm:formularios.submissions.view');
 });
 

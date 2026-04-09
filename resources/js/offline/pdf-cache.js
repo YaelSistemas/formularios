@@ -88,6 +88,7 @@ export async function preloadVisibleSubmissionPdfs({
   formId,
   submissions,
   token,
+  onItemDone,
 }) {
   if (!navigator.onLine) return;
   if (!userId || !formId || !token) return;
@@ -100,7 +101,10 @@ export async function preloadVisibleSubmissionPdfs({
     if (submission?.offline_pending || submission?.pending_sync) continue;
 
     const exists = await getCachedSubmissionPdf(userId, formId, submissionId);
-    if (exists?.blob) continue;
+    if (exists?.blob) {
+      onItemDone?.(submission);
+      continue;
+    }
 
     try {
       await cacheSubmissionPdfFromServer({
@@ -109,6 +113,7 @@ export async function preloadVisibleSubmissionPdfs({
         submissionId,
         token,
       });
+      onItemDone?.(submission);
     } catch {
       // ignore individual pdf cache failures
     }
