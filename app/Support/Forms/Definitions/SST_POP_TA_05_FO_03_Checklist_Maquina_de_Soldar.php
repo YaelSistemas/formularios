@@ -44,7 +44,7 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                     'label' => 'Sistema',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'SISTEMA DE GESTION INTEGRAL',
+                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
                 ],
                 [
                     'id' => 'header_line_3',
@@ -58,14 +58,14 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                     'label' => 'Código',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'Codigo: SST-POP-TA-05-FO-03',
+                    'text' => 'Código: SST-POP-TA-05-FO-03',
                 ],
                 [
                     'id' => 'header_line_5',
                     'label' => 'Fecha de emisión',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'Fecha de Emisión. 27/03/2025',
+                    'text' => 'Fecha de Emisión: 27/03/2025',
                 ],
                 [
                     'id' => 'header_line_6',

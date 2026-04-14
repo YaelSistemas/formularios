@@ -1252,15 +1252,16 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
                         ? isMobile
                           ? 14
                           : 18
-                        : line.id === "header_line_3"
+                        : line.id === "header_line_2"
                         ? isMobile
-                          ? 15
-                          : 16
+                          ? 13
+                          : 15
                         : isMobile
-                        ? 13
+                        ? 12
                         : 14,
-                    lineHeight: line.id === "header_line_1" ? 1.35 : 1.45,
                     color: "#111827",
+                    textAlign: "left",
+                    lineHeight: isMobile ? 1.45 : 1.35,
                   }}
                 >
                   {line.text}
