@@ -64,6 +64,9 @@ class FormSubmissionPdfController extends Controller
 
             'sst_pop_ta_05_fo_03_checklist_maquina_de_soldar'
                 => 'pdf.forms.SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar',
+            
+            'sst_pop_ta_04_fo_04_checklist_linea_retractil_y_puntos_fijos'
+                => 'pdf.forms.SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos',
 
             default => 'pdf.forms.generic_submission',
         };

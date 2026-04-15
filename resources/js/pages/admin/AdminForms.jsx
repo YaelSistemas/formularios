@@ -4,6 +4,7 @@ import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "../user/forms/layouts/S
 import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "../user/forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
 import SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar from "../user/forms/layouts/SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar";
 import SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte from "../user/forms/layouts/SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte";
+import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "../user/forms/layouts/SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1230,6 +1231,9 @@ export default function AdminForms() {
 
     sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil:
       SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil,
+
+    sst_pop_ta_04_fo_04_checklist_linea_retractil_y_puntos_fijos:
+      SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

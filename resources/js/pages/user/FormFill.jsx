@@ -8,6 +8,7 @@ import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "./f
 import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "./forms/layouts/SST_POP_TA_07_FO_01_Inspeccion_de_Compresor";
 import SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar from "./forms/layouts/SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar";
 import SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte from "./forms/layouts/SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte";
+import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "./forms/layouts/SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -456,6 +457,13 @@ export default function FormFill({
         case "inspeccion_equipo_oxicorte":
         return (
           <SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte
+            {...sharedProps}
+          />
+        );
+
+        case "checklist_linea_retractil_y_puntos_fijos":
+        return (
+          <SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos
             {...sharedProps}
           />
         );
