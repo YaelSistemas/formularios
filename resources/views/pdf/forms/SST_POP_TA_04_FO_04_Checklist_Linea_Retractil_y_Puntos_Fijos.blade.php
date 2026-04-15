@@ -19,9 +19,9 @@
 
         .sheet {
             width: 110%;
-            transform: scale(0.90);
+            transform: scale(0.86);
             transform-origin: top left;
-            margin-left: 7px;
+            margin-left: 30px;
         }
 
         .header-table {
@@ -373,7 +373,7 @@
             </tr>
         
             <tr>
-                <td rowspan="2" colspan="2" class="vertical-center">N° de Identificación</td>
+                <td rowspan="2" class="vertical-center">N° de Identificación</td>
                 <td rowspan="2" class="vertical-center">Marca / Modelo del Arnés</td>
 
                 <td colspan="4" class="group-title">CONDICIONES GENERALES</td>
@@ -381,7 +381,7 @@
                 <td colspan="5" class="group-title">2. GANCHO DE SEGURIDAD DE CIERRE AUTOMATICO</td>       
                 <td colspan="5" class="group-title">3. CONECTOR DE PUNTO FIJO/PUNTO DE ANCLAJE FIJO</td>
                 <td colspan="2" class="group-title">Acciones</td>
-                <td rowspan="2" colspan="2" class="vertical-center">Observaciones</td>
+                <td rowspan="2" colspan="3" class="vertical-center">Observaciones</td>
             </tr>
         
             <tr>
@@ -419,79 +419,169 @@
 
         @php
             $rows = data_get($answers, 'tabla_linea_retractil', []);
-            $totalRows = max(count($rows), 8);
 
             $filasConDatos = collect($rows)->filter(function ($row) {
                 return !empty(array_filter($row, fn($value) => $value !== null && $value !== ''));
-            })->count();
+            })->values();
+            
+            $totalFilas = $filasConDatos->count();
+            
+            $pages = [];
+            $remaining = $totalFilas;
+            $offset = 0;
+            
+            while ($remaining > 0) {
+                if (empty($pages)) {
+                    // PRIMERA HOJA
+                    if ($remaining <= 8) {
+                        // última hoja con pie
+                        $capacity = 8;
+                    } elseif ($remaining <= 10) {
+                        // deja 1 fila para la siguiente
+                        $capacity = $remaining - 1;
+                    } else {
+                        // ya hay más hojas, primera hoja máxima 10
+                        $capacity = 10;
+                    }
+                } else {
+                    // HOJAS 2 EN ADELANTE
+                    if ($remaining <= 14) {
+                        // última hoja con pie
+                        $capacity = 14;
+                    } elseif ($remaining <= 18) {
+                        // deja 1 fila para la siguiente
+                        $capacity = $remaining - 1;
+                    } else {
+                        // hoja intermedia máxima 18
+                        $capacity = 18;
+                    }
+                }
+            
+                $pages[] = $filasConDatos->slice($offset, $capacity)->values();
+            
+                $offset += $capacity;
+                $remaining = $totalFilas - $offset;
+            }
+            
+            if (empty($pages)) {
+                $pages[] = collect();
+            }
+            
+            $ultimaPaginaFilas = collect(end($pages))->count();
             
             $alturaFirma = match (true) {
-                $filasConDatos >= 8 => 20,
-                $filasConDatos === 7 => 25,
-                $filasConDatos === 6 => 30,
-                $filasConDatos === 5 => 50,
-                $filasConDatos === 4 => 80,
-                $filasConDatos === 3 => 120,
+                $ultimaPaginaFilas >= 8 => 0,
+                $ultimaPaginaFilas === 7 => 10,
+                $ultimaPaginaFilas === 6 => 30,
+                $ultimaPaginaFilas === 5 => 50,
+                $ultimaPaginaFilas === 4 => 80,
+                $ultimaPaginaFilas === 3 => 120,
                 default => 140,
             };
         @endphp
         
-        <table class="data-table" style="margin-top: 6px;">
-            @for ($i = 0; $i < $totalRows; $i++)
-                @php
-                    $row = $rows[$i] ?? [];
-                    $isEmpty = empty(array_filter($row, fn($value) => $value !== null && $value !== ''));
-                @endphp
-            
-                <tr class="{{ $isEmpty ? 'row-empty' : 'row-filled' }}">
-                    <!-- N° Identificación -->
-                    <td colspan="2">{{ data_get($row, 'numero_identificacion') }}</td>
+        @foreach($pages as $pageIndex => $chunk)
+            @php
+                $filasPorPagina = $chunk->count();
+                $esUltimaPagina = $loop->last;
+            @endphp
         
-                    <!-- Marca -->
-                    <td>{{ data_get($row, 'marca_modelo') }}</td>
-        
-                    <!-- CONDICIONES GENERALES -->
-                    <td>{{ data_get($row, 'manija_anclaje') }}</td>
-                    <td>{{ data_get($row, 'carcaza_termoplastica') }}</td>
-                    <td>{{ data_get($row, 'linea_vida_acero_textil') }}</td>
-                    <td>{{ data_get($row, 'activacion_sistema_bloqueo') }}</td>
-        
-                    <!-- MOSQUETÓN -->
-                    <td>{{ data_get($row, 'mosqueton_1_1') }}</td>
-                    <td>{{ data_get($row, 'mosqueton_1_2') }}</td>
-                    <td>{{ data_get($row, 'mosqueton_1_3') }}</td>
-        
-                    <!-- GANCHO -->
-                    <td>{{ data_get($row, 'gancho_2_1') }}</td>
-                    <td>{{ data_get($row, 'gancho_2_2') }}</td>
-                    <td colspan="2">{{ data_get($row, 'gancho_2_3') }}</td>
-                    <td>{{ data_get($row, 'gancho_2_4') }}</td>
-        
-                    <!-- CONECTOR -->
-                    <td>{{ data_get($row, 'conector_3_1') }}</td>
-                    <td>{{ data_get($row, 'conector_3_2') }}</td>
-                    <td>{{ data_get($row, 'conector_3_3') }}</td>
-                    <td>{{ data_get($row, 'conector_3_4') }}</td>
-                    <td>{{ data_get($row, 'conector_3_5') }}</td>
-        
-                    <!-- ACCIONES -->
+            <table class="data-table" style="margin-top: 6px;">
+                @for ($i = 0; $i < $filasPorPagina; $i++)
                     @php
-                        $accion = data_get($row, 'acciones', '');
+                        $row = $chunk[$i] ?? [];
+                        $isEmpty = empty($row);
                     @endphp
-                    
-                    <td>
-                        {{ $accion === 'El Equipo se Marca como Dañado y es Sacado de Uso' ? '●' : '' }}
-                    </td>
-                    
-                    <td>
-                        {{ $accion === 'El Equipo está en Buenas Condiciones' ? '●' : '' }}
-                    </td>
         
-                    <!-- OBSERVACIONES -->
-                    <td colspan="2">{{ data_get($row, 'observaciones') }}</td>
-                </tr>
-            @endfor
-        </table>
+                    <tr class="{{ $isEmpty ? 'row-empty' : 'row-filled' }}">
+                        <td>{{ data_get($row, 'numero_identificacion') }}</td>
+                        <td>{{ data_get($row, 'marca_modelo') }}</td>
+        
+                        <td>{{ data_get($row, 'manija_anclaje') }}</td>
+                        <td>{{ data_get($row, 'carcaza_termoplastica') }}</td>
+                        <td>{{ data_get($row, 'linea_vida_acero_textil') }}</td>
+                        <td>{{ data_get($row, 'activacion_sistema_bloqueo') }}</td>
+        
+                        <td>{{ data_get($row, 'mosqueton_1_1') }}</td>
+                        <td>{{ data_get($row, 'mosqueton_1_2') }}</td>
+                        <td>{{ data_get($row, 'mosqueton_1_3') }}</td>
+        
+                        <td>{{ data_get($row, 'gancho_2_1') }}</td>
+                        <td>{{ data_get($row, 'gancho_2_2') }}</td>
+                        <td colspan="2">{{ data_get($row, 'gancho_2_3') }}</td>
+                        <td>{{ data_get($row, 'gancho_2_4') }}</td>
+        
+                        <td>{{ data_get($row, 'conector_3_1') }}</td>
+                        <td>{{ data_get($row, 'conector_3_2') }}</td>
+                        <td>{{ data_get($row, 'conector_3_3') }}</td>
+                        <td>{{ data_get($row, 'conector_3_4') }}</td>
+                        <td>{{ data_get($row, 'conector_3_5') }}</td>
+        
+                        @php
+                            $accion = data_get($row, 'acciones', '');
+                        @endphp
+        
+                        <td>{{ $accion === 'El Equipo se Marca como Dañado y es Sacado de Uso' ? '●' : '' }}</td>
+                        <td>{{ $accion === 'El Equipo está en Buenas Condiciones' ? '●' : '' }}</td>
+        
+                        <td colspan="3">{{ data_get($row, 'observaciones') }}</td>
+                    </tr>
+                @endfor
+            </table>
+        
+            @if(!$loop->last)
+                <div style="page-break-after: always;"></div>
+        
+                <table class="criteria-table" style="margin-top: 0;">
+                    <tr>
+                        <td style="border: none;"></td>
+                        <td style="border: none;"></td>
+                        <td colspan="22" class="top-title">
+                            Criterios: (✓) Buen Estado &nbsp;&nbsp; (X) Mal Estado &nbsp;&nbsp; (NA) No Aplica
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td rowspan="2" class="vertical-center">N° de Identificación</td>
+                        <td rowspan="2" class="vertical-center">Marca / Modelo del Arnés</td>
+        
+                        <td colspan="4" class="group-title">CONDICIONES GENERALES</td>
+                        <td colspan="3" class="group-title">1. MOSQUETÓN</td>
+                        <td colspan="5" class="group-title">2. GANCHO DE SEGURIDAD DE CIERRE AUTOMATICO</td>
+                        <td colspan="5" class="group-title">3. CONECTOR DE PUNTO FIJO/PUNTO DE ANCLAJE FIJO</td>
+                        <td colspan="2" class="group-title">Acciones</td>
+                        <td rowspan="2" colspan="3" class="vertical-center">Observaciones</td>
+                    </tr>
+        
+                    <tr>
+                        <td class="sub-title">Manija de Anclaje</td>
+                        <td class="sub-title">Carcaza Termoplástica</td>
+                        <td class="sub-title">Línea de Vida Acero Galvanizado o Textil</td>
+                        <td class="sub-title">Activación de Sistema de Bloqueo</td>
+        
+                        <td class="sub-title">Desgaste, Deformaciones</td>
+                        <td class="sub-title">Picaduras, Grietas</td>
+                        <td class="sub-title">Corrosión</td>
+        
+                        <td class="sub-title">Desgaste, Deformaciones</td>
+                        <td class="sub-title">Picadura, Grietas</td>
+                        <td colspan="2" class="sub-title">
+                            Ajuste Inadecuado o Incorrecto de los Cierres de Seguridad (Enganches)
+                        </td>
+                        <td class="sub-title">Corrosión</td>
+        
+                        <td class="sub-title">Forro del Cable se Encuentra Desgastado</td>
+                        <td class="sub-title">Cuerpo de línea Presencia de Daño</td>
+                        <td class="sub-title">Costuras Rotas o Dañadas</td>
+                        <td class="sub-title">Argollas o Deformaciones</td>
+                        <td class="sub-title">Presencia de Aceites, Grasas o Químicos</td>
+        
+                        <td class="sub-title">El Equipo se Marca como Dañado y es Sacado de Uso</td>
+                        <td class="sub-title">El Equipo está en Buenas Condiciones</td>
+                    </tr>
+                </table>
+            @endif
+        @endforeach
 
         <table class="data-table" style="margin-top: 6px;">
             <!-- FILA 1 -->
