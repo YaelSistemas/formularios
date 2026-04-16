@@ -941,6 +941,19 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
             >
               <thead>
                 <tr>
+                  <th
+                    style={{
+                      border: "1px solid #d1d5db",
+                      padding: isMobile ? 9 : 10,
+                      background: "#f8fafc",
+                      textAlign: "center",
+                      fontSize: isMobile ? 11 : 12,
+                      width: 60,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    #
+                  </th>
                   {columns.map((col, idx) => (
                     <th
                       key={`${f.id}_col_${idx}`}
@@ -977,6 +990,17 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                 {rows.length ? (
                   rows.map((row, rowIndex) => (
                     <tr key={`${f.id}_row_${rowIndex}`}>
+                      <td
+                        style={{
+                          border: "1px solid #d1d5db",
+                          padding: isMobile ? 9 : 10,
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          fontSize: isMobile ? 12 : 13,
+                        }}
+                      >
+                        {rowIndex + 1}
+                      </td>
                       {rowSchema.map((col) => (
                         <td
                           key={`${f.id}_${rowIndex}_${col.id}`}
@@ -984,7 +1008,8 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                             border: "1px solid #d1d5db",
                             padding: isMobile ? 9 : 10,
                             fontSize: isMobile ? 12 : 13,
-                            verticalAlign: "top",
+                            verticalAlign: "middle",
+                            textAlign: "center",
                           }}
                         >
                           {renderTableCellValue(col, row)}
@@ -996,7 +1021,7 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                             border: "1px solid #d1d5db",
                             padding: isMobile ? 9 : 10,
                             textAlign: "center",
-                            verticalAlign: "top",
+                            verticalAlign: "middle",
                           }}
                         >
                           <div
@@ -1048,7 +1073,7 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                 ) : (
                   <tr>
                     <td
-                      colSpan={columns.length + (readOnly ? 0 : 1)}
+                      colSpan={columns.length + 1 + (readOnly ? 0 : 1)}
                       style={{
                         border: "1px solid #d1d5db",
                         padding: 12,

@@ -18,9 +18,10 @@
         }
 
         .sheet {
-            width: 110%;
+            width: 100%;
             transform: scale(0.90);
             transform-origin: top left;
+            margin-left: 55px;
         }
 
         .header-table {

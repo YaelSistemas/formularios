@@ -927,6 +927,19 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             >
               <thead>
                 <tr>
+                  <th
+                    style={{
+                      border: "1px solid #d1d5db",
+                      padding: isMobile ? 9 : 10,
+                      background: "#f8fafc",
+                      textAlign: "center",
+                      fontSize: isMobile ? 11 : 12,
+                      whiteSpace: "nowrap",
+                      width: 60,
+                    }}
+                  >
+                    #
+                  </th>
                   {columns.map((col, idx) => (
                     <th
                       key={`${f.id}_col_${idx}`}
@@ -963,6 +976,20 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 {rows.length ? (
                   rows.map((row, rowIndex) => (
                     <tr key={`${f.id}_row_${rowIndex}`}>
+                      <td
+                        style={{
+                          border: "1px solid #d1d5db",
+                          padding: isMobile ? 9 : 10,
+                          fontSize: isMobile ? 12 : 13,
+                          textAlign: "center",
+                          verticalAlign: "middle",
+                          fontWeight: 700,
+                          background: "#f8fafc",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {rowIndex + 1}
+                      </td>
                       {rowSchema.map((col) => (
                         <td
                           key={`${f.id}_${rowIndex}_${col.id}`}
@@ -970,7 +997,8 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                             border: "1px solid #d1d5db",
                             padding: isMobile ? 9 : 10,
                             fontSize: isMobile ? 12 : 13,
-                            verticalAlign: "top",
+                            verticalAlign: "middle",
+                            textAlign: "center",
                           }}
                         >
                           {renderTableCellValue(col, row)}
@@ -982,7 +1010,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                             border: "1px solid #d1d5db",
                             padding: isMobile ? 9 : 10,
                             textAlign: "center",
-                            verticalAlign: "top",
+                            verticalAlign: "middle",
                           }}
                         >
                           <div
@@ -990,7 +1018,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                               display: "inline-flex",
                               gap: 8,
                               flexWrap: "wrap",
-                              justifyContent: "center",
+                              justifyContent: "middle",
                             }}
                           >
                             <button
@@ -1034,7 +1062,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                 ) : (
                   <tr>
                     <td
-                      colSpan={columns.length + (readOnly ? 0 : 1)}
+                      colSpan={columns.length + (readOnly ? 0 : 1) + 1}
                       style={{
                         border: "1px solid #d1d5db",
                         padding: 12,

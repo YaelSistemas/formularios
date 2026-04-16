@@ -482,7 +482,10 @@
         
         @foreach($pages as $pageIndex => $chunk)
             @php
-                $filasPorPagina = $chunk->count();
+                $filasPorPagina = $loop->first
+                    ? max(8, $chunk->count()) // primera hoja mínimo 8
+                    : $chunk->count();
+        
                 $esUltimaPagina = $loop->last;
             @endphp
         

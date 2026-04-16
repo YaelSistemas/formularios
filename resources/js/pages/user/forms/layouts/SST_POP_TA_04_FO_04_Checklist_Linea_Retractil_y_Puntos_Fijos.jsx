@@ -1078,6 +1078,20 @@ export default function SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_F
             >
               <thead>
                 <tr>
+                  <th
+                    style={{
+                      border: "1px solid #d1d5db",
+                      padding: isMobile ? 9 : 10,
+                      background: "#f8fafc",
+                      textAlign: "center",
+                      fontSize: isMobile ? 11 : 12,
+                      whiteSpace: "nowrap",
+                      width: 60,
+                    }}
+                  >
+                    #
+                  </th>
+                
                   {rowSchema
                     .filter((col) => col.type !== "fixed_image")
                     .map((col) => (
@@ -1116,6 +1130,21 @@ export default function SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_F
                 {rows.length ? (
                   rows.map((row, rowIndex) => (
                     <tr key={`${f.id}_row_${rowIndex}`}>
+                      <td
+                        style={{
+                          border: "1px solid #d1d5db",
+                          padding: isMobile ? 9 : 10,
+                          fontSize: isMobile ? 12 : 13,
+                          verticalAlign: "middle",
+                          textAlign: "center",
+                          fontWeight: 700,
+                          background: "#f8fafc",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {rowIndex + 1}
+                      </td>
+                    
                       {rowSchema
                         .filter((col) => col.type !== "fixed_image")
                         .map((col) => (
@@ -1125,7 +1154,8 @@ export default function SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_F
                             border: "1px solid #d1d5db",
                             padding: isMobile ? 9 : 10,
                             fontSize: isMobile ? 12 : 13,
-                            verticalAlign: "top",
+                            verticalAlign: "middle",
+                            textAlign: "center",
                           }}
                         >
                           {renderTableCellValue(col, row)}
@@ -1137,7 +1167,7 @@ export default function SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_F
                             border: "1px solid #d1d5db",
                             padding: isMobile ? 9 : 10,
                             textAlign: "center",
-                            verticalAlign: "top",
+                            verticalAlign: "middle",
                           }}
                         >
                           <div
@@ -1191,7 +1221,8 @@ export default function SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_F
                     <td
                       colSpan={
                         rowSchema.filter((col) => col.type !== "fixed_image").length +
-                        (readOnly ? 0 : 1)
+                        (readOnly ? 0 : 1) +
+                        1
                       }
                       style={{
                         border: "1px solid #d1d5db",
