@@ -529,6 +529,10 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sst_pop_ta_04_fo_04_checklist_linea_retractil_y_puntos_fijos') {
                             $storedPath = $this->storeSignatureForChecklistLineaRetractil($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sst_pop_ta_04_fo_03_inspeccion_de_linea_de_vida') {
+                            $storedPath = $this->storeSignatureForInspeccionLineaVida($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
@@ -537,6 +541,7 @@ class FormSubmissionsController extends Controller
                                 'sst_pop_ta_05_fo_02_inspeccion_de_equipo_de_oxicorte',
                                 'sst_pop_ta_05_fo_03_checklist_maquina_de_soldar',
                                 'sst_pop_ta_04_fo_04_checklist_linea_retractil_y_puntos_fijos',
+                                'sst_pop_ta_04_fo_03_inspeccion_de_linea_de_vida',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -908,6 +913,37 @@ class FormSubmissionsController extends Controller
         }
     
         $baseDirectory = 'forms/signatures/SSTPOPTA04FO04_CheckListLineaRetractilPuntosFijos';
+    
+        $directory = match ($fieldId) {
+            'firma_inspector' => $baseDirectory . '/Inspector',
+            default => $baseDirectory,
+        };
+    
+        $fileName = 'firma_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForInspeccionLineaVida(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SSTPOPTA04FO03_InspeccionLineaVida';
     
         $directory = match ($fieldId) {
             'firma_inspector' => $baseDirectory . '/Inspector',

@@ -9,6 +9,7 @@ import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "./forms/layouts/SST_POP
 import SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar from "./forms/layouts/SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar";
 import SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte from "./forms/layouts/SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte";
 import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "./forms/layouts/SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos";
+import SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida from "./forms/layouts/SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -467,6 +468,13 @@ export default function FormFill({
             {...sharedProps}
           />
         );
+
+        case "inspeccion_de_linea_de_vida":
+          return (
+            <SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida
+              {...sharedProps}
+            />
+          );
 
       default:
         return <DefaultFormLayout {...sharedProps} />;

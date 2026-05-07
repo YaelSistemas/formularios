@@ -67,6 +67,9 @@ class FormSubmissionPdfController extends Controller
             
             'sst_pop_ta_04_fo_04_checklist_linea_retractil_y_puntos_fijos'
                 => 'pdf.forms.SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos',
+            
+            'sst_pop_ta_04_fo_03_inspeccion_de_linea_de_vida'
+                => 'pdf.forms.SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida',
 
             default => 'pdf.forms.generic_submission',
         };
