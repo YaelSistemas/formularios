@@ -10,6 +10,7 @@ import SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar from "./forms/layouts/SST
 import SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte from "./forms/layouts/SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte";
 import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "./forms/layouts/SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos";
 import SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida from "./forms/layouts/SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida";
+import SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad from "./forms/layouts/SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -472,6 +473,13 @@ export default function FormFill({
         case "inspeccion_de_linea_de_vida":
           return (
             <SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida
+              {...sharedProps}
+            />
+          );
+          
+        case "inspeccion_de_arnes_de_seguridad":
+          return (
+            <SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad
               {...sharedProps}
             />
           );

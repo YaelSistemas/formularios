@@ -71,6 +71,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pop_ta_04_fo_03_inspeccion_de_linea_de_vida'
                 => 'pdf.forms.SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida',
 
+            'sst_pop_ta_04_fo_02_inspeccion_de_arnes_de_seguridad'
+                => 'pdf.forms.SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad',
+
             default => 'pdf.forms.generic_submission',
         };
     }
