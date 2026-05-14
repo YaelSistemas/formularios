@@ -74,6 +74,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pop_ta_04_fo_02_inspeccion_de_arnes_de_seguridad'
                 => 'pdf.forms.SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad',
 
+            'sst_pop_ta_04_fo_01_checklist_de_sand_blast'
+                => 'pdf.forms.SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast',
+
             default => 'pdf.forms.generic_submission',
         };
     }

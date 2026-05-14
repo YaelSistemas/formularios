@@ -7,6 +7,7 @@ import SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte from "../user/forms/
 import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "../user/forms/layouts/SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos";
 import SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida from "../user/forms/layouts/SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida";
 import SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad from "../user/forms/layouts/SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad";
+import SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast from "../user/forms/layouts/SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1242,6 +1243,9 @@ export default function AdminForms() {
     
     sst_pop_ta_04_fo_02_inspeccion_de_arnes_de_seguridad:
       SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad,
+
+    sst_pop_ta_04_fo_01_checklist_de_sand_blast:
+      SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

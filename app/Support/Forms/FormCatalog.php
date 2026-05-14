@@ -9,6 +9,7 @@ use App\Support\Forms\Definitions\SST_POP_TA_08_FO_01_Checklist_de_Herramienta_E
 use App\Support\Forms\Definitions\SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos; 
 use App\Support\Forms\Definitions\SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida;
 use App\Support\Forms\Definitions\SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad;
+use App\Support\Forms\Definitions\SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast;
 
 class FormCatalog
 {
@@ -22,6 +23,7 @@ class FormCatalog
             SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos::class, 
             SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida::class,
             SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad::class,
+            SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast::class,
         ];
     }
 }
