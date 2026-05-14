@@ -328,11 +328,11 @@
                     </td>
         
                     <td style="border:1px solid #000; text-align:center; vertical-align:middle; font-size:11px;">
-                        {{ data_get($row, $criterio['estado']) === 'Buen estado' ? '•' : '' }}
+                        {{ data_get($row, $criterio['estado']) === 'Buen estado' ? '✓' : '' }}
                     </td>
         
                     <td style="border:1px solid #000; text-align:center; vertical-align:middle; font-size:11px;">
-                        {{ data_get($row, $criterio['estado']) === 'Mal estado' ? '•' : '' }}
+                        {{ data_get($row, $criterio['estado']) === 'Mal estado' ? 'x' : '' }}
                     </td>
         
                     <td colspan="2" style="border:1px solid #000; padding:3px 5px; vertical-align: middle; text-align: center;">

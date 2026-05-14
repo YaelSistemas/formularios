@@ -8,6 +8,7 @@ import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "../use
 import SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida from "../user/forms/layouts/SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida";
 import SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad from "../user/forms/layouts/SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad";
 import SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast from "../user/forms/layouts/SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast";
+import SST_POP_TA_01_FO_08_Checklist_de_Tirfor from "../user/forms/layouts/SST_POP_TA_01_FO_08_Checklist_de_Tirfor";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1246,6 +1247,9 @@ export default function AdminForms() {
 
     sst_pop_ta_04_fo_01_checklist_de_sand_blast:
       SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast,
+
+    sst_pop_ta_01_fo_08_checklist_de_tirfor:
+      SST_POP_TA_01_FO_08_Checklist_de_Tirfor,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

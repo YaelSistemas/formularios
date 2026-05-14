@@ -12,6 +12,7 @@ import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "./form
 import SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida from "./forms/layouts/SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida";
 import SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad from "./forms/layouts/SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad";
 import SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast from "./forms/layouts/SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast";
+import SST_POP_TA_01_FO_08_Checklist_de_Tirfor from "./forms/layouts/SST_POP_TA_01_FO_08_Checklist_de_Tirfor";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -488,6 +489,13 @@ export default function FormFill({
         case "checklist_de_sand_blast":
           return (
             <SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast
+              {...sharedProps}
+            />
+          );
+          
+        case "checklist_de_tirfor":
+          return (
+            <SST_POP_TA_01_FO_08_Checklist_de_Tirfor
               {...sharedProps}
             />
           );

@@ -76,6 +76,9 @@ class FormSubmissionPdfController extends Controller
 
             'sst_pop_ta_04_fo_01_checklist_de_sand_blast'
                 => 'pdf.forms.SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast',
+            
+            'sst_pop_ta_01_fo_08_checklist_de_tirfor'
+                => 'pdf.forms.SST_POP_TA_01_FO_08_Checklist_de_Tirfor',
 
             default => 'pdf.forms.generic_submission',
         };

@@ -541,6 +541,10 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sst_pop_ta_04_fo_01_checklist_de_sand_blast') {
                             $storedPath = $this->storeSignatureForChecklistSandBlast($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sst_pop_ta_01_fo_08_checklist_de_tirfor') {
+                            $storedPath = $this->storeSignatureForChecklistTirfor($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
@@ -552,6 +556,7 @@ class FormSubmissionsController extends Controller
                                 'sst_pop_ta_04_fo_03_inspeccion_de_linea_de_vida',
                                 'sst_pop_ta_04_fo_02_inspeccion_de_arnes_de_seguridad',
                                 'sst_pop_ta_04_fo_01_checklist_de_sand_blast',
+                                'sst_pop_ta_01_fo_08_checklist_de_tirfor',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1024,6 +1029,48 @@ class FormSubmissionsController extends Controller
         };
     
         $fileName = 'firma_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForChecklistTirfor(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SSTPOPTA01FO08_ChecklistTirfor';
+    
+        $directory = match ($fieldId) {
+            'firma_trabajador_elabora_checklist'
+                => $baseDirectory . '/TrabajadorElaboraChecklist',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
     
         $relativePath = $directory . '/' . $fileName;
     
