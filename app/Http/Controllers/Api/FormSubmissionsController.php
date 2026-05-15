@@ -549,6 +549,10 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sst_pop_ta_01_fo_07_checklist_de_tecle') {
                             $storedPath = $this->storeSignatureForChecklistTecle($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sst_pop_ta_01_fo_06_checklist_de_polipasto_manual_de_cadena') {
+                            $storedPath = $this->storeSignatureForChecklistPolipastoManualCadena($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
@@ -562,6 +566,7 @@ class FormSubmissionsController extends Controller
                                 'sst_pop_ta_04_fo_01_checklist_de_sand_blast',
                                 'sst_pop_ta_01_fo_08_checklist_de_tirfor',
                                 'sst_pop_ta_01_fo_07_checklist_de_tecle',
+                                'sst_pop_ta_01_fo_06_checklist_de_polipasto_manual_de_cadena',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1134,6 +1139,42 @@ class FormSubmissionsController extends Controller
         $path = $directory . '/' . $filename;
     
         Storage::disk('public')->put($path, $decoded);
+    
+        return $path;
+    }
+
+    private function storeSignatureForChecklistPolipastoManualCadena(string $dataUrl,int $userId,string $fieldId): ?string 
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $data = base64_decode(
+            preg_replace('/^data:image\/png;base64,/', '', $dataUrl)
+        );
+    
+        if ($data === false) {
+            return null;
+        }
+    
+        $folder = match ($fieldId) {
+            'firma_trabajador_elabora_checklist' =>
+                'forms/signatures/SSTPOPTA01FO06ChecklistPolipastoManualCadena/Trabajador_Elabora_Checklist',
+    
+            'firma_supervisor_trabajador' =>
+                'forms/signatures/SSTPOPTA01FO06ChecklistPolipastoManualCadena/Supervisor_del_Trabajador',
+    
+            default => 'forms/signatures/SSTPOPTA01FO06ChecklistPolipastoManualCadena/Otros',
+        };
+    
+        $filename = now()->format('Ymd_His')
+            . "_{$userId}_"
+            . Str::random(8)
+            . '.png';
+    
+        $path = "{$folder}/{$filename}";
+    
+        Storage::disk('public')->put($path, $data);
     
         return $path;
     }

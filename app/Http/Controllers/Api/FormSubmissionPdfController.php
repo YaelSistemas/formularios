@@ -82,6 +82,9 @@ class FormSubmissionPdfController extends Controller
 
             'sst_pop_ta_01_fo_07_checklist_de_tecle'
                 => 'pdf.forms.SST_POP_TA_01_FO_07_Checklist_de_Tecle',
+            
+            'sst_pop_ta_01_fo_06_checklist_de_polipasto_manual_de_cadena'
+                => 'pdf.forms.SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena',
 
             default => 'pdf.forms.generic_submission',
         };
