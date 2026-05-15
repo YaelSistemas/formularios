@@ -11,6 +11,7 @@ use App\Support\Forms\Definitions\SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vid
 use App\Support\Forms\Definitions\SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad;
 use App\Support\Forms\Definitions\SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast;
 use App\Support\Forms\Definitions\SST_POP_TA_01_FO_08_Checklist_de_Tirfor;
+use App\Support\Forms\Definitions\SST_POP_TA_01_FO_07_Checklist_de_Tecle;
 
 class FormCatalog
 {
@@ -26,6 +27,7 @@ class FormCatalog
             SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad::class,
             SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast::class,
             SST_POP_TA_01_FO_08_Checklist_de_Tirfor::class,
+            SST_POP_TA_01_FO_07_Checklist_de_Tecle::class,
         ];
     }
 }

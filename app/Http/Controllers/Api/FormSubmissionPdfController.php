@@ -80,6 +80,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pop_ta_01_fo_08_checklist_de_tirfor'
                 => 'pdf.forms.SST_POP_TA_01_FO_08_Checklist_de_Tirfor',
 
+            'sst_pop_ta_01_fo_07_checklist_de_tecle'
+                => 'pdf.forms.SST_POP_TA_01_FO_07_Checklist_de_Tecle',
+
             default => 'pdf.forms.generic_submission',
         };
     }

@@ -545,6 +545,10 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sst_pop_ta_01_fo_08_checklist_de_tirfor') {
                             $storedPath = $this->storeSignatureForChecklistTirfor($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sst_pop_ta_01_fo_07_checklist_de_tecle') {
+                            $storedPath = $this->storeSignatureForChecklistTecle($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
@@ -557,6 +561,7 @@ class FormSubmissionsController extends Controller
                                 'sst_pop_ta_04_fo_02_inspeccion_de_arnes_de_seguridad',
                                 'sst_pop_ta_04_fo_01_checklist_de_sand_blast',
                                 'sst_pop_ta_01_fo_08_checklist_de_tirfor',
+                                'sst_pop_ta_01_fo_07_checklist_de_tecle',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1077,6 +1082,60 @@ class FormSubmissionsController extends Controller
         \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
     
         return $relativePath;
+    }
+
+    private function storeSignatureForChecklistTecle(string $dataUrl, int $userId, string $fieldId): ?string 
+    {
+        if (
+            !preg_match(
+                '/^data:image\/(\w+);base64,/',
+                $dataUrl,
+                $type
+            )
+        ) {
+            return null;
+        }
+    
+        $data = substr($dataUrl, strpos($dataUrl, ',') + 1);
+    
+        $decoded = base64_decode($data);
+    
+        if ($decoded === false) {
+            return null;
+        }
+    
+        $extension = strtolower($type[1] ?? 'png');
+    
+        if (!in_array($extension, ['png', 'jpg', 'jpeg'])) {
+            $extension = 'png';
+        }
+    
+        $directoryMap = [
+            'firma_trabajador_elabora_checklist'
+                => 'forms/signatures/SSTPOPTA01FO07ChecklistTecle/Trabajador_Elabora_Checklist',
+    
+            'firma_supervisor_trabajador'
+                => 'forms/signatures/SSTPOPTA01FO07ChecklistTecle/Supervisor_del_Trabajador',
+        ];
+    
+        $directory = $directoryMap[$fieldId]
+            ?? 'forms/signatures/SSTPOPTA01FO07ChecklistTecle';
+    
+        $filename =
+            'signature_' .
+            $fieldId .
+            '_' .
+            $userId .
+            '_' .
+            now()->timestamp .
+            '.' .
+            $extension;
+    
+        $path = $directory . '/' . $filename;
+    
+        Storage::disk('public')->put($path, $decoded);
+    
+        return $path;
     }
 
     public function destroy(Request $request, Form $form, FormSubmission $submission)
