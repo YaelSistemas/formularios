@@ -13,6 +13,7 @@ use App\Support\Forms\Definitions\SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast;
 use App\Support\Forms\Definitions\SST_POP_TA_01_FO_08_Checklist_de_Tirfor;
 use App\Support\Forms\Definitions\SST_POP_TA_01_FO_07_Checklist_de_Tecle;
 use App\Support\Forms\Definitions\SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena;
+use App\Support\Forms\Definitions\SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles;
 class FormCatalog
 {
     public static function definitions(): array
@@ -29,6 +30,7 @@ class FormCatalog
             SST_POP_TA_01_FO_08_Checklist_de_Tirfor::class,
             SST_POP_TA_01_FO_07_Checklist_de_Tecle::class,
             SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena::class,
+            SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles::class,
         ];
     }
 }

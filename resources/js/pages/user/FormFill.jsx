@@ -15,6 +15,7 @@ import SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast from "./forms/layouts/SST_POP
 import SST_POP_TA_01_FO_08_Checklist_de_Tirfor from "./forms/layouts/SST_POP_TA_01_FO_08_Checklist_de_Tirfor";
 import SST_POP_TA_01_FO_07_Checklist_de_Tecle from "./forms/layouts/SST_POP_TA_01_FO_07_Checklist_de_Tecle";
 import SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena from "./forms/layouts/SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena";
+import SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles from "./forms/layouts/SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -510,11 +511,18 @@ export default function FormFill({
           );
 
         case "checklist_de_polipasto":
-        return (
-          <SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena
-            {...sharedProps}
-          />
-        );
+          return (
+            <SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena
+              {...sharedProps}
+            />
+          );
+
+        case "checklist_de_escaleras_portatiles":
+          return (
+            <SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles
+              {...sharedProps}
+            />
+          );
 
       default:
         return <DefaultFormLayout {...sharedProps} />;
