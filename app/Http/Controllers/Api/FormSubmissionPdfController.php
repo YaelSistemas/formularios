@@ -89,6 +89,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pop_ta_01_fo_04_checklist_de_inspeccion_de_escaleras_portatiles'
                 => 'pdf.forms.SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles',
 
+            'sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal'
+                => 'pdf.forms.SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal',
+
             default => 'pdf.forms.generic_submission',
         };
     }
