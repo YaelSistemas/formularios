@@ -92,6 +92,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal'
                 => 'pdf.forms.SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal',
 
+            'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles'
+                => 'pdf.forms.SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles',
+
             default => 'pdf.forms.generic_submission',
         };
     }

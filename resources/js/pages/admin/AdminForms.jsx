@@ -13,6 +13,7 @@ import SST_POP_TA_01_FO_07_Checklist_de_Tecle from "../user/forms/layouts/SST_PO
 import SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena from "../user/forms/layouts/SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena";
 import SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles from "../user/forms/layouts/SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles";
 import SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal from "../user/forms/layouts/SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal";
+import SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles from "../user/forms/layouts/SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1266,6 +1267,9 @@ export default function AdminForms() {
 
     sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal:
       SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal,
+
+    sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles:
+      SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

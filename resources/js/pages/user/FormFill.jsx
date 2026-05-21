@@ -17,6 +17,7 @@ import SST_POP_TA_01_FO_07_Checklist_de_Tecle from "./forms/layouts/SST_POP_TA_0
 import SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena from "./forms/layouts/SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena";
 import SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles from "./forms/layouts/SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles";
 import SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal from "./forms/layouts/SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal";
+import SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles from "./forms/layouts/SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -532,6 +533,13 @@ export default function FormFill({
             />
           );
 
+        case "checklist_de_unidades_moviles":
+          return (
+            <SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles
+              {...sharedProps}
+            />
+          );
+          
       default:
         return <DefaultFormLayout {...sharedProps} />;
     }

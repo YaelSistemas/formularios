@@ -561,6 +561,10 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal') {
                             $storedPath = $this->storeSignatureForInspeccionEquipoProteccionPersonal($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles') {
+                            $storedPath = $this->storeSignatureForChecklistUnidadesMoviles($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
@@ -577,6 +581,7 @@ class FormSubmissionsController extends Controller
                                 'sst_pop_ta_01_fo_06_checklist_de_polipasto_manual_de_cadena',
                                 'sst_pop_ta_01_fo_04_checklist_de_inspeccion_de_escaleras_portatiles',
                                 'sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal',
+                                'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1247,6 +1252,46 @@ class FormSubmissionsController extends Controller
         };
     
         $fileName = 'firma_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForChecklistUnidadesMoviles(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SSTPGITA02FO04_ChecklistUnidadesMoviles';
+    
+        $directory = match ($fieldId) {
+            'firma_responsable_inspeccion' => $baseDirectory . '/Responsable_Inspeccion',
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
     
         $relativePath = $directory . '/' . $fileName;
     
