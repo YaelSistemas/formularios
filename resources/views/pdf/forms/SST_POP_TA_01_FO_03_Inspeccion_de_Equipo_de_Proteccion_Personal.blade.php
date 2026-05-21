@@ -341,7 +341,7 @@
         border-collapse:separate;
         border-spacing:0;
         table-layout:fixed;
-        font-size:5px;
+        font-size:7px;
     ">
     
         <colgroup>
@@ -424,7 +424,7 @@
     
             <!-- RODILLERAS -->
             <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Rodilleras<br>(Desgastes, Roturas)</div>
+                <div class="vertical-text">Rodilleras<br>(Desgastes,<br>Roturas)</div>
             </td>
     
             <!-- ZAPATO -->
