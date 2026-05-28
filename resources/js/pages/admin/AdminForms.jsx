@@ -14,6 +14,7 @@ import SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena from "../user
 import SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles from "../user/forms/layouts/SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles";
 import SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal from "../user/forms/layouts/SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal";
 import SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles from "../user/forms/layouts/SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles";
+import SST_PGI_TA_02_FO_03_Checklist_de_Botiquines from "../user/forms/layouts/SST_PGI_TA_02_FO_03_Checklist_de_Botiquines";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1270,6 +1271,9 @@ export default function AdminForms() {
 
     sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles:
       SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles,
+
+    sst_pgi_ta_02_fo_03_checklist_de_botiquines:
+      SST_PGI_TA_02_FO_03_Checklist_de_Botiquines,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

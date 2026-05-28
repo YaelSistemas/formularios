@@ -94,6 +94,9 @@ class FormSubmissionPdfController extends Controller
 
             'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles'
                 => 'pdf.forms.SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles',
+            
+            'sst_pgi_ta_02_fo_03_checklist_de_botiquines'
+                => 'pdf.forms.SST_PGI_TA_02_FO_03_Checklist_de_Botiquines',
 
             default => 'pdf.forms.generic_submission',
         };
