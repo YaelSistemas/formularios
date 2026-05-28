@@ -98,6 +98,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pgi_ta_02_fo_03_checklist_de_botiquines'
                 => 'pdf.forms.SST_PGI_TA_02_FO_03_Checklist_de_Botiquines',
 
+            'sst_pgi_ta_02_fo_02_checklist_de_extintor'
+                => 'pdf.forms.SST_PGI_TA_02_FO_02_Checklist_de_Extintor',
+
             default => 'pdf.forms.generic_submission',
         };
     }
