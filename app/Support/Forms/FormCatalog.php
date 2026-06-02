@@ -18,6 +18,7 @@ use App\Support\Forms\Definitions\SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Pr
 use App\Support\Forms\Definitions\SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles;
 use App\Support\Forms\Definitions\SST_PGI_TA_02_FO_03_Checklist_de_Botiquines;
 use App\Support\Forms\Definitions\SST_PGI_TA_02_FO_02_Checklist_de_Extintor;
+use App\Support\Forms\Definitions\SST_PGI_TA_01_FO_01_Boleta_de_Observaciones;
 class FormCatalog
 {
     public static function definitions(): array
@@ -39,6 +40,7 @@ class FormCatalog
             SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles::class,
             SST_PGI_TA_02_FO_03_Checklist_de_Botiquines::class,
             SST_PGI_TA_02_FO_02_Checklist_de_Extintor::class,
+            SST_PGI_TA_01_FO_01_Boleta_de_Observaciones::class,
         ];
     }
 }

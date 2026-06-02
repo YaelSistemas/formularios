@@ -573,6 +573,10 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sst_pgi_ta_02_fo_02_checklist_de_extintor') {
                             $storedPath = $this->storeSignatureForChecklistExtintor($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sst_pgi_ta_01_fo_01_boleta_de_observaciones') {
+                            $storedPath = $this->storeSignatureForBoletaObservaciones($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
@@ -592,6 +596,7 @@ class FormSubmissionsController extends Controller
                                 'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles',
                                 'sst_pgi_ta_02_fo_03_checklist_de_botiquines',
                                 'sst_pgi_ta_02_fo_02_checklist_de_extintor',
+                                'sst_pgi_ta_01_fo_01_boleta_de_observaciones',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1370,7 +1375,55 @@ class FormSubmissionsController extends Controller
         \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
     
         return $relativePath;
-}
+    }
+
+    private function storeSignatureForBoletaObservaciones(string $dataUrl,?int $userId,string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SSTPGITA01FO01_BoletaObservaciones';
+    
+        $directory = match ($fieldId) {
+            'firma_reporta_observacion'
+                => $baseDirectory . '/Reporta_Observacion',
+    
+            'firma_observado'
+                => $baseDirectory . '/Observado',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return $relativePath;
+    }
 
     public function destroy(Request $request, Form $form, FormSubmission $submission)
     {

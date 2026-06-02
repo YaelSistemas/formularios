@@ -101,6 +101,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pgi_ta_02_fo_02_checklist_de_extintor'
                 => 'pdf.forms.SST_PGI_TA_02_FO_02_Checklist_de_Extintor',
 
+            'sst_pgi_ta_01_fo_01_boleta_de_observaciones'
+                => 'pdf.forms.SST_PGI_TA_01_FO_01_Boleta_de_Observaciones',
+
             default => 'pdf.forms.generic_submission',
         };
     }

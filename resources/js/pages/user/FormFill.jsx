@@ -20,6 +20,7 @@ import SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal from "./f
 import SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles from "./forms/layouts/SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles";
 import SST_PGI_TA_02_FO_03_Checklist_de_Botiquines from "./forms/layouts/SST_PGI_TA_02_FO_03_Checklist_de_Botiquines";
 import SST_PGI_TA_02_FO_02_Checklist_de_Extintor from "./forms/layouts/SST_PGI_TA_02_FO_02_Checklist_de_Extintor";
+import SST_PGI_TA_01_FO_01_Boleta_de_Observaciones from "./forms/layouts/SST_PGI_TA_01_FO_01_Boleta_de_Observaciones";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -552,6 +553,13 @@ export default function FormFill({
         case "checklist_de_extintor":
           return (
             <SST_PGI_TA_02_FO_02_Checklist_de_Extintor
+              {...sharedProps}
+            />
+          );
+
+        case "boleta_de_observaciones":
+          return (
+            <SST_PGI_TA_01_FO_01_Boleta_de_Observaciones
               {...sharedProps}
             />
           );
