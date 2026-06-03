@@ -21,6 +21,7 @@ import SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles from "./forms/layouts/S
 import SST_PGI_TA_02_FO_03_Checklist_de_Botiquines from "./forms/layouts/SST_PGI_TA_02_FO_03_Checklist_de_Botiquines";
 import SST_PGI_TA_02_FO_02_Checklist_de_Extintor from "./forms/layouts/SST_PGI_TA_02_FO_02_Checklist_de_Extintor";
 import SST_PGI_TA_01_FO_01_Boleta_de_Observaciones from "./forms/layouts/SST_PGI_TA_01_FO_01_Boleta_de_Observaciones";
+import SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas from "./forms/layouts/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -560,6 +561,13 @@ export default function FormFill({
         case "boleta_de_observaciones":
           return (
             <SST_PGI_TA_01_FO_01_Boleta_de_Observaciones
+              {...sharedProps}
+            />
+          );
+
+        case "checklist_eslingas_de_cadenas":
+          return (
+            <SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas
               {...sharedProps}
             />
           );

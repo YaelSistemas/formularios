@@ -104,6 +104,9 @@ class FormSubmissionPdfController extends Controller
             'sst_pgi_ta_01_fo_01_boleta_de_observaciones'
                 => 'pdf.forms.SST_PGI_TA_01_FO_01_Boleta_de_Observaciones',
 
+            'sgi_pop_lg_01_fo_09_checklist_eslingas_de_cadenas'
+                => 'pdf.forms.SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas',
+
             default => 'pdf.forms.generic_submission',
         };
     }

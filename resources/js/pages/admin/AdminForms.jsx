@@ -17,6 +17,7 @@ import SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles from "../user/forms/lay
 import SST_PGI_TA_02_FO_03_Checklist_de_Botiquines from "../user/forms/layouts/SST_PGI_TA_02_FO_03_Checklist_de_Botiquines";
 import SST_PGI_TA_02_FO_02_Checklist_de_Extintor from "../user/forms/layouts/SST_PGI_TA_02_FO_02_Checklist_de_Extintor";
 import SST_PGI_TA_01_FO_01_Boleta_de_Observaciones from "../user/forms/layouts/SST_PGI_TA_01_FO_01_Boleta_de_Observaciones";
+import SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas from "../user/forms/layouts/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1282,6 +1283,9 @@ export default function AdminForms() {
 
     sst_pgi_ta_01_fo_01_boleta_de_observaciones:
       SST_PGI_TA_01_FO_01_Boleta_de_Observaciones,
+
+    sgi_pop_lg_01_fo_09_checklist_eslingas_de_cadenas:
+      SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {
