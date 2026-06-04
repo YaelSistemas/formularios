@@ -107,6 +107,9 @@ class FormSubmissionPdfController extends Controller
             'sgi_pop_lg_01_fo_09_checklist_eslingas_de_cadenas'
                 => 'pdf.forms.SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas',
 
+            'sgi_pop_lg_01_fo_08_inspeccion_de_grua_viajera'
+                => 'pdf.forms.sgi_pop_lg_01_fo_08_inspeccion_de_grua_viajera',
+
             default => 'pdf.forms.generic_submission',
         };
     }

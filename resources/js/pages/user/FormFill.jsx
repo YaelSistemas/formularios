@@ -22,6 +22,7 @@ import SST_PGI_TA_02_FO_03_Checklist_de_Botiquines from "./forms/layouts/SST_PGI
 import SST_PGI_TA_02_FO_02_Checklist_de_Extintor from "./forms/layouts/SST_PGI_TA_02_FO_02_Checklist_de_Extintor";
 import SST_PGI_TA_01_FO_01_Boleta_de_Observaciones from "./forms/layouts/SST_PGI_TA_01_FO_01_Boleta_de_Observaciones";
 import SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas from "./forms/layouts/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas";
+import SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -571,6 +572,13 @@ export default function FormFill({
               {...sharedProps}
             />
           );
+
+        case "inspeccion_de_grua_viajera":
+        return (
+          <SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera
+            {...sharedProps}
+          />
+        );
           
       default:
         return <DefaultFormLayout {...sharedProps} />;
