@@ -21,6 +21,7 @@ use App\Support\Forms\Definitions\SST_PGI_TA_02_FO_02_Checklist_de_Extintor;
 use App\Support\Forms\Definitions\SST_PGI_TA_01_FO_01_Boleta_de_Observaciones;
 use App\Support\Forms\Definitions\SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas;
 use App\Support\Forms\Definitions\SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera;
+use App\Support\Forms\Definitions\SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera;
 class FormCatalog
 {
     public static function definitions(): array
@@ -45,6 +46,7 @@ class FormCatalog
             SST_PGI_TA_01_FO_01_Boleta_de_Observaciones::class,
             SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas::class,
             SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera::class,
+            SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera::class,
         ];
     }
 }

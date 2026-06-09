@@ -585,6 +585,10 @@ class FormSubmissionsController extends Controller
                         if ($formCodeKey === 'sgi_pop_lg_01_fo_08_inspeccion_de_grua_viajera') {
                             $storedPath = $this->storeSignatureForInspeccionGruaViajera($v, $userId, $id);
                         }
+
+                        if ($formCodeKey === 'sgi_pop_lg_01_fo_06_checklist_de_mantenimiento_grua_viajera') {
+                            $storedPath = $this->storeSignatureForChecklistMantenimientoGruaViajera($v, $userId, $id);
+                        }
                     
                         if (
                             in_array($formCodeKey, [
@@ -607,6 +611,7 @@ class FormSubmissionsController extends Controller
                                 'sst_pgi_ta_01_fo_01_boleta_de_observaciones',
                                 'sgi_pop_lg_01_fo_09_checklist_eslingas_de_cadenas',
                                 'sgi_pop_lg_01_fo_08_inspeccion_de_grua_viajera',
+                                'sgi_pop_lg_01_fo_06_checklist_de_mantenimiento_grua_viajera',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1495,6 +1500,48 @@ class FormSubmissionsController extends Controller
         $directory = match ($fieldId) {
             'firma_responsable_inspeccion' =>
                 $baseDirectory . '/Responsable_Inspeccion',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForChecklistMantenimientoGruaViajera(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SGIPOPLG01FO06_ChecklistMantenimientoGruaViajera';
+    
+        $directory = match ($fieldId) {
+            'firma_responsable_mantenimiento' =>
+                $baseDirectory . '/Responsable_Mantenimiento',
     
             default => $baseDirectory,
         };
