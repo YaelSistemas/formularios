@@ -20,6 +20,7 @@ import SST_PGI_TA_01_FO_01_Boleta_de_Observaciones from "../user/forms/layouts/S
 import SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas from "../user/forms/layouts/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas";
 import SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera from "../user/forms/layouts/SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera";
 import SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera from "../user/forms/layouts/SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera";
+import SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda from "../user/forms/layouts/SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1294,6 +1295,9 @@ export default function AdminForms() {
 
     sgi_pop_lg_01_fo_06_checklist_de_mantenimiento_grua_viajera:
       SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera,
+
+    sgi_pop_lg_01_fo_04_checklist_de_mantenimiento_cortadora_de_banda:
+      SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

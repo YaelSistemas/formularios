@@ -113,6 +113,9 @@ class FormSubmissionPdfController extends Controller
             'sgi_pop_lg_01_fo_06_checklist_de_mantenimiento_grua_viajera'
                 => 'pdf.forms.SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera',
 
+            'sgi_pop_lg_01_fo_04_checklist_de_mantenimiento_cortadora_de_banda'
+                => 'pdf.forms.SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda',
+
             default => 'pdf.forms.generic_submission',
         };
     }

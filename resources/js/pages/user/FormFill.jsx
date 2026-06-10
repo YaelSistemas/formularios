@@ -24,6 +24,7 @@ import SST_PGI_TA_01_FO_01_Boleta_de_Observaciones from "./forms/layouts/SST_PGI
 import SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas from "./forms/layouts/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas";
 import SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera";
 import SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera";
+import SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda from "./forms/layouts/SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -584,6 +585,13 @@ export default function FormFill({
       case "checklist_de_mantenimiento_grua_viajera":
         return (
           <SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera
+            {...sharedProps}
+          />
+        );
+
+      case "checklist_de_mantenimiento_cortadora_de_banda":
+        return (
+          <SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda
             {...sharedProps}
           />
         );

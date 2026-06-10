@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera({
+export default function SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda({
   form,
   fields,
   answers,
@@ -17,6 +17,9 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
 }) {
   const [formFieldError, setFormFieldError] = useState("");
   const [formFieldErrorId, setFormFieldErrorId] = useState(null);
+  const [indicacionesOpen, setIndicacionesOpen] = useState(true);
+  const [condicionesMecanicasOpen, setCondicionesMecanicasOpen] = useState(true);
+  const [condicionesElectricasOpen, setCondicionesElectricasOpen] = useState(true);
 
   const [signatureModal, setSignatureModal] = useState({
     open: false,
@@ -27,10 +30,6 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
     if (typeof window === "undefined") return false;
     return window.innerWidth < 768;
   });
-
-  const [openIndicaciones, setOpenIndicaciones] = useState(true);
-  const [openCondicionesMecanicas, setOpenCondicionesMecanicas] = useState(true);
-  const [openCondicionesElectricas, setOpenCondicionesElectricas] = useState(true);
 
   const signatureCanvasRef = useRef(null);
   const signatureWrapperRef = useRef(null);
@@ -85,24 +84,19 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
     }
   };
 
-  const isMecanicasFieldId = (fieldId) => {
-    return String(fieldId || "").startsWith("mecanicas_");
-  };
+  const openSectionForFieldError = (fieldId) => {
+    const id = String(fieldId || "");
 
-  const isElectricasFieldId = (fieldId) => {
-    return String(fieldId || "").startsWith("electricas_");
-  };
-
-  const openSectionsForFieldError = (fieldId) => {
-    if (isMecanicasFieldId(fieldId)) {
-      setOpenIndicaciones(true);
-      setOpenCondicionesMecanicas(true);
+    if (id.startsWith("mecanicas_")) {
+      setIndicacionesOpen(true);
+      setCondicionesMecanicasOpen(true);
       return;
     }
 
-    if (isElectricasFieldId(fieldId)) {
-      setOpenIndicaciones(true);
-      setOpenCondicionesElectricas(true);
+    if (id.startsWith("electricas_")) {
+      setIndicacionesOpen(true);
+      setCondicionesElectricasOpen(true);
+      return;
     }
   };
 
@@ -110,7 +104,7 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
     setMsg("");
     setFormFieldError(message);
     setFormFieldErrorId(fieldId);
-    openSectionsForFieldError(fieldId);
+    openSectionForFieldError(fieldId);
 
     if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
 
@@ -130,7 +124,7 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
           if (inputEl?.focus) inputEl.focus();
         }, 180);
       });
-    }, 120);
+    }, 80);
 
     formErrorTimerRef.current = setTimeout(() => {
       setFormFieldError("");
@@ -900,36 +894,41 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
   };
 
   const renderMainSectionBox = (title, sections, isOpen = true, setIsOpen = null) => {
-    const canToggle = typeof setIsOpen === "function";
-
     return (
       <div style={nestedSectionStyle}>
-        <button
-          type="button"
-          onClick={() => {
-            if (canToggle) setIsOpen((prev) => !prev);
-          }}
-          disabled={!canToggle}
-          style={{
-            ...nestedSectionHeaderStyle,
-            width: "100%",
-            border: "none",
-            borderBottom: isOpen ? "1px solid #dbe4ee" : "none",
-            cursor: canToggle && !readOnly ? "pointer" : canToggle ? "pointer" : "default",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            textAlign: "left",
-            appearance: "none",
-          }}
-        >
-          <span>{title}</span>
-          {canToggle ? (
-            <span style={{ fontSize: 12, lineHeight: 1 }}>
-              {isOpen ? "▲" : "▼"}
+        {typeof setIsOpen === "function" ? (
+          <button
+            type="button"
+            onClick={() => setIsOpen((prev) => !prev)}
+            style={{
+              ...nestedSectionHeaderStyle,
+              width: "100%",
+              border: "none",
+              borderBottom: isOpen ? "1px solid #dbe4ee" : "none",
+              cursor: "pointer",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              textAlign: "left",
+            }}
+          >
+            <span>{title}</span>
+            <span
+              aria-hidden="true"
+              style={{
+                fontSize: 16,
+                lineHeight: 1,
+                transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s ease",
+              }}
+            >
+              ▾
             </span>
-          ) : null}
-        </button>
+          </button>
+        ) : (
+          <div style={nestedSectionHeaderStyle}>{title}</div>
+        )}
 
         {isOpen ? (
           <div
@@ -948,113 +947,44 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
 
   const condicionesMecanicasSections = [
     {
-      title: "1. Transmisión Longitudinal",
+      title: "1. Moto-reductores",
       criteria: [
-        { baseId: "mecanicas_1_1_rodajas", title: "1.1. Rodajas" },
-        { baseId: "mecanicas_1_2_baleros", title: "1.2. Baleros" },
-        { baseId: "mecanicas_1_3_tren_engrane", title: "1.3. Tren de engrane" },
-        { baseId: "mecanicas_1_4_vias_desplazamiento", title: "1.4. Vías de desplazamiento" },
-        { baseId: "mecanicas_1_5_tornilleria", title: "1.5. Tornillería" },
+        { baseId: "mecanicas_1_1_niveles_aceite", title: "1.1. Niveles de aceite" },
+        { baseId: "mecanicas_1_2_alineamiento_cadenas", title: "1.2. Alineamiento de cadenas" },
+        { baseId: "mecanicas_1_3_baleros_motores", title: "1.3. Baleros de los motores" },
+        { baseId: "mecanicas_1_4_chumaceras", title: "1.4. Chumaceras" },
+        { baseId: "mecanicas_1_5_tren_engranaje", title: "1.5. Tren de engranaje" },
       ],
     },
     {
-      title: "2. Transmisión Transversal",
+      title: "2. Mesa de Corte",
       criteria: [
-        { baseId: "mecanicas_2_1_rodajas", title: "2.1. Rodajas" },
-        { baseId: "mecanicas_2_2_baleros", title: "2.2. Baleros" },
-        { baseId: "mecanicas_2_3_tren_engrane", title: "2.3. Tren de engrane" },
-        { baseId: "mecanicas_2_4_vias_desplazamiento", title: "2.4. Vías de desplazamiento" },
-        { baseId: "mecanicas_2_5_tornilleria", title: "2.5. Tornillería" },
-      ],
-    },
-    {
-      title: "3. Niveles aceite de motorreductores",
-      criteria: [
-        {
-          baseId: "mecanicas_3_niveles_aceite_motorreductores",
-          title: "3. Niveles aceite de motorreductores",
-          resultLabel: "Resultado",
-        },
-      ],
-    },
-    {
-      title: "4. Embrague y Freno",
-      criteria: [
-        { baseId: "mecanicas_4_1_discos", title: "4.1. Discos" },
-        { baseId: "mecanicas_4_2_pastas", title: "4.2. Pastas" },
-        { baseId: "mecanicas_4_3_tornilleria", title: "4.3. Tornillería" },
-      ],
-    },
-    {
-      title: "5. Tambor de Transmisión",
-      criteria: [
-        { baseId: "mecanicas_5_1_cable_acero", title: "5.1. Cable de acero" },
-        { baseId: "mecanicas_5_2_ganchos", title: "5.2. Ganchos 22.5 y 8.5 Ton." },
+        { baseId: "mecanicas_2_1_balero_chumaceras", title: "2.1. Balero de chumaceras" },
+        { baseId: "mecanicas_2_2_tornilleria", title: "2.2. Tornillería" },
       ],
     },
   ];
 
   const condicionesElectricasSections = [
     {
-      title: "1. Conexiones y aislantes de motores",
+      title: "1. Tablero de Control",
       criteria: [
-        {
-          baseId: "electricas_1_conexiones_aislantes_motores",
-          title: "1. Conexiones y aislantes de motores",
-          resultLabel: "Resultado",
-        },
+        { baseId: "electricas_1_1_variadores_velocidad", title: "1.1. Variadores de velocidad" },
+        { baseId: "electricas_1_2_contactores", title: "1.2. Contactores" },
+        { baseId: "electricas_1_3_conexiones", title: "1.3. Conexiones" },
+        { baseId: "electricas_1_4_selector_motor", title: "1.4. Selector de motor" },
       ],
     },
     {
-      title: "2. Sensores de paro",
+      title: "2. Motores",
       criteria: [
-        { baseId: "electricas_2_1_longitudinal", title: "2.1. Longitudinal" },
-        { baseId: "electricas_2_2_transversal", title: "2.2. Transversal" },
-        { baseId: "electricas_2_3_ganchos_subida", title: "2.3. Ganchos de subida" },
-      ],
-    },
-    {
-      title: "3. Variadores de Velocidad",
-      criteria: [
-        {
-          baseId: "electricas_3_variadores_velocidad",
-          title: "3. Variadores de Velocidad",
-          resultLabel: "Resultado",
-        },
-      ],
-    },
-    {
-      title: "4. Tableros Eléctricos",
-      criteria: [
-        {
-          baseId: "electricas_4_tableros_electricos",
-          title: "4. Tableros Eléctricos",
-          resultLabel: "Resultado",
-        },
-      ],
-    },
-    {
-      title: "5. Botonera",
-      criteria: [
-        {
-          baseId: "electricas_5_botonera",
-          title: "5. Botonera",
-          resultLabel: "Resultado",
-        },
-      ],
-    },
-    {
-      title: "6. Toma Corriente",
-      criteria: [
-        {
-          baseId: "electricas_6_toma_corriente",
-          title: "6. Toma Corriente",
-          resultLabel: "Resultado",
-        },
+        { baseId: "electricas_2_1_conexiones", title: "2.1. Conexiones" },
+        { baseId: "electricas_2_2_aislantes", title: "2.2. Aislantes" },
       ],
     },
   ];
 
+  const separacionIndicacionesLlenado = getField("separacion_indicaciones_llenado");
   const indicacion1 = getField("indicacion_1");
   const observacionesGenerales = getField("observaciones_generales");
 
@@ -1423,36 +1353,71 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
 
             {taller ? renderDivider("taller_divider") : null}
 
-            <div style={nestedSectionStyle}>
+            {nombreResponsableMantenimiento ? renderOuterField(nombreResponsableMantenimiento) : null}
+
+            {nombreResponsableMantenimiento && firmaResponsableMantenimiento
+              ? renderDivider("nombre_responsable_divider")
+              : null}
+
+            {firmaResponsableMantenimiento ? renderOuterField(firmaResponsableMantenimiento) : null}
+
+            {firmaResponsableMantenimiento ? renderDivider("firma_responsable_divider") : null}
+
+            <div
+              style={{
+                border: "1px solid #dbe4ee",
+                borderRadius: 16,
+                overflow: "hidden",
+                background: "#ffffff",
+              }}
+            >
               <button
                 type="button"
-                onClick={() => setOpenIndicaciones((prev) => !prev)}
+                onClick={() => setIndicacionesOpen((prev) => !prev)}
                 style={{
-                  ...nestedSectionHeaderStyle,
                   width: "100%",
                   border: "none",
-                  borderBottom: openIndicaciones ? "1px solid #dbe4ee" : "none",
+                  borderBottom: indicacionesOpen ? "1px solid #dbe4ee" : "none",
+                  background: "#eef2f7",
+                  color: "#0f172a",
+                  padding: isMobile ? "13px 14px" : "15px 18px",
                   cursor: "pointer",
                   display: "flex",
-                  alignItems: "center",
                   justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
                   textAlign: "left",
-                  appearance: "none",
+                  fontWeight: 900,
+                  fontSize: isMobile ? 15 : 16,
+                  lineHeight: 1.35,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.2,
                 }}
               >
-                <span>INDICACIONES DE LLENADO</span>
-                <span style={{ fontSize: 12, lineHeight: 1 }}>
-                  {openIndicaciones ? "▲" : "▼"}
+                <span>
+                  {separacionIndicacionesLlenado?.text ||
+                    separacionIndicacionesLlenado?.label ||
+                    "INDICACIONES DE LLENADO"}
+                </span>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    fontSize: 18,
+                    lineHeight: 1,
+                    transform: indicacionesOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  ▾
                 </span>
               </button>
 
-              {openIndicaciones ? (
+              {indicacionesOpen ? (
                 <div
                   style={{
                     padding: isMobile ? 12 : 14,
                     display: "grid",
                     gap: isMobile ? 12 : 14,
-                    background: "#fff",
                   }}
                 >
                   {indicacion1 ? (
@@ -1468,38 +1433,20 @@ export default function SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viaj
                     </div>
                   ) : null}
 
-                  {renderMainSectionBox(
-                    "CONDICIONES MECÁNICAS",
-                    condicionesMecanicasSections,
-                    openCondicionesMecanicas,
-                    setOpenCondicionesMecanicas
-                  )}
+                  {renderMainSectionBox("CONDICIONES MECÁNICAS", condicionesMecanicasSections, condicionesMecanicasOpen, setCondicionesMecanicasOpen)}
 
-                  {renderMainSectionBox(
-                    "CONDICIONES ELÉCTRICAS",
-                    condicionesElectricasSections,
-                    openCondicionesElectricas,
-                    setOpenCondicionesElectricas
-                  )}
+                  {renderMainSectionBox("CONDICIONES ELÉCTRICAS", condicionesElectricasSections, condicionesElectricasOpen, setCondicionesElectricasOpen)}
                 </div>
               ) : null}
             </div>
 
             {renderDivider("observaciones_generales_divider")}
-
-            {observacionesGenerales
-              ? renderOuterField({ ...observacionesGenerales, label: "Observaciones Generales" })
-              : null}
             
-            {renderDivider("observaciones_generales_divider")}
-
-            {nombreResponsableMantenimiento ? renderOuterField(nombreResponsableMantenimiento) : null}
-
-            {nombreResponsableMantenimiento && firmaResponsableMantenimiento
-              ? renderDivider("nombre_responsable_divider")
-              : null}
-
-            {firmaResponsableMantenimiento ? renderOuterField(firmaResponsableMantenimiento) : null}
+            {observacionesGenerales ? (
+              <div>
+                {renderOuterField({ ...observacionesGenerales, label: "Observaciones Generales" })}
+              </div>
+            ) : null}
           </div>
 
           {!readOnly ? (

@@ -371,7 +371,7 @@
                             vertical-align:middle;
                             font-weight:bold;
                         ">
-                            {{ $esMalas ? 'X' : '' }}
+                            {{ $esMalas ? 'x' : '' }}
                         </td>
                     
                         <!-- OBSERVACIONES -->
@@ -379,7 +379,7 @@
                             border:1px solid #000;
                             height:{{ $rowHeight }}px;
                             padding:3px;
-                            text-align:left;
+                            text-align:center;
                             vertical-align:middle;
                         ">
                             {{ $observaciones }}
@@ -419,7 +419,7 @@
                             vertical-align:middle;
                             font-weight:bold;
                         ">
-                            {{ $esMalas ? 'X' : '' }}
+                            {{ $esMalas ? 'x' : '' }}
                         </td>
                         
                         <!-- OBSERVACIONES -->
@@ -427,7 +427,7 @@
                             border:1px solid #000;
                             height:{{ $rowHeight }}px;
                             padding:3px;
-                            text-align:left;
+                            text-align:center;
                             vertical-align:middle;
                         ">
                             {{ $observaciones }}
@@ -581,7 +581,7 @@
                             vertical-align:middle;
                             font-weight:bold;
                         ">
-                            {{ $esMalas ? 'X' : '' }}
+                            {{ $esMalas ? 'x' : '' }}
                         </td>
                         
                         <!-- OBSERVACIONES -->
@@ -589,7 +589,7 @@
                             border:1px solid #000;
                             height:{{ $rowHeight }}px;
                             padding:3px;
-                            text-align:left;
+                            text-align:center;
                             vertical-align:middle;
                         ">
                             {{ $observaciones }}
@@ -616,10 +616,10 @@
             <tr>
                 <td colspan="5" style="
                     border:1px solid #000;
-                    height:{{ $rowHeight * 2 }}px;
-                    padding:3px;
-                    text-align:left;
-                    vertical-align:top;
+                    height:40px;
+                    padding:3px; 
+                    text-align:left; 
+                    vertical-align:middle;
                 ">
                     {{ data_get($answers, 'observaciones_generales', '') }}
                 </td>
@@ -678,27 +678,26 @@
             <tr>
                 <td style="
                     border:1px solid #000;
-                    height:80px;
+                    height:60px;
                     padding:3px;
                     text-align:center;
                     vertical-align:middle;
-                    font-weight:bold;
                 ">
                     {{ $nombreResponsable }}
                 </td>
         
                 <td style="
                     border:1px solid #000;
-                    height:80px;
+                    height:60px;
                     padding:3px;
                     text-align:center;
                     vertical-align:middle;
                 ">
                     @if($firmaSrc)
                         <img src="{{ $firmaSrc }}" style="
-                            max-width:140px;
-                            max-height:50px;
-                            object-fit:contain;
+                            max-width: 180px;
+                                max-height: 50px;
+                                object-fit: contain;
                         ">
                     @endif
                 </td>
