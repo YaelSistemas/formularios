@@ -25,6 +25,7 @@ import SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas from "./forms/layouts/S
 import SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera";
 import SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera";
 import SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda from "./forms/layouts/SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda";
+import SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas from "./forms/layouts/SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -582,19 +583,26 @@ export default function FormFill({
           />
         );
 
-      case "checklist_de_mantenimiento_grua_viajera":
-        return (
-          <SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera
-            {...sharedProps}
-          />
-        );
+        case "checklist_de_mantenimiento_grua_viajera":
+          return (
+            <SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera
+              {...sharedProps}
+            />
+          );
+  
+        case "checklist_de_mantenimiento_cortadora_de_banda":
+          return (
+            <SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda
+              {...sharedProps}
+            />
+          );
 
-      case "checklist_de_mantenimiento_cortadora_de_banda":
-        return (
-          <SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda
-            {...sharedProps}
-          />
-        );
+          case "checklist_semanal_montacargas":
+            return (
+              <SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas
+                {...sharedProps}
+              />
+            );
           
       default:
         return <DefaultFormLayout {...sharedProps} />;

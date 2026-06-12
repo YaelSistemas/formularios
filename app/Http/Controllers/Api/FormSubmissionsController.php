@@ -594,6 +594,10 @@ class FormSubmissionsController extends Controller
                             $storedPath = $this->storeSignatureForChecklistMantenimientoCortadoraBanda($v, $userId, $id);
                         }
 
+                        if ($formCodeKey === 'sgi_pop_lg_01_fo_03_checklist_semanal_montacargas') {
+                            $storedPath = $this->storeSignatureForChecklistSemanalMontacargas($v, $userId, $id);
+                        }
+
                         if (
                             in_array($formCodeKey, [
                                 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil',
@@ -617,6 +621,7 @@ class FormSubmissionsController extends Controller
                                 'sgi_pop_lg_01_fo_08_inspeccion_de_grua_viajera',
                                 'sgi_pop_lg_01_fo_06_checklist_de_mantenimiento_grua_viajera',
                                 'sgi_pop_lg_01_fo_04_checklist_de_mantenimiento_cortadora_de_banda',
+                                'sgi_pop_lg_01_fo_03_checklist_semanal_montacargas',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1613,6 +1618,52 @@ class FormSubmissionsController extends Controller
     
         return $relativePath;
     }
+
+    private function storeSignatureForChecklistSemanalMontacargas(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SGIPOPLG01FO03_ChecklistSemanalMontacargas';
+    
+        $directory = match ($fieldId) {
+            'firma_inspector' =>
+                $baseDirectory . '/Inspector',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return $relativePath;
+    }
+
     public function destroy(Request $request, Form $form, FormSubmission $submission)
     {
         $user = $request->user();

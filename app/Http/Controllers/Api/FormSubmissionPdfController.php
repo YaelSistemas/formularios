@@ -116,6 +116,9 @@ class FormSubmissionPdfController extends Controller
             'sgi_pop_lg_01_fo_04_checklist_de_mantenimiento_cortadora_de_banda'
                 => 'pdf.forms.SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda',
 
+            'sgi_pop_lg_01_fo_03_checklist_semanal_montacargas'
+                => 'pdf.forms.SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas',
+
             default => 'pdf.forms.generic_submission',
         };
     }
