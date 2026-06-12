@@ -119,6 +119,9 @@ class FormSubmissionPdfController extends Controller
             'sgi_pop_lg_01_fo_03_checklist_semanal_montacargas'
                 => 'pdf.forms.SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas',
 
+            'sgi_pop_lg_01_07_checklist_mantenimiento_sistema_electrico'
+                => 'pdf.forms.SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico',
+
             default => 'pdf.forms.generic_submission',
         };
     }

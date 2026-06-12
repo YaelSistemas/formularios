@@ -26,6 +26,7 @@ import SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera from "./forms/layouts/SGI_
 import SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera";
 import SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda from "./forms/layouts/SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda";
 import SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas from "./forms/layouts/SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas";
+import SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico from "./forms/layouts/SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -600,6 +601,13 @@ export default function FormFill({
           case "checklist_semanal_montacargas":
             return (
               <SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas
+                {...sharedProps}
+              />
+            );
+
+          case "checklist_mantenimiento_sistema_electrico":
+            return (
+              <SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico
                 {...sharedProps}
               />
             );

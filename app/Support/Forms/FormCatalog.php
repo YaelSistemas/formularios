@@ -24,6 +24,7 @@ use App\Support\Forms\Definitions\SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera
 use App\Support\Forms\Definitions\SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera;
 use App\Support\Forms\Definitions\SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda;
 use App\Support\Forms\Definitions\SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas;
+use App\Support\Forms\Definitions\SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico;
 class FormCatalog
 {
     public static function definitions(): array
@@ -51,6 +52,7 @@ class FormCatalog
             SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera::class,
             SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda::class,
             SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas::class,
+            SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico::class,
         ];
     }
 }
