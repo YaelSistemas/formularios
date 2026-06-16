@@ -606,6 +606,10 @@ class FormSubmissionsController extends Controller
                             $storedPath = $this->storeSignatureForChecklistInspeccionEstrobos($v, $userId, $id);
                         }
 
+                        if ($formCodeKey === 'sgi_pop_gt_01_fo_10_checklist_inspeccion_de_eslingas') {
+                            $storedPath = $this->storeSignatureForChecklistInspeccionEslingas($v, $userId, $id);
+                        }
+
                         if (
                             in_array($formCodeKey, [
                                 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil',
@@ -632,6 +636,7 @@ class FormSubmissionsController extends Controller
                                 'sgi_pop_lg_01_fo_03_checklist_semanal_montacargas',
                                 'sgi_pop_lg_01_07_checklist_mantenimiento_sistema_electrico',
                                 'sgi_pop_gt_01_fo_11_checklist_de_inspeccion_de_estrobos',
+                                'sgi_pop_gt_01_fo_10_checklist_inspeccion_de_eslingas',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1742,6 +1747,54 @@ class FormSubmissionsController extends Controller
     
             'firma_supervisor' =>
                 $baseDirectory . '/Firma_Supervisor',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForChecklistInspeccionEslingas(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SGIPOPGT01FO10_ChecklistInspeccionEslingas';
+    
+        $directory = match ($fieldId) {
+            'firma_colaborador_inspecciona' =>
+                $baseDirectory . '/Inspecciona',
+    
+            'firma_supervisor' =>
+                $baseDirectory . '/Supervisor',
     
             default => $baseDirectory,
         };
