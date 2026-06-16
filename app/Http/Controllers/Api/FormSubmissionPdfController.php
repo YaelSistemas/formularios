@@ -122,6 +122,9 @@ class FormSubmissionPdfController extends Controller
             'sgi_pop_lg_01_07_checklist_mantenimiento_sistema_electrico'
                 => 'pdf.forms.SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico',
 
+            'sgi_pop_gt_01_fo_11_checklist_de_inspeccion_de_estrobos'
+                => 'pdf.forms.SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos',
+                
             default => 'pdf.forms.generic_submission',
         };
     }

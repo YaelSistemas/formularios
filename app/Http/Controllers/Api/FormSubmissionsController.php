@@ -602,6 +602,10 @@ class FormSubmissionsController extends Controller
                             $storedPath = $this->storeSignatureForChecklistMantenimientoSistemaElectrico($v, $userId, $id);
                         }
 
+                        if ($formCodeKey === 'sgi_pop_gt_01_fo_11_checklist_de_inspeccion_de_estrobos') {
+                            $storedPath = $this->storeSignatureForChecklistInspeccionEstrobos($v, $userId, $id);
+                        }
+
                         if (
                             in_array($formCodeKey, [
                                 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil',
@@ -627,6 +631,7 @@ class FormSubmissionsController extends Controller
                                 'sgi_pop_lg_01_fo_04_checklist_de_mantenimiento_cortadora_de_banda',
                                 'sgi_pop_lg_01_fo_03_checklist_semanal_montacargas',
                                 'sgi_pop_lg_01_07_checklist_mantenimiento_sistema_electrico',
+                                'sgi_pop_gt_01_fo_11_checklist_de_inspeccion_de_estrobos',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1689,6 +1694,54 @@ class FormSubmissionsController extends Controller
         $directory = match ($fieldId) {
             'firma_responsable_mantenimiento' =>
                 $baseDirectory . '/Responsable_Mantenimiento',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForChecklistInspeccionEstrobos(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SGIPOPGT01FO11_ChecklistInspeccionEstrobos';
+    
+        $directory = match ($fieldId) {
+            'firma_inspector' =>
+                $baseDirectory . '/Firma_Inspector',
+    
+            'firma_supervisor' =>
+                $baseDirectory . '/Firma_Supervisor',
     
             default => $baseDirectory,
         };

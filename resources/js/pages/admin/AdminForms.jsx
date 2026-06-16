@@ -23,6 +23,7 @@ import SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera from "../user
 import SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda from "../user/forms/layouts/SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda";
 import SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas from "../user/forms/layouts/SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas";
 import SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico from "../user/forms/layouts/SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico";
+import SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos from "../user/forms/layouts/SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1306,6 +1307,9 @@ export default function AdminForms() {
 
     sgi_pop_lg_01_07_checklist_mantenimiento_sistema_electrico:
       SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico,
+
+    sgi_pop_gt_01_fo_11_checklist_de_inspeccion_de_estrobos:
+      SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {
