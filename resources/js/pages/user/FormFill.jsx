@@ -30,6 +30,7 @@ import SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico from "./forms/
 import SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos from "./forms/layouts/SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos";
 import SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas from "./forms/layouts/SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas";
 import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "./forms/layouts/SGI_POP_GT_01_FO_09_Checklist_de_Prensas";
+import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "./forms/layouts/SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -632,6 +633,13 @@ export default function FormFill({
           case "checklist_de_prensas":
             return (
               <SGI_POP_GT_01_FO_09_Checklist_de_Prensas
+                {...sharedProps}
+              />
+            );
+
+          case "lista_de_herramientas_materiales":
+            return (
+              <SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales
                 {...sharedProps}
               />
             );

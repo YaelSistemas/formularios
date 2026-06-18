@@ -26,6 +26,7 @@ import SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico from "../user/
 import SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos from "../user/forms/layouts/SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos";
 import SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas from "../user/forms/layouts/SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas";
 import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "../user/forms/layouts/SGI_POP_GT_01_FO_09_Checklist_de_Prensas";
+import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "../user/forms/layouts/SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1318,6 +1319,9 @@ export default function AdminForms() {
 
     sgi_pop_gt_01_fo_09_checklist_de_prensas:
       SGI_POP_GT_01_FO_09_Checklist_de_Prensas,
+
+    sgi_pop_gt_01_fo_08_lista_de_herramientas_materiales:
+      SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

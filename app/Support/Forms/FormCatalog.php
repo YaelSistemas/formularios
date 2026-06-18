@@ -28,6 +28,7 @@ use App\Support\Forms\Definitions\SGI_POP_LG_01_07_Checklist_Mantenimiento_Siste
 use App\Support\Forms\Definitions\SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos;
 use App\Support\Forms\Definitions\SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas;
 use App\Support\Forms\Definitions\SGI_POP_GT_01_FO_09_Checklist_de_Prensas;
+use App\Support\Forms\Definitions\SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales;
 class FormCatalog
 {
     public static function definitions(): array
@@ -59,6 +60,7 @@ class FormCatalog
             SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos::class,
             SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas::class,
             SGI_POP_GT_01_FO_09_Checklist_de_Prensas::class,
+            SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales::class,
         ];
     }
 }
