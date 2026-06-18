@@ -29,6 +29,7 @@ import SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas from "./forms/layouts/S
 import SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico from "./forms/layouts/SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico";
 import SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos from "./forms/layouts/SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos";
 import SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas from "./forms/layouts/SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas";
+import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "./forms/layouts/SGI_POP_GT_01_FO_09_Checklist_de_Prensas";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -624,6 +625,13 @@ export default function FormFill({
           case "checklist_inspeccion_de_eslingas":
             return (
               <SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas
+                {...sharedProps}
+              />
+            );
+
+          case "checklist_de_prensas":
+            return (
+              <SGI_POP_GT_01_FO_09_Checklist_de_Prensas
                 {...sharedProps}
               />
             );

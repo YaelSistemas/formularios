@@ -25,6 +25,7 @@ import SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas from "../user/forms/lay
 import SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico from "../user/forms/layouts/SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico";
 import SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos from "../user/forms/layouts/SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos";
 import SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas from "../user/forms/layouts/SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas";
+import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "../user/forms/layouts/SGI_POP_GT_01_FO_09_Checklist_de_Prensas";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1314,6 +1315,9 @@ export default function AdminForms() {
 
     sgi_pop_gt_01_fo_10_checklist_inspeccion_de_eslingas:
       SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas,
+
+    sgi_pop_gt_01_fo_09_checklist_de_prensas:
+      SGI_POP_GT_01_FO_09_Checklist_de_Prensas,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

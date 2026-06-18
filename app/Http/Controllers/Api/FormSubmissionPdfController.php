@@ -127,7 +127,10 @@ class FormSubmissionPdfController extends Controller
 
             'sgi_pop_gt_01_fo_10_checklist_inspeccion_de_eslingas'
                 => 'pdf.forms.SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas',
-                
+            
+            'sgi_pop_gt_01_fo_09_checklist_de_prensas'
+                => 'pdf.forms.SGI_POP_GT_01_FO_09_Checklist_de_Prensas',
+      
             default => 'pdf.forms.generic_submission',
         };
     }
