@@ -27,6 +27,7 @@ import SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos from "../user/for
 import SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas from "../user/forms/layouts/SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas";
 import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "../user/forms/layouts/SGI_POP_GT_01_FO_09_Checklist_de_Prensas";
 import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "../user/forms/layouts/SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales";
+import SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos from "../user/forms/layouts/SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1322,6 +1323,9 @@ export default function AdminForms() {
 
     sgi_pop_gt_01_fo_08_lista_de_herramientas_materiales:
       SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales,
+
+    sgi_pop_fo_01_checklist_de_prensas_para_pasamanos:
+      SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

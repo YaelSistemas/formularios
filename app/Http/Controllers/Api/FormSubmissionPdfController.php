@@ -133,7 +133,10 @@ class FormSubmissionPdfController extends Controller
       
             'sgi_pop_gt_01_fo_08_lista_de_herramientas_materiales'
                 => 'pdf.forms.SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales',
-                
+
+            'sgi_pop_fo_01_checklist_de_prensas_para_pasamanos'
+                => 'pdf.forms.SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos',
+
             default => 'pdf.forms.generic_submission',
         };
     }
