@@ -137,6 +137,9 @@ class FormSubmissionPdfController extends Controller
             'sgi_pop_fo_01_checklist_de_prensas_para_pasamanos'
                 => 'pdf.forms.SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos',
 
+            'sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia'
+                => 'pdf.forms.SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia',
+      
             default => 'pdf.forms.generic_submission',
         };
     }
