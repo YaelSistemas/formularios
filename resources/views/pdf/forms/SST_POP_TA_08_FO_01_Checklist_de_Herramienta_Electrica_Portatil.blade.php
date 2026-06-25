@@ -19,66 +19,48 @@
 
         .sheet {
             width: 100%;
-            transform: scale(0.90);
-            transform-origin: top left;
-            margin-left: 55px;
+            margin: 0;
         }
 
         .header-table {
-            width: 99.6%;
+            width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
-
+        
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
-
+        
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
-
+        
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
-
+        
         .center-cell {
             font-weight: bold;
         }
-
-        .right-cell {
+        
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
-        }
-
-        .row-2-center {
-            font-size: 10px;
-        }
-
-        .row-3-center {
-            font-size: 10px;
-        }
-
-        .row-1-right,
-        .row-2-right,
-        .row-3-right {
-            font-size: 9px;
+            text-align: center !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
             width: 76%;
-            margin: 20px auto 0 auto;
+            margin: 10px auto 0 auto;
         }
 
         .inspection-line {
@@ -110,7 +92,7 @@
             position: absolute;
             left: 0;
             right: 0;
-            bottom: 8px;
+            bottom: 3px;
             text-align: center;
             font-size: 10px;
             font-weight: normal;
@@ -151,7 +133,7 @@
             display: block;
             width: 100%;
             text-align: center;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: bold;
             line-height: 1.4;
             margin-bottom: 4px;
@@ -314,24 +296,36 @@
 
         $tableRows = is_array(data_get($answers, 'tabla_herramientas')) ? data_get($answers, 'tabla_herramientas') : [];
 
-        $minRows = 7;
-        
-        $rowsToRender = $tableRows;
-        
-        while (count($rowsToRender) < $minRows) {
-            $rowsToRender[] = [
-                'tipo_herramienta' => '',
-                'serie' => '',
-                'conexiones_electricas' => '',
-                'interruptores' => '',
-                'condiciones_fisicas' => '',
-                'mango_sujecion' => '',
-                'aditamientos' => '',
-                'prueba_funcionamiento' => '',
-                'acciones' => '',
-                'observaciones' => '',
-            ];
+        // Cada hoja debe mostrar exactamente 7 filas de registros.
+        // Si hay más de 7 registros, se crean nuevas hojas de 7 en 7.
+        $rowsPerPage = 7;
+
+        $emptyRow = [
+            'tipo_herramienta' => '',
+            'serie' => '',
+            'conexiones_electricas' => '',
+            'interruptores' => '',
+            'condiciones_fisicas' => '',
+            'mango_sujecion' => '',
+            'aditamientos' => '',
+            'prueba_funcionamiento' => '',
+            'acciones' => '',
+            'observaciones' => '',
+        ];
+
+        $pagesRows = array_chunk($tableRows, $rowsPerPage);
+
+        if (count($pagesRows) === 0) {
+            $pagesRows = [[]];
         }
+
+        $pagesRows = array_map(function ($pageRows) use ($rowsPerPage, $emptyRow) {
+            while (count($pageRows) < $rowsPerPage) {
+                $pageRows[] = $emptyRow;
+            }
+
+            return $pageRows;
+        }, $pagesRows);
 
         $cellValue = function ($value) {
             if ($value === null || $value === '') {
@@ -344,47 +338,47 @@
         };
     @endphp
 
-    <div class="sheet">
+    @foreach($pagesRows as $pageRows)
+    <div class="sheet" style="{{ !$loop->last ? 'page-break-after: always;' : '' }}">
         <table class="header-table">
-            <colgroup>
-                <col style="width: 20%">
-                <col style="width: 25%">
-                <col style="width: 25%">
-                <col style="width: 15%">
-                <col style="width: 15%">
-            </colgroup>
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+        
             <tr>
                 <td rowspan="3" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}" alt="Logo">
                     @endif
                 </td>
-
-                <td colspan="2" class="center-cell row-1-center">
+        
+                <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
-
-                <td colspan="2" class="right-cell row-1-right">
+        
+                <td class="right-cell">
                     CODIFICACIÓN: SST-POP-TA-08-FO-01
                 </td>
             </tr>
-
+        
             <tr>
-                <td colspan="2" class="center-cell row-2-center">
+                <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
-
-                <td colspan="2" class="right-cell row-2-right">
+        
+                <td class="right-cell">
                     FECHA DE EMISIÓN: 27/03/2025
                 </td>
             </tr>
-
+        
             <tr>
-                <td colspan="2" class="center-cell row-3-center">
-                    Checklist de herramienta eléctrica portátil
+                <td class="center-cell">
+                    CHECKLIST DE HERRAMIENTA ELÉCTRICA PORTÁTIL
                 </td>
-
-                <td colspan="2" class="right-cell row-3-right">
+        
+                <td class="right-cell">
                     NÚMERO DE REVISIÓN: 03
                 </td>
             </tr>
@@ -492,7 +486,7 @@
                 <col style="width: 12%">
                 <col style="width: 12%">
             </colgroup>
-            @foreach($rowsToRender as $row)
+            @foreach($pageRows as $row)
                 <tr>
                     <td><div class="cell-fixed">{{ $cellValue($row['tipo_herramienta'] ?? '') }}</div></td>
                     <td><div class="cell-fixed">{{ $cellValue($row['serie'] ?? '') }}</div></td>
@@ -508,5 +502,6 @@
             @endforeach
         </table>
     </div>
+    @endforeach
 </body>
 </html>

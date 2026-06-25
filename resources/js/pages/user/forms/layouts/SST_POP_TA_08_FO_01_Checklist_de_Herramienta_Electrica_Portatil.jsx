@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil({
   form,
@@ -17,6 +17,10 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 }) {
   const [collapsedSections, setCollapsedSections] = useState({
     indicaciones_toggle: false,
+  });
+
+  const [modalCollapsedSections, setModalCollapsedSections] = useState({
+    criterios_herramienta_electrica: false,
   });
 
   const [tableModal, setTableModal] = useState({
@@ -72,6 +76,30 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableModal.open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [tableModal.open]);
+
+  const normalizeAssetUrl = (url) => {
+    if (!url) return "";
+
+    let normalized = String(url).trim();
+    normalized = normalized.replace(/\\/g, "/");
+    normalized = normalized.replace(/^\/?public\//i, "/");
+
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    if (!normalized.startsWith("/")) normalized = `/${normalized}`;
+
+    return normalized;
+  };
 
   const scrollToTopSafe = () => {
     try {
@@ -196,6 +224,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     if (readOnly) return;
 
     clearTableModalError();
+    setModalCollapsedSections({
+      criterios_herramienta_electrica: false,
+    });
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -211,6 +242,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     const currentRow = rows[rowIndex] || {};
 
     clearTableModalError();
+    setModalCollapsedSections({
+      criterios_herramienta_electrica: false,
+    });
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -242,7 +276,21 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const isObservationColumn = (col) => {
     const id = String(col?.id || "").toLowerCase();
     const label = String(col?.label || "").toLowerCase();
-    return id === "observaciones" || label === "observaciones";
+
+    return id.includes("observaciones") || label.includes("observaciones");
+  };
+
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+    return isObservationColumn(col) || isNotesColumn(col);
   };
 
   const isEmptyValue = (value, type) => {
@@ -275,9 +323,13 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
     for (const col of rowSchema) {
       if (!col?.id) continue;
-      if (isObservationColumn(col)) continue;
+      if (col.type === "static_text" || col.type === "fixed_image") continue;
 
       const v = tableRowDraft[col.id];
+
+      if (isOptionalColumn(col)) {
+        continue;
+      }
 
       if (isEmptyValue(v, col.type)) {
         showTableModalFieldError(col.id, `Falta responder: ${col.label}`);
@@ -473,6 +525,77 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     if (formFieldErrorId === fieldId) {
       clearFormFieldError();
     }
+  };
+
+
+
+  const buildModalGroups = (rowSchema) => {
+    const schema = Array.isArray(rowSchema) ? rowSchema : [];
+
+    const defaultImageField = {
+      id: "imagen_herramienta_electrica",
+      type: "fixed_image",
+      label: "",
+      required: false,
+      url: "/images/forms/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil/Imagen_Herramienta_Electrica_Portatil.png",
+    };
+
+    const schemaImageField = schema.find((col) => col.type === "fixed_image");
+
+    const imageField = schemaImageField
+      ? {
+          ...defaultImageField,
+          ...schemaImageField,
+          label: schemaImageField.label || "",
+          url: schemaImageField.url || defaultImageField.url,
+        }
+      : defaultImageField;
+
+    const criteriosFields = schema.filter(
+      (col) =>
+        !isObservationColumn(col) &&
+        col.type !== "fixed_image" &&
+        col.type !== "static_text"
+    );
+
+    const observacionesField = schema.find((col) => isObservationColumn(col));
+
+    return [
+      {
+        kind: "image",
+        id: imageField.id,
+        titleField: null,
+        fields: [imageField],
+      },
+
+      {
+        kind: "collapsible_section",
+        id: "criterios_herramienta_electrica",
+        title: "Criterios a inspeccionar",
+        fields: criteriosFields,
+      },
+
+      observacionesField
+        ? {
+            kind: "single",
+            id: observacionesField.id,
+            titleField: null,
+            fields: [observacionesField],
+          }
+        : null,
+    ].filter(Boolean);
+  };
+
+  const getCleanFieldLabel = (col) => {
+    return String(col?.text || col?.label || "");
+  };
+
+  const getGroupTitle = (group) => {
+    return String(group?.title || group?.titleField?.text || group?.titleField?.label || "");
+  };
+
+  const getModalFieldDisplayLabel = (col) => {
+    return getCleanFieldLabel(col);
   };
 
   const renderBasicInput = (f) => {
@@ -725,6 +848,57 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   };
 
   const renderTableModalField = (f) => {
+    if (f.type === "fixed_image") {
+      const url = normalizeAssetUrl(f.url || "");
+      if (!url) return null;
+
+      return (
+        <div
+          style={{
+            border: "1px solid #e5e7eb",
+            borderRadius: 14,
+            background: "#fff",
+            padding: 12,
+            textAlign: "center",
+          }}
+        >
+          <img
+            src={url}
+            alt={f.label || "Imagen"}
+            style={{
+              display: "block",
+              width: "100%",
+              maxWidth: isMobile ? 320 : 560,
+              maxHeight: isMobile ? 240 : 360,
+              objectFit: "contain",
+              borderRadius: 10,
+              margin: "0 auto",
+              background: "#fff",
+            }}
+          />
+        </div>
+      );
+    }
+
+    if (f.type === "static_text") {
+      return (
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid #cbd5e1",
+            background: "#eef2f7",
+            color: "#0f172a",
+            padding: isMobile ? "12px 14px" : "12px 14px",
+            fontSize: isMobile ? 14 : 15,
+            fontWeight: 900,
+            lineHeight: 1.4,
+          }}
+        >
+          {f.text || f.label}
+        </div>
+      );
+    }
+
     const commonStyle = {
       width: "100%",
       padding: isMobile ? 11 : 10,
@@ -876,6 +1050,44 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const renderTableCellValue = (col, row) => {
     const value = row?.[col.id];
 
+    if (col.type === "fixed_image") {
+      const url = normalizeAssetUrl(col.url || "");
+      return (
+        <div style={{ textAlign: "center" }}>
+          <img
+            src={url}
+            alt={col.label || "Imagen"}
+            style={{
+              display: "block",
+              width: "100%",
+              maxWidth: 120,
+              maxHeight: 90,
+              objectFit: "contain",
+              margin: "0 auto",
+              borderRadius: 8,
+              background: "#fff",
+            }}
+          />
+        </div>
+      );
+    }
+
+    if (col.type === "static_text") {
+      return (
+        <div
+          style={{
+            whiteSpace: "pre-line",
+            lineHeight: 1.5,
+            color: "#334155",
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: 800,
+          }}
+        >
+          {col.text || col.label || "—"}
+        </div>
+      );
+    }
+
     if (value === null || value === undefined || value === "") return "—";
     if (typeof value === "boolean") return value ? "Sí" : "No";
 
@@ -884,7 +1096,7 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
   const renderField = (f) => {
     if (f.type === "fixed_image") {
-      const url = f.url || "";
+      const url = normalizeAssetUrl(f.url || "");
       if (!url) return null;
 
       return (
@@ -898,6 +1110,25 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
               borderRadius: 10,
             }}
           />
+        </div>
+      );
+    }
+
+    if (f.type === "static_text") {
+      return (
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid #cbd5e1",
+            background: "#eef2f7",
+            color: "#0f172a",
+            padding: isMobile ? "12px 14px" : "12px 14px",
+            fontSize: isMobile ? 14 : 15,
+            fontWeight: 900,
+            lineHeight: 1.4,
+          }}
+        >
+          {f.text || f.label}
         </div>
       );
     }
@@ -990,7 +1221,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                       >
                         {rowIndex + 1}
                       </td>
-                      {rowSchema.map((col) => (
+                      {rowSchema
+                        .filter((col) => col.type !== "fixed_image" && col.type !== "static_text")
+                        .map((col) => (
                         <td
                           key={`${f.id}_${rowIndex}_${col.id}`}
                           style={{
@@ -1129,6 +1362,13 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
   const indicacion1 = getField("indicaciones_line_1");
   const indicacion2 = getField("indicaciones_line_2");
   const tablaHerramientas = getField("tabla_herramientas");
+
+  const modalGroups = useMemo(() => {
+    const schema = Array.isArray(tableModal.field?.row_schema)
+      ? tableModal.field.row_schema
+      : [];
+    return buildModalGroups(schema);
+  }, [tableModal.field]);
 
   const isCollapsed = !!collapsedSections[indicacionesToggle?.id];
 
@@ -1291,9 +1531,13 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
 
       for (const col of rowSchema) {
         if (!col?.id) continue;
-        if (isObservationColumn(col)) continue;
+        if (col.type === "static_text" || col.type === "fixed_image") continue;
 
         const value = row[col.id];
+
+        if (isOptionalColumn(col)) {
+          continue;
+        }
 
         if (isEmptyValue(value, col.type)) {
           setMsg(`En la fila ${i + 1} falta responder: ${col.label}`);
@@ -1379,6 +1623,213 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
     }
 
     return isOnline ? "Enviar formulario" : "Guardar offline";
+  };
+
+  const renderModalGroupContent = (group, index, filteredGroups) => {
+    if (group.kind === "image") {
+      const col = group.fields[0];
+
+      return (
+        <React.Fragment key={group.id}>
+          <div
+            style={{
+              borderRadius: 14,
+              border: "1px solid #e5e7eb",
+              background: "#fff",
+              padding: 12,
+              textAlign: "center",
+            }}
+          >
+            {renderTableModalField(col)}
+          </div>
+
+          {index < filteredGroups.length - 1 ? (
+            <div
+              style={{
+                borderBottom: "1px solid #cbd5e1",
+                margin: "4px 0 2px 0",
+              }}
+            ></div>
+          ) : null}
+        </React.Fragment>
+      );
+    }
+
+    if (group.kind === "collapsible_section") {
+      const isModalSectionCollapsed = !!modalCollapsedSections[group.id];
+
+      return (
+        <React.Fragment key={group.id}>
+          <div
+            style={{
+              borderRadius: 16,
+              overflow: "hidden",
+              border: "1px solid #dbe4ee",
+              background: "#f8fafc",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setModalCollapsedSections((prev) => ({
+                  ...prev,
+                  [group.id]: !prev[group.id],
+                }))
+              }
+              style={{
+                width: "100%",
+                border: "none",
+                background: "#eef2f7",
+                padding: "12px 14px",
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontWeight: 900,
+                color: "#0f172a",
+                fontSize: isMobile ? 14 : 15,
+                textAlign: "left",
+              }}
+            >
+              <span>{getGroupTitle(group)}</span>
+              <span>{isModalSectionCollapsed ? "＋" : "－"}</span>
+            </button>
+
+            {!isModalSectionCollapsed ? (
+              <div style={{ padding: 14, display: "grid", gap: 14 }}>
+                {group.fields.map((col) => {
+                  const hasError = tableModalErrorFieldId === col.id;
+                  const isRequiredVisual = !isOptionalColumn(col);
+
+                  return (
+                    <div
+                      key={col.id}
+                      ref={(el) => {
+                        tableFieldWrapRefs.current[col.id] = el;
+                      }}
+                      style={{
+                        borderRadius: 14,
+                        border: hasError
+                          ? "1px solid #fdba74"
+                          : "1px solid rgba(15,23,42,0.08)",
+                        background: "#fff",
+                        padding: 12,
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: isMobile ? 14 : 14,
+                          lineHeight: 1.4,
+                          color: "#0f172a",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {getModalFieldDisplayLabel(col)}{" "}
+                        {isRequiredVisual ? (
+                          <span style={{ color: "crimson" }}>*</span>
+                        ) : null}
+                      </label>
+
+                      {hasError && tableModalError ? (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            borderRadius: 10,
+                            border: "1px solid #fdba74",
+                            background: "#fff7ed",
+                            color: "#9a3412",
+                            padding: "8px 10px",
+                            fontSize: 13,
+                            lineHeight: 1.4,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {tableModalError}
+                        </div>
+                      ) : null}
+
+                      <div style={{ marginTop: 10 }}>{renderTableModalField(col)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          {index < filteredGroups.length - 1 ? (
+            <div
+              style={{
+                borderBottom: "1px solid #cbd5e1",
+                margin: "4px 0 2px 0",
+              }}
+            ></div>
+          ) : null}
+        </React.Fragment>
+      );
+    }
+
+    const col = group.fields[0];
+    const hasError = tableModalErrorFieldId === col.id;
+    const isRequiredVisual = !isOptionalColumn(col);
+
+    return (
+      <React.Fragment key={group.id}>
+        <div
+          ref={(el) => {
+            tableFieldWrapRefs.current[col.id] = el;
+          }}
+          style={{
+            borderRadius: 14,
+            border: hasError
+              ? "1px solid #fdba74"
+              : "1px solid rgba(15,23,42,0.08)",
+            background: "#fff",
+            padding: 12,
+          }}
+        >
+          <label
+            style={{
+              fontSize: isMobile ? 14 : 14,
+              lineHeight: 1.4,
+              color: "#0f172a",
+              fontWeight: 700,
+            }}
+          >
+            {getModalFieldDisplayLabel(col)}{" "}
+            {isRequiredVisual ? <span style={{ color: "crimson" }}>*</span> : null}
+          </label>
+
+          {hasError && tableModalError ? (
+            <div
+              style={{
+                marginTop: 8,
+                borderRadius: 10,
+                border: "1px solid #fdba74",
+                background: "#fff7ed",
+                color: "#9a3412",
+                padding: "8px 10px",
+                fontSize: 13,
+                lineHeight: 1.4,
+                fontWeight: 700,
+              }}
+            >
+              {tableModalError}
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 10 }}>{renderTableModalField(col)}</div>
+        </div>
+
+        {index < filteredGroups.length - 1 ? (
+          <div
+            style={{
+              borderBottom: "1px solid #cbd5e1",
+              margin: "4px 0 2px 0",
+            }}
+          ></div>
+        ) : null}
+      </React.Fragment>
+    );
   };
 
   const desktopContentWidth = 900;
@@ -1586,31 +2037,21 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "grid",
-                gap: isMobile ? 10 : 6,
-                textAlign: "left",
-              }}
-            >
+            {headerLines.length ? (
+              <div
+                style={{
+                  display: "grid",
+                  gap: isMobile ? 10 : 6,
+                  textAlign: "left",
+                }}
+              >
               {headerLines.map((line) => (
                 <div
                   key={line.id}
                   style={{
                     width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
+                    fontWeight: 700,
+                    fontSize: isMobile ? 12 : 14,
                     color: "#111827",
                     textAlign: "left",
                     lineHeight: isMobile ? 1.45 : 1.35,
@@ -1619,11 +2060,44 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                   {line.text}
                 </div>
               ))}
-            </div>
+              </div>
+            ) : null}
+
+            {logo || headerLines.length ? (
+              <div
+                style={{
+                  borderBottom: "1px solid #d1d5db",
+                  margin: "4px 0 0 0",
+                }}
+              />
+            ) : null}
 
             {renderOuterRequiredField(taller)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(nombreInspector)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(firmaInspector)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
 
             {indicacionesToggle ? (
               <div
@@ -1846,56 +2320,9 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
             </div>
 
             <div style={{ padding: 16, display: "grid", gap: 14 }}>
-              {(Array.isArray(tableModal.field.row_schema)
-                ? tableModal.field.row_schema
-                : []
-              ).map((col) => (
-                <div
-                  key={col.id}
-                  ref={(el) => {
-                    tableFieldWrapRefs.current[col.id] = el;
-                  }}
-                  style={{
-                    display: "grid",
-                    gap: 8,
-                    padding: tableModalErrorFieldId === col.id ? "10px" : 0,
-                    borderRadius: 12,
-                    background:
-                      tableModalErrorFieldId === col.id ? "#fff7ed" : "transparent",
-                    border:
-                      tableModalErrorFieldId === col.id
-                        ? "1px solid #fdba74"
-                        : "1px solid transparent",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  <label style={{ fontSize: isMobile ? 14 : 14, lineHeight: 1.4 }}>
-                    <b>{col.label}</b>{" "}
-                    {!isObservationColumn(col) ? (
-                      <span style={{ color: "crimson" }}>*</span>
-                    ) : null}
-                  </label>
-
-                  {tableModalErrorFieldId === col.id && tableModalError ? (
-                    <div
-                      style={{
-                        borderRadius: 10,
-                        border: "1px solid #fdba74",
-                        background: "#fff7ed",
-                        color: "#9a3412",
-                        padding: "8px 10px",
-                        fontSize: 13,
-                        lineHeight: 1.4,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {tableModalError}
-                    </div>
-                  ) : null}
-
-                  {renderTableModalField(col)}
-                </div>
-              ))}
+              {modalGroups.map((group, index, filteredGroups) =>
+                renderModalGroupContent(group, index, filteredGroups)
+              )}
             </div>
 
             <div
@@ -2020,7 +2447,10 @@ export default function SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_P
                   onMouseUp={stopDrawing}
                   onMouseLeave={stopDrawing}
                   onTouchStart={startDrawing}
-                  onTouchMove={draw}
+                  onTouchMove={(e) => {
+                    e.preventDefault();
+                    draw(e);
+                  }}
                   onTouchEnd={stopDrawing}
                   style={{
                     display: "block",

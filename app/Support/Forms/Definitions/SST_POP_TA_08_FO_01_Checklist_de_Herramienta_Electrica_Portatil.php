@@ -37,14 +37,14 @@ class SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil implements
                     'label' => 'Empresa',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'label' => 'Sistema',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
@@ -154,6 +154,12 @@ class SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil implements
                         'Observaciones',
                     ],
                     'row_schema' => [
+                        [
+                            'id' => 'imagen_herramienta_electrica',
+                            'type' => 'fixed_image',
+                            'label' => 'Imagen herramienta eléctrica',
+                            'url' => '/images/forms/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil/Imagen_Herramienta_Electrica_Portatil.png',
+                        ],
                         [
                             'id' => 'tipo_herramienta',
                             'label' => 'Tipo de Herramienta',
