@@ -31,6 +31,7 @@ use App\Support\Forms\Definitions\SGI_POP_GT_01_FO_09_Checklist_de_Prensas;
 use App\Support\Forms\Definitions\SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales;
 use App\Support\Forms\Definitions\SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos;
 use App\Support\Forms\Definitions\SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia;
+use App\Support\Forms\Definitions\SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo;
 class FormCatalog
 {
     public static function definitions(): array
@@ -65,6 +66,7 @@ class FormCatalog
             SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales::class,
             SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos::class,
             SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia::class,
+            SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo::class,
         ];
     }
 }

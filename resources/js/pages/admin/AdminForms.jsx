@@ -29,6 +29,7 @@ import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "../user/forms/layouts/SGI_
 import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "../user/forms/layouts/SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales";
 import SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos from "../user/forms/layouts/SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos";
 import SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia from "../user/forms/layouts/SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia";
+import SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo from "../user/forms/layouts/SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -1330,6 +1331,9 @@ export default function AdminForms() {
 
     sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia:
       SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia,
+
+    sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo:
+      SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

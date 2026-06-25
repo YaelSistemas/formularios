@@ -626,6 +626,10 @@ class FormSubmissionsController extends Controller
                             $storedPath = $this->storeSignatureForChecklistInspeccionLavaojosEmergencia($v, $userId, $id);
                         }
 
+                        if ($formCodeKey === 'sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo') {
+                            $storedPath = $this->storeSignatureForChecklistDetectoresHumo($v, $userId, $id);
+                        }
+
                         if (
                             in_array($formCodeKey, [
                                 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil',
@@ -657,6 +661,7 @@ class FormSubmissionsController extends Controller
                                 'sgi_pop_gt_01_fo_08_lista_de_herramientas_materiales',
                                 'sgi_pop_fo_01_checklist_de_prensas_para_pasamanos',
                                 'sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia',
+                                'sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -2003,6 +2008,51 @@ class FormSubmissionsController extends Controller
         }
     
         $baseDirectory = 'forms/signatures/SGIPGITA04FO02_ChecklistInspeccionLavaojosEmergencia';
+    
+        $directory = match ($fieldId) {
+            'firma_inspector' =>
+                $baseDirectory . '/Inspector',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForChecklistDetectoresHumo(string $dataUrl, ?int $userId, string $fieldId): ?string
+    {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SGIPGITA04FO01_ChecklistDetectoresHumo';
     
         $directory = match ($fieldId) {
             'firma_inspector' =>

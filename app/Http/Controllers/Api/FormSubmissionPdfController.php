@@ -139,6 +139,9 @@ class FormSubmissionPdfController extends Controller
 
             'sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia'
                 => 'pdf.forms.SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia',
+
+            'sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo'
+                => 'pdf.forms.SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo',
       
             default => 'pdf.forms.generic_submission',
         };

@@ -33,6 +33,7 @@ import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "./forms/layouts/SGI_POP_GT
 import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "./forms/layouts/SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales";
 import SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos from "./forms/layouts/SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos";
 import SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia from "./forms/layouts/SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia";
+import SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo from "./forms/layouts/SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -656,6 +657,13 @@ export default function FormFill({
           case "checklist_de_inspeccion_de_lavaojos_de_emergencia":
             return (
               <SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia
+                {...sharedProps}
+              />
+            );
+
+          case "checklist_de_detectores_de_humo":
+            return (
+              <SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo
                 {...sharedProps}
               />
             );
