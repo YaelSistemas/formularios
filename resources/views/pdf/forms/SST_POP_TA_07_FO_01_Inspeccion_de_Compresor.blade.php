@@ -81,29 +81,30 @@
         }
 
         .right-cell {
-            font-weight: normal;
+            font-weight: bold;
             text-align: left !important;
             vertical-align: middle;
-            font-size: 9px;
-            padding-left: 6px;
+            font-size: 8px;
+            padding-left: 8px;
+            line-height: 1.1;
         }
 
         .row-1-center {
-            font-size: 11px;
+            font-size: 8px;
         }
 
         .row-2-center {
-            font-size: 10px;
+            font-size: 8px;
         }
 
         .row-3-center {
-            font-size: 10px;
+            font-size: 8px;
         }
 
         .row-1-right,
         .row-2-right,
         .row-3-right {
-            font-size: 9px;
+            font-size: 8px;
         }
 
         .inspection-area-left {
@@ -143,7 +144,7 @@
             position: absolute;
             left: 0;
             right: 0;
-            bottom: 2px;
+            bottom: 0px;
             font-size: 10px;
             font-weight: normal;
             text-align: center;
@@ -318,10 +319,24 @@
             padding: 0 2px;
         }
 
+        /* ANCHOS DE COLUMNAS - TABLA PRINCIPAL */
+        .main-grid-table .col-tipo { width: 4%; }
+        .main-grid-table .col-serie { width: 5%; }
+        .main-grid-table .col-marca { width: 5%; }
+        .main-grid-table .col-modelo { width: 5%; }
+
+        .main-grid-table .col-check {
+            width: 4.7%;
+        }
+
+        .main-grid-table .col-obs {
+            width: 19.9%;
+        }
+
         /* AJUSTE DE FIRMAS SUBIDAS PARA EVITAR SALTO DE HOJA */
         .signature-section {
             width: 99.6%;
-            margin-top: 55px; /* Reducido para que suban y no salten de hoja */
+            margin-top: 15px; /* Reducido para que suban y no salten de hoja */
             display: table;
             table-layout: fixed;
         }
@@ -432,14 +447,21 @@
             'observaciones' => '',
         ];
         
-        $minRows = 7; // 7 filas de datos + 2 filas de encabezado = 9 visibles por defecto
-        $totalRows = max(count($rows), $minRows);
-        
-        $rowsToRender = $rows;
-        
-        while (count($rowsToRender) < $totalRows) {
-            $rowsToRender[] = $emptyRow;
+        $rowsPerPage = 10;
+
+        $pagesRows = array_chunk($rows, $rowsPerPage);
+
+        if (count($pagesRows) === 0) {
+            $pagesRows = [[]];
         }
+
+        $pagesRows = array_map(function ($pageRows) use ($rowsPerPage, $emptyRow) {
+            while (count($pageRows) < $rowsPerPage) {
+                $pageRows[] = $emptyRow;
+            }
+
+            return $pageRows;
+        }, $pagesRows);
 
         $cellValue = function ($value) {
             if ($value === null || $value === '') return '';
@@ -494,7 +516,8 @@
             ?? '';
     @endphp
 
-    <div class="sheet">
+    @foreach($pagesRows as $rowsToRender)
+    <div class="sheet" style="{{ !$loop->last ? 'page-break-after: always;' : '' }}">
         <div class="header-row">
             <div class="header-left">
                 <table class="header-table">
@@ -506,15 +529,15 @@
                             @if($logoSrc) <img src="{{ $logoSrc }}" alt="Logo"> @endif
                         </td>
                         <td colspan="2" class="center-cell row-1-center">VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.</td>
-                        <td colspan="2" class="right-cell row-1-right">Código:&nbsp; SST-POP-TA-07-FO-01</td>
+                        <td colspan="2" class="right-cell row-1-right">CÓDIGO: SST-POP-TA-07-FO-01</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="center-cell row-2-center">SISTEMA DE GESTIÓN INTEGRAL</td>
-                        <td colspan="2" class="right-cell row-2-right">Fecha de Emisión:&nbsp; 27/03/2025</td>
+                        <td colspan="2" class="right-cell row-2-right">FECHA DE EMISIÓN: 27/03/2025</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="center-cell row-3-center">Inspección de compresor</td>
-                        <td colspan="2" class="right-cell row-3-right">Revisión:&nbsp; 03</td>
+                        <td colspan="2" class="center-cell row-3-center">INSPECCIÓN DE COMPRESOR</td>
+                        <td colspan="2" class="right-cell row-3-right">REVISIÓN: 03</td>
                     </tr>
                 </table>
 
@@ -583,46 +606,47 @@
 
         <div class="main-grid-wrap">
             <table class="main-grid-table">
+
                 <tr>
-                    <td colspan="4" class="item-title">ITEM</td>
-                    <td rowspan="2" class="shade">A) INTERRUPTOR DE ON (I) OFF (O)</td>
-                    <td rowspan="2" class="shade">B) MANÓMETRO DE TANQUE</td>
-                    <td rowspan="2" class="shade">C) MANÓMETRO (MEDIDOR DE PRESIÓN) DE SALIDA</td>
-                    <td rowspan="2" class="shade">D) REGULADOR</td>
-                    <td rowspan="2" class="shade">E) CONECTORES RÁPIDOS UNIVERSALES</td>
-                    <td rowspan="2" class="shade">F) VÁLVULA DE SEGURIDAD</td>
-                    <td rowspan="2" class="shade">G) VÁLVULA DE DRENAJE</td>
-                    <td rowspan="2" class="shade">H) ENROLLA CABLE ELÉCTRICO</td>
-                    <td rowspan="2" class="shade">I) VÁLVULA DE CONTROL</td>
-                    <td rowspan="2" class="shade">J) CABLE DE ALIMENTACIÓN ELÉCTRICA</td>
-                    <td rowspan="2" class="shade">K) CONTENEDOR</td>
-                    <td rowspan="2" class="shade">L) CARCASA</td>
-                    <td rowspan="2" class="shade">M) MANGUERA DE ALIMENTACIÓN</td>
-                    <td rowspan="2" class="shade">Observaciones</td>
+                    <td colspan="4" class="item-title" style="width:19%;">ITEM</td>
+                    <td rowspan="2" class="shade col-check">A) INTERRUPTOR DE ON (I) OFF (O)</td>
+                    <td rowspan="2" class="shade col-check">B) MANÓMETRO DE TANQUE</td>
+                    <td rowspan="2" class="shade col-check">C) MANÓMETRO (MEDIDOR DE PRESIÓN) DE SALIDA</td>
+                    <td rowspan="2" class="shade col-check">D) REGULADOR</td>
+                    <td rowspan="2" class="shade col-check">E) CONECTORES RÁPIDOS UNIVERSALES</td>
+                    <td rowspan="2" class="shade col-check">F) VÁLVULA DE SEGURIDAD</td>
+                    <td rowspan="2" class="shade col-check">G) VÁLVULA DE DRENAJE</td>
+                    <td rowspan="2" class="shade col-check">H) ENROLLA CABLE ELÉCTRICO</td>
+                    <td rowspan="2" class="shade col-check">I) VÁLVULA DE CONTROL</td>
+                    <td rowspan="2" class="shade col-check">J) CABLE DE ALIMENTACIÓN ELÉCTRICA</td>
+                    <td rowspan="2" class="shade col-check">K) CONTENEDOR</td>
+                    <td rowspan="2" class="shade col-check">L) CARCASA</td>
+                    <td rowspan="2" class="shade col-check">M) MANGUERA DE ALIMENTACIÓN</td>
+                    <td rowspan="2" class="shade col-obs">Observaciones</td>
                 </tr>
                 <tr>
-                    <td class="shade">Tipo</td><td class="shade"># Serie</td><td class="shade">Marca</td><td class="shade">Modelo</td>
+                    <td class="shade col-tipo">Tipo</td><td class="shade col-serie"># Serie</td><td class="shade col-marca">Marca</td><td class="shade col-modelo">Modelo</td>
                 </tr>
                 @foreach($rowsToRender as $row)
                     <tr class="data-row">
-                        <td>{{ $cellValue($row['tipo'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['numero_serie'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['marca'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['modelo'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['interruptor_on_off'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['manometro_tanque'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['manometro_salida'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['regulador'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['conectores_rapidos_universales'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['valvula_seguridad'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['valvula_drenaje'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['enrolla_cable_electrico'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['valvula_control'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['cable_alimentacion_electrica'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['contenedor'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['carcasa'] ?? '') }}</td>
-                        <td>{{ $cellValue($row['manguera_alimentacion'] ?? '') }}</td>
-                        <td class="obs-cell">{{ $cellValue($row['observaciones'] ?? '') }}</td>
+                        <td class="col-tipo">{{ $cellValue($row['tipo'] ?? '') }}</td>
+                        <td class="col-serie">{{ $cellValue($row['numero_serie'] ?? '') }}</td>
+                        <td class="col-marca">{{ $cellValue($row['marca'] ?? '') }}</td>
+                        <td class="col-modelo">{{ $cellValue($row['modelo'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['interruptor_on_off'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['manometro_tanque'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['manometro_salida'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['regulador'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['conectores_rapidos_universales'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['valvula_seguridad'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['valvula_drenaje'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['enrolla_cable_electrico'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['valvula_control'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['cable_alimentacion_electrica'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['contenedor'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['carcasa'] ?? '') }}</td>
+                        <td class="col-check">{{ $cellValue($row['manguera_alimentacion'] ?? '') }}</td>
+                        <td class="obs-cell col-obs">{{ $cellValue($row['observaciones'] ?? '') }}</td>
                     </tr>
                 @endforeach
             </table>
@@ -656,5 +680,6 @@
             </div>
         </div>
     </div>
+    @endforeach
 </body>
 </html>

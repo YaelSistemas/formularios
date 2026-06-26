@@ -19,6 +19,10 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
     indicaciones_toggle: false,
   });
 
+  const [modalCollapsedSections, setModalCollapsedSections] = useState({
+    criterios_compresor: false,
+  });
+
   const [tableModal, setTableModal] = useState({
     open: false,
     field: null,
@@ -72,6 +76,30 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableModal.open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [tableModal.open]);
+
+  const normalizeAssetUrl = (url) => {
+    if (!url) return "";
+
+    let normalized = String(url).trim();
+    normalized = normalized.replace(/\\/g, "/");
+    normalized = normalized.replace(/^\/?public\//i, "/");
+
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    if (!normalized.startsWith("/")) normalized = `/${normalized}`;
+
+    return normalized;
+  };
 
   const scrollToTopSafe = () => {
     try {
@@ -196,6 +224,9 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
     if (readOnly) return;
 
     clearTableModalError();
+    setModalCollapsedSections({
+      criterios_compresor: false,
+    });
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -211,6 +242,9 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
     const currentRow = rows[rowIndex] || {};
 
     clearTableModalError();
+    setModalCollapsedSections({
+      criterios_compresor: false,
+    });
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -242,7 +276,24 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
   const isObservationColumn = (col) => {
     const id = String(col?.id || "").toLowerCase();
     const label = String(col?.label || "").toLowerCase();
-    return id === "observaciones" || label === "observaciones";
+    return id.includes("observaciones") || label.includes("observaciones");
+  };
+
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+    return isObservationColumn(col) || isNotesColumn(col);
+  };
+
+  const getCleanFieldLabel = (col) => {
+    return String(col?.text || col?.label || "");
   };
 
   const isEmptyValue = (value, type) => {
@@ -275,9 +326,13 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
 
     for (const col of rowSchema) {
       if (!col?.id) continue;
-      if (isObservationColumn(col)) continue;
+      if (col.type === "static_text" || col.type === "fixed_image") continue;
 
       const v = tableRowDraft[col.id];
+
+      if (isOptionalColumn(col)) {
+        continue;
+      }
 
       if (isEmptyValue(v, col.type)) {
         showTableModalFieldError(col.id, `Falta responder: ${col.label}`);
@@ -722,6 +777,57 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
   };
 
   const renderTableModalField = (f) => {
+    if (f.type === "fixed_image") {
+      const url = normalizeAssetUrl(f.url || "");
+      if (!url) return null;
+
+      return (
+        <div
+          style={{
+            border: "1px solid #e5e7eb",
+            borderRadius: 14,
+            background: "#fff",
+            padding: 12,
+            textAlign: "center",
+          }}
+        >
+          <img
+            src={url}
+            alt={f.label || "Imagen"}
+            style={{
+              display: "block",
+              width: "100%",
+              maxWidth: isMobile ? 320 : 560,
+              maxHeight: isMobile ? 240 : 360,
+              objectFit: "contain",
+              borderRadius: 10,
+              margin: "0 auto",
+              background: "#fff",
+            }}
+          />
+        </div>
+      );
+    }
+
+    if (f.type === "static_text") {
+      return (
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid #cbd5e1",
+            background: "#eef2f7",
+            color: "#0f172a",
+            padding: isMobile ? "12px 14px" : "12px 14px",
+            fontSize: isMobile ? 14 : 15,
+            fontWeight: 900,
+            lineHeight: 1.4,
+          }}
+        >
+          {f.text || f.label}
+        </div>
+      );
+    }
+
     const commonStyle = {
       width: "100%",
       padding: isMobile ? 11 : 10,
@@ -890,6 +996,8 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
   const renderTableCellValue = (col, row) => {
     const value = row?.[col.id];
 
+    if (col.type === "fixed_image" || col.type === "static_text") return "";
+
     if (value === null || value === undefined || value === "") return "—";
     if (typeof value === "boolean") return value ? "Sí" : "No";
 
@@ -898,7 +1006,7 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
 
   const renderField = (f) => {
     if (f.type === "fixed_image") {
-      const url = f.url || "";
+      const url = normalizeAssetUrl(f.url || "");
       if (!url) return null;
 
       return (
@@ -920,6 +1028,9 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
       const rows = Array.isArray(answers[f.id]) ? answers[f.id] : [];
       const columns = Array.isArray(f.columns) ? f.columns : [];
       const rowSchema = Array.isArray(f.row_schema) ? f.row_schema : [];
+      const visibleRowSchema = rowSchema.filter(
+        (col) => col.type !== "fixed_image" && col.type !== "static_text"
+      );
 
       return (
         <div style={{ display: "grid", gap: 10 }}>
@@ -954,9 +1065,9 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                   >
                     #
                   </th>
-                  {columns.map((col, idx) => (
+                  {visibleRowSchema.map((col) => (
                     <th
-                      key={`${f.id}_col_${idx}`}
+                      key={`${f.id}_col_${col.id}`}
                       style={{
                         border: "1px solid #d1d5db",
                         padding: isMobile ? 9 : 10,
@@ -966,7 +1077,7 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {col}
+                      {getCleanFieldLabel(col)}
                     </th>
                   ))}
                   {!readOnly ? (
@@ -1001,7 +1112,7 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                       >
                         {rowIndex + 1}
                       </td>
-                      {rowSchema.map((col) => (
+                      {visibleRowSchema.map((col) => (
                         <td
                           key={`${f.id}_${rowIndex}_${col.id}`}
                           style={{
@@ -1073,7 +1184,7 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                 ) : (
                   <tr>
                     <td
-                      colSpan={columns.length + 1 + (readOnly ? 0 : 1)}
+                      colSpan={visibleRowSchema.length + 1 + (readOnly ? 0 : 1)}
                       style={{
                         border: "1px solid #d1d5db",
                         padding: 12,
@@ -1317,9 +1428,13 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
 
       for (const col of rowSchema) {
         if (!col?.id) continue;
-        if (isObservationColumn(col)) continue;
+        if (col.type === "static_text" || col.type === "fixed_image") continue;
 
         const value = row[col.id];
+
+        if (isOptionalColumn(col)) {
+          continue;
+        }
 
         if (isEmptyValue(value, col.type)) {
           setMsg(`En la fila ${i + 1} falta responder: ${col.label}`);
@@ -1632,19 +1747,8 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                   key={line.id}
                   style={{
                     width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
+                    fontWeight: 700,
+                    fontSize: isMobile ? 12 : 14,
                     color: "#111827",
                     textAlign: "left",
                     lineHeight: isMobile ? 1.45 : 1.35,
@@ -1655,11 +1759,41 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
               ))}
             </div>
 
+            {logo || headerLines.length ? (
+              <div
+                style={{
+                  borderBottom: "1px solid #d1d5db",
+                  margin: "4px 0 0 0",
+                }}
+              />
+            ) : null}
+
             {renderOuterRequiredField(taller)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
 
             {renderOuterRequiredField(nombreInspector)}
 
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(firmaInspector)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
 
             {indicacionesToggle ? (
               <div
@@ -1743,7 +1877,21 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
               </div>
             ) : null}
 
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(responsableSeguridad)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
 
             {renderOuterRequiredField(firmaResponsableSeguridad)}
           </div>
@@ -1886,116 +2034,140 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
             <div style={{ padding: 16, display: "grid", gap: 14 }}>
               <div
                 style={{
-                  display: "grid",
-                  gap: 14,
-                  marginBottom: 4,
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  border: "1px solid #dbe4ee",
+                  background: "#f8fafc",
                 }}
               >
-                <div
+                <button
+                  type="button"
+                  onClick={() =>
+                    setModalCollapsedSections((prev) => ({
+                      ...prev,
+                      criterios_compresor: !prev.criterios_compresor,
+                    }))
+                  }
                   style={{
+                    width: "100%",
+                    border: "none",
+                    background: "#eef2f7",
+                    padding: "12px 14px",
+                    cursor: "pointer",
                     display: "flex",
-                    justifyContent: "center",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontWeight: 900,
+                    color: "#0f172a",
+                    fontSize: isMobile ? 14 : 15,
+                    textAlign: "left",
                   }}
                 >
-                  <img
-                    src={compresorImagenTop}
-                    alt="Imagen compresor"
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      maxWidth: isMobile ? 320 : 520,
-                      maxHeight: isMobile ? 220 : 300,
-                      objectFit: "contain",
-                      borderRadius: 10,
-                      background: "#fff",
-                    }}
-                  />
-                </div>
+                  <span>Criterios a inspeccionar</span>
+                  <span>{modalCollapsedSections.criterios_compresor ? "＋" : "－"}</span>
+                </button>
 
-                <div
-                  style={{
-                    borderTop: "1px solid #e5e7eb",
-                  }}
-                />
-
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                  }}
-                >
-                  <img
-                    src={compresorImagenCategorias}
-                    alt="Tipos y categorías de presión"
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      maxWidth: isMobile ? 220 : 340,
-                      maxHeight: isMobile ? 140 : 180,
-                      objectFit: "contain",
-                      borderRadius: 10,
-                      background: "#fff",
-                    }}
-                  />
-                </div>
-
-                <div
-                  style={{
-                    borderTop: "1px solid #e5e7eb",
-                  }}
-                />
-              </div>
-
-              {(Array.isArray(tableModal.field.row_schema)
-                ? tableModal.field.row_schema
-                : []
-              ).map((col) => (
-                <div
-                  key={col.id}
-                  ref={(el) => {
-                    tableFieldWrapRefs.current[col.id] = el;
-                  }}
-                  style={{
-                    display: "grid",
-                    gap: 8,
-                    padding: tableModalErrorFieldId === col.id ? "10px" : 0,
-                    borderRadius: 12,
-                    background:
-                      tableModalErrorFieldId === col.id ? "#fff7ed" : "transparent",
-                    border:
-                      tableModalErrorFieldId === col.id
-                        ? "1px solid #fdba74"
-                        : "1px solid transparent",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  <label style={{ fontSize: isMobile ? 14 : 14, lineHeight: 1.4 }}>
-                    <b>{col.label}</b>{" "}
-                    {!isObservationColumn(col) ? (
-                      <span style={{ color: "crimson" }}>*</span>
-                    ) : null}
-                  </label>
-
-                  {tableModalErrorFieldId === col.id && tableModalError ? (
+                {!modalCollapsedSections.criterios_compresor ? (
+                  <div style={{ padding: 14, display: "grid", gap: 14 }}>
                     <div
                       style={{
-                        borderRadius: 10,
-                        border: "1px solid #fdba74",
-                        background: "#fff7ed",
-                        color: "#9a3412",
-                        padding: "8px 10px",
-                        fontSize: 13,
-                        lineHeight: 1.4,
-                        fontWeight: 700,
+                        borderRadius: 14,
+                        border: "1px solid rgba(15,23,42,0.08)",
+                        background: "#fff",
+                        padding: 12,
                       }}
                     >
-                      {tableModalError}
+                      {renderTableModalField({
+                        id: "imagen_compresor_modal",
+                        type: "fixed_image",
+                        label: "Imagen compresor",
+                        url: compresorImagenTop,
+                        required: false,
+                      })}
                     </div>
-                  ) : null}
 
-                  {renderTableModalField(col)}
-                </div>
-              ))}
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid rgba(15,23,42,0.08)",
+                        background: "#fff",
+                        padding: 12,
+                      }}
+                    >
+                      {renderTableModalField({
+                        id: "imagen_categorias_presion_modal",
+                        type: "fixed_image",
+                        label: "Tipos y categorías de presión",
+                        url: compresorImagenCategorias,
+                        required: false,
+                      })}
+                    </div>
+
+                    {(Array.isArray(tableModal.field.row_schema)
+                      ? tableModal.field.row_schema
+                      : []
+                    )
+                      .filter((col) => col.type !== "static_text" && col.type !== "fixed_image")
+                      .map((col) => {
+                        const hasError = tableModalErrorFieldId === col.id;
+                        const isRequiredVisual = !isOptionalColumn(col);
+
+                        return (
+                          <div
+                            key={col.id}
+                            ref={(el) => {
+                              tableFieldWrapRefs.current[col.id] = el;
+                            }}
+                            style={{
+                              borderRadius: 14,
+                              border: hasError
+                                ? "1px solid #fdba74"
+                                : "1px solid rgba(15,23,42,0.08)",
+                              background: "#fff",
+                              padding: 12,
+                            }}
+                          >
+                            <label
+                              style={{
+                                fontSize: isMobile ? 14 : 14,
+                                lineHeight: 1.4,
+                                color: "#0f172a",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {getCleanFieldLabel(col)}{" "}
+                              {isRequiredVisual ? (
+                                <span style={{ color: "crimson" }}>*</span>
+                              ) : null}
+                            </label>
+
+                            {hasError && tableModalError ? (
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  borderRadius: 10,
+                                  border: "1px solid #fdba74",
+                                  background: "#fff7ed",
+                                  color: "#9a3412",
+                                  padding: "8px 10px",
+                                  fontSize: 13,
+                                  lineHeight: 1.4,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {tableModalError}
+                              </div>
+                            ) : null}
+
+                            <div style={{ marginTop: 10 }}>
+                              {renderTableModalField(col)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div
@@ -2120,7 +2292,10 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
                   onMouseUp={stopDrawing}
                   onMouseLeave={stopDrawing}
                   onTouchStart={startDrawing}
-                  onTouchMove={draw}
+                  onTouchMove={(e) => {
+                    e.preventDefault();
+                    draw(e);
+                  }}
                   onTouchEnd={stopDrawing}
                   style={{
                     display: "block",
