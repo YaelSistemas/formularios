@@ -19,6 +19,9 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
     indicaciones_toggle: false,
   });
 
+  const [datosMaquinaOpen, setDatosMaquinaOpen] = useState(true);
+  const [criteriosInspeccionarOpen, setCriteriosInspeccionarOpen] = useState(true);
+
   const [formFieldError, setFormFieldError] = useState("");
   const [formFieldErrorId, setFormFieldErrorId] = useState(null);
 
@@ -69,6 +72,19 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const normalizeAssetUrl = (url) => {
+    if (!url) return "";
+
+    let normalized = String(url).trim();
+    normalized = normalized.replace(/\\/g, "/");
+    normalized = normalized.replace(/^\/?public\//i, "/");
+
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    if (!normalized.startsWith("/")) normalized = `/${normalized}`;
+
+    return normalized;
   };
 
   const clearFormFieldError = () => {
@@ -211,8 +227,12 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
 
   const isCollapsed = !!collapsedSections[indicacionesToggle?.id];
 
-  const indicacionesFieldIds = useMemo(() => {
-    const ids = [numeroSerie?.id, tipoModelo?.id];
+  const datosMaquinaFieldIds = useMemo(() => {
+    return new Set([numeroSerie?.id, tipoModelo?.id].filter(Boolean));
+  }, [numeroSerie, tipoModelo]);
+
+  const criteriosInspeccionarFieldIds = useMemo(() => {
+    const ids = [];
 
     checklistItems.forEach((item) => {
       if (item?.status?.id) ids.push(item.status.id);
@@ -220,7 +240,14 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
     });
 
     return new Set(ids.filter(Boolean));
-  }, [numeroSerie, tipoModelo, checklistItems]);
+  }, [checklistItems]);
+
+  const indicacionesFieldIds = useMemo(() => {
+    return new Set([
+      ...Array.from(datosMaquinaFieldIds),
+      ...Array.from(criteriosInspeccionarFieldIds),
+    ]);
+  }, [datosMaquinaFieldIds, criteriosInspeccionarFieldIds]);
 
   const showFormFieldError = (fieldId, message) => {
     setMsg("");
@@ -242,6 +269,14 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
         ...prev,
         [indicacionesToggle.id]: false,
       }));
+    }
+
+    if (fieldId && datosMaquinaFieldIds.has(fieldId)) {
+      setDatosMaquinaOpen(true);
+    }
+
+    if (fieldId && criteriosInspeccionarFieldIds.has(fieldId)) {
+      setCriteriosInspeccionarOpen(true);
     }
 
     const runScrollAndFocus = () => {
@@ -703,7 +738,7 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
 
   const renderField = (f) => {
     if (f.type === "fixed_image") {
-      const url = f.url || "";
+      const url = normalizeAssetUrl(f.url || "");
       if (!url) return null;
 
       return (
@@ -765,6 +800,82 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
     display: "grid",
     gap: 12,
   };
+
+  const renderDivider = (key = null) => (
+    <div
+      key={key}
+      style={{
+        borderBottom: "1px solid #d1d5db",
+        margin: "4px 0 0 0",
+      }}
+    />
+  );
+
+  const nestedSectionStyle = {
+    border: "1px solid #dbe4ee",
+    borderRadius: 18,
+    background: "#f8fafc",
+    overflow: "hidden",
+    boxShadow: "0 6px 18px rgba(15,23,42,0.04)",
+  };
+
+  const nestedSectionHeaderStyle = {
+    padding: isMobile ? "13px 14px" : "15px 18px",
+    background: "#eef2f7",
+    borderBottom: "1px solid #dbe4ee",
+    fontWeight: 900,
+    color: "#0f172a",
+    fontSize: isMobile ? 15 : 16,
+    lineHeight: 1.35,
+    textTransform: "uppercase",
+    letterSpacing: 0.2,
+  };
+
+  const renderCollapsibleSection = (title, isOpen, setIsOpen, children) => (
+    <div style={nestedSectionStyle}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={{
+          ...nestedSectionHeaderStyle,
+          width: "100%",
+          border: "none",
+          borderBottom: isOpen ? "1px solid #dbe4ee" : "none",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          textAlign: "left",
+        }}
+      >
+        <span>{title}</span>
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 18,
+            lineHeight: 1,
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.2s ease",
+          }}
+        >
+          ▾
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div
+          style={{
+            padding: isMobile ? 12 : 14,
+            display: "grid",
+            gap: isMobile ? 12 : 14,
+          }}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
 
   const getOuterFieldBlockStyle = (fieldId) => {
     const hasError = formFieldErrorId === fieldId;
@@ -1246,19 +1357,8 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
                   key={line.id}
                   style={{
                     width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
+                    fontWeight: 700,
+                    fontSize: isMobile ? 12 : 14,
                     color: "#111827",
                     textAlign: "left",
                     lineHeight: isMobile ? 1.45 : 1.35,
@@ -1269,11 +1369,18 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
               ))}
             </div>
 
+            {logo || headerLines.length ? renderDivider("header_divider") : null}
+
             {renderOuterRequiredField(taller)}
+            {taller ? renderDivider("taller_divider") : null}
             {renderOuterRequiredField(nombreInspector)}
+            {nombreInspector ? renderDivider("nombre_inspector_divider") : null}
             {renderOuterRequiredField(firmaInspector)}
+            {firmaInspector ? renderDivider("firma_inspector_divider") : null}
             {renderOuterRequiredField(nombreSupervisor)}
+            {nombreSupervisor ? renderDivider("nombre_supervisor_divider") : null}
             {renderOuterRequiredField(firmaSupervisor)}
+            {firmaSupervisor ? renderDivider("firma_supervisor_divider") : null}
 
             {indicacionesToggle ? (
               <div
@@ -1315,47 +1422,64 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
                       background: "#fff",
                     }}
                   >
-                    {imagenMaquinaSoldar ? (
-                      <div style={{ display: "flex", justifyContent: "center" }}>
-                        <div
-                          style={{
-                            width: "100%",
-                            maxWidth: isMobile ? 260 : 360,
-                            textAlign: "center",
-                          }}
-                        >
-                          {renderField(imagenMaquinaSoldar)}
-                        </div>
+                    {renderCollapsibleSection(
+                      "DATOS DE LA MÁQUINA",
+                      datosMaquinaOpen,
+                      setDatosMaquinaOpen,
+                      <>
+                        {imagenMaquinaSoldar ? (
+                          <div style={{ display: "flex", justifyContent: "center" }}>
+                            <div
+                              style={{
+                                width: "100%",
+                                maxWidth: isMobile ? 260 : 360,
+                                textAlign: "center",
+                              }}
+                            >
+                              {renderField(imagenMaquinaSoldar)}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {imagenMaquinaSoldar ? renderDivider("imagen_maquina_soldar_divider") : null}
+
+                        {indicacion1 ? (
+                          <div
+                            style={{
+                              color: "#111827",
+                              fontSize: isMobile ? 14 : 14,
+                              lineHeight: 1.5,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {indicacion1.text}
+                          </div>
+                        ) : null}
+
+                        {indicacion1 ? renderDivider("indicacion_maquina_soldar_divider") : null}
+
+                        {renderInnerRequiredField(numeroSerie)}
+                        {numeroSerie ? renderDivider("numero_serie_maquina_divider") : null}
+                        {renderInnerRequiredField(tipoModelo)}
+                      </>
+                    )}
+
+                    {renderCollapsibleSection(
+                      "CRITERIOS A INSPECCIONAR",
+                      criteriosInspeccionarOpen,
+                      setCriteriosInspeccionarOpen,
+                      <div style={{ display: "grid", gap: 14 }}>
+                        {checklistItems.map((item) => (
+                          <div key={item.key} style={itemCardStyle}>
+                            {renderInnerRequiredField(item.status, item.label)}
+
+                            {item.status && item.obs ? renderDivider(`${item.key}_divider`) : null}
+
+                            {item.obs ? renderInnerRequiredField(item.obs, "Observaciones") : null}
+                          </div>
+                        ))}
                       </div>
-                    ) : null}
-
-                    {indicacion1 ? (
-                      <div
-                        style={{
-                          color: "#111827",
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.5,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {indicacion1.text}
-                      </div>
-                    ) : null}
-
-                    {renderInnerRequiredField(numeroSerie)}
-                    {renderInnerRequiredField(tipoModelo)}
-
-                    <div style={{ display: "grid", gap: 14 }}>
-                      {checklistItems.map((item) => (
-                        <div key={item.key} style={itemCardStyle}>
-                          {renderInnerRequiredField(item.status, item.label)}
-
-                          {item.obs ? (
-                            renderInnerRequiredField(item.obs, "Observaciones")
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
+                    )}
                   </div>
                 ) : null}
               </div>

@@ -37,14 +37,14 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                     'label' => 'Empresa',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'label' => 'Sistema',
                     'type' => 'static_text',
                     'required' => false,
-                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
@@ -103,25 +103,25 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                 ],
                 [
                     'id' => 'nombre_inspector',
-                    'label' => 'Nombre del inspector',
+                    'label' => 'Nombre del Inspector',
                     'type' => 'text',
                     'required' => true,
                 ],
                 [
                     'id' => 'firma_inspector',
-                    'label' => 'Firma del inspector',
+                    'label' => 'Firma del Inspector',
                     'type' => 'signature',
                     'required' => true,
                 ],
                 [
                     'id' => 'nombre_supervisor',
-                    'label' => 'Nombre del supervisor',
+                    'label' => 'Nombre del Supervisor',
                     'type' => 'text',
                     'required' => true,
                 ],
                 [
                     'id' => 'firma_supervisor',
-                    'label' => 'Firma del supervisor',
+                    'label' => 'Firma del Supervisor',
                     'type' => 'signature',
                     'required' => true,
                 ],
@@ -156,7 +156,7 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                 ],
                 [
                     'id' => 'tipo_modelo_maquina',
-                    'label' => 'Tipo y modelo de maquina',
+                    'label' => 'Tipo y Modelo de Maquina',
                     'type' => 'text',
                     'required' => true,
                 ],
@@ -196,7 +196,7 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                 'label' => $label,
                 'type' => 'radio',
                 'required' => true,
-                'options' => ['(B) Bueno', '(M) Malo', '(NA) No Aplica'],
+                'options' => ['( B ) Bueno', '( M ) Malo', '( NA ) No Aplica'],
             ];
 
             $fields[] = [
