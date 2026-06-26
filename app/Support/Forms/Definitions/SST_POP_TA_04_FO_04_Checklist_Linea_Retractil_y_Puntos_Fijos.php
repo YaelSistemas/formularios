@@ -33,12 +33,12 @@ class SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos implements Fo
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales S.A. de C.V.',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTION INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
@@ -170,28 +170,28 @@ class SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos implements Fo
                             'label' => 'Manija de Anclaje',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'carcaza_termoplastica',
                             'label' => 'Carcaza Termoplástica',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'linea_vida_acero_textil',
                             'label' => 'Línea de Vida Acero Galvanizado o Textil',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'activacion_sistema_bloqueo',
                             'label' => 'Activación de Sistema de Bloqueo',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
 
                         [
@@ -206,21 +206,21 @@ class SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos implements Fo
                             'label' => '1.1. Desgaste, Deformaciones',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'mosqueton_1_2',
                             'label' => '1.2. Picaduras, Grietas',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'mosqueton_1_3',
                             'label' => '1.3. Corrosión',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
 
                         [
@@ -235,28 +235,28 @@ class SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos implements Fo
                             'label' => '2.1. Desgaste, Deformaciones',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'gancho_2_2',
                             'label' => '2.2. Picadura, Grietas',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'gancho_2_3',
                             'label' => '2.3. Ajuste Inadecuado o Incorrecto de los Cierres de Seguridad (Enganches)',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'gancho_2_4',
                             'label' => '2.4. Corrosión',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
 
                         [
