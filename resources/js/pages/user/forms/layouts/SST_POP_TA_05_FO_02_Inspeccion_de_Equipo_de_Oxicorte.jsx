@@ -19,6 +19,10 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
     indicaciones_toggle: false,
   });
 
+  const [guiaOpen, setGuiaOpen] = useState(true);
+  const [componentesOpen, setComponentesOpen] = useState(true);
+  const [observacionesOpen, setObservacionesOpen] = useState(true);
+
   const [formFieldError, setFormFieldError] = useState("");
   const [formFieldErrorId, setFormFieldErrorId] = useState(null);
 
@@ -232,15 +236,31 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
 
   const isCollapsed = !!collapsedSections[indicacionesToggle?.id];
 
-  const indicacionesFieldIds = useMemo(() => {
-    const ids = [numeroIdentificacion?.id, observaciones?.id];
+  const guiaFieldIds = useMemo(() => {
+    return new Set([numeroIdentificacion?.id].filter(Boolean));
+  }, [numeroIdentificacion]);
+
+  const componentesFieldIds = useMemo(() => {
+    const ids = [];
 
     checklistItems.forEach((item) => {
       if (item?.status?.id) ids.push(item.status.id);
     });
 
     return new Set(ids.filter(Boolean));
-  }, [numeroIdentificacion, observaciones, checklistItems]);
+  }, [checklistItems]);
+
+  const observacionesFieldIds = useMemo(() => {
+    return new Set([observaciones?.id].filter(Boolean));
+  }, [observaciones]);
+
+  const indicacionesFieldIds = useMemo(() => {
+    return new Set([
+      ...Array.from(guiaFieldIds),
+      ...Array.from(componentesFieldIds),
+      ...Array.from(observacionesFieldIds),
+    ].filter(Boolean));
+  }, [guiaFieldIds, componentesFieldIds, observacionesFieldIds]);
 
   const showFormFieldError = (fieldId, message) => {
     setMsg("");
@@ -251,17 +271,33 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
       clearTimeout(formErrorTimerRef.current);
     }
 
-    const mustOpenSection =
-      !!fieldId &&
-      isCollapsed &&
-      indicacionesToggle?.id &&
-      indicacionesFieldIds.has(fieldId);
+    const fieldIsInIndicaciones =
+      !!fieldId && indicacionesToggle?.id && indicacionesFieldIds.has(fieldId);
 
-    if (mustOpenSection) {
+    const mustOpenMainSection = fieldIsInIndicaciones && isCollapsed;
+    const mustOpenGuiaSection = fieldIsInIndicaciones && guiaFieldIds.has(fieldId) && !guiaOpen;
+    const mustOpenComponentesSection =
+      fieldIsInIndicaciones && componentesFieldIds.has(fieldId) && !componentesOpen;
+    const mustOpenObservacionesSection =
+      fieldIsInIndicaciones && observacionesFieldIds.has(fieldId) && !observacionesOpen;
+
+    if (mustOpenMainSection) {
       setCollapsedSections((prev) => ({
         ...prev,
         [indicacionesToggle.id]: false,
       }));
+    }
+
+    if (mustOpenGuiaSection) {
+      setGuiaOpen(true);
+    }
+
+    if (mustOpenComponentesSection) {
+      setComponentesOpen(true);
+    }
+
+    if (mustOpenObservacionesSection) {
+      setObservacionesOpen(true);
     }
 
     const runScrollAndFocus = () => {
@@ -282,10 +318,16 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
       }, 180);
     };
 
-    if (mustOpenSection) {
+    const mustWaitForSectionToRender =
+      mustOpenMainSection ||
+      mustOpenGuiaSection ||
+      mustOpenComponentesSection ||
+      mustOpenObservacionesSection;
+
+    if (mustWaitForSectionToRender) {
       setTimeout(() => {
         requestAnimationFrame(runScrollAndFocus);
-      }, 80);
+      }, 180);
     } else {
       requestAnimationFrame(runScrollAndFocus);
     }
@@ -895,6 +937,82 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
     );
   };
 
+  const renderDivider = (key = null) => (
+    <div
+      key={key}
+      style={{
+        borderBottom: "1px solid #d1d5db",
+        margin: "4px 0 0 0",
+      }}
+    />
+  );
+
+  const nestedSectionStyle = {
+    border: "1px solid #dbe4ee",
+    borderRadius: 18,
+    background: "#f8fafc",
+    overflow: "hidden",
+    boxShadow: "0 6px 18px rgba(15,23,42,0.04)",
+  };
+
+  const nestedSectionHeaderStyle = {
+    padding: isMobile ? "13px 14px" : "15px 18px",
+    background: "#eef2f7",
+    borderBottom: "1px solid #dbe4ee",
+    fontWeight: 900,
+    color: "#0f172a",
+    fontSize: isMobile ? 15 : 16,
+    lineHeight: 1.35,
+    textTransform: "uppercase",
+    letterSpacing: 0.2,
+  };
+
+  const renderCollapsibleSection = (title, isOpen, setIsOpen, children) => (
+    <div style={nestedSectionStyle}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={{
+          ...nestedSectionHeaderStyle,
+          width: "100%",
+          border: "none",
+          borderBottom: isOpen ? "1px solid #dbe4ee" : "none",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          textAlign: "left",
+        }}
+      >
+        <span>{title}</span>
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 18,
+            lineHeight: 1,
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.2s ease",
+          }}
+        >
+          ▾
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div
+          style={{
+            padding: isMobile ? 12 : 14,
+            display: "grid",
+            gap: isMobile ? 12 : 14,
+          }}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+
   const validateSimpleRequiredField = (field, emptyMessage = null) => {
     if (!field) return false;
 
@@ -1274,19 +1392,8 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
                   key={line.id}
                   style={{
                     width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
+                    fontWeight: 700,
+                    fontSize: isMobile ? 12 : 14,
                     color: "#111827",
                     textAlign: "left",
                     lineHeight: isMobile ? 1.45 : 1.35,
@@ -1297,10 +1404,16 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
               ))}
             </div>
 
+            {renderDivider("header_divider")}
+
             {renderOuterRequiredField(taller)}
+            {taller ? renderDivider("taller_divider") : null}
             {renderOuterRequiredField(nombreInspector)}
+            {nombreInspector ? renderDivider("nombre_inspector_divider") : null}
             {renderOuterRequiredField(firmaInspector)}
+            {firmaInspector ? renderDivider("firma_inspector_divider") : null}
             {renderOuterRequiredField(nombreSupervisor)}
+            {nombreSupervisor ? renderDivider("nombre_supervisor_divider") : null}
             {renderOuterRequiredField(firmaSupervisor)}
 
             {indicacionesToggle ? (
@@ -1343,85 +1456,117 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
                       background: "#fff",
                     }}
                   >
-                    {guiaInspeccion ? (
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: isMobile ? 16 : 18,
-                          lineHeight: 1.4,
-                          fontWeight: 800,
-                          textAlign: "center",
-                        }}
-                      >
-                        {guiaInspeccion.text}
+                    {renderCollapsibleSection(
+                      "Guía de inspección e identificación",
+                      guiaOpen,
+                      setGuiaOpen,
+                      <>
+                        {guiaInspeccion ? (
+                          <div
+                            style={{
+                              color: "#111827",
+                              fontSize: isMobile ? 14 : 14,
+                              lineHeight: 1.5,
+                              fontWeight: 700,
+                              textAlign: "center",
+                            }}
+                          >
+                            {guiaInspeccion.text}
+                          </div>
+                        ) : null}
+
+                        {guiaInspeccion ? renderDivider("guia_inspeccion_divider") : null}
+
+                        {imagenOxicorte ? (
+                          <div style={{ display: "flex", justifyContent: "center", marginTop: 4, marginBottom: 6 }}>
+                            <div
+                              style={{
+                                width: "100%",
+                                maxWidth: isMobile ? 260 : 420,
+                                textAlign: "center",
+                              }}
+                            >
+                              {renderField(imagenOxicorte)}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {imagenOxicorte ? renderDivider("imagen_oxicorte_divider") : null}
+
+                        {indicacion1 ? (
+                          <div
+                            style={{
+                              color: "#111827",
+                              fontSize: isMobile ? 14 : 14,
+                              lineHeight: 1.5,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {indicacion1.text}
+                          </div>
+                        ) : null}
+
+                        {indicacion1 ? renderDivider("indicacion_1_divider") : null}
+
+                        {renderInnerRequiredField(numeroIdentificacion)}
+                      </>
+                    )}
+
+                    {renderCollapsibleSection(
+                      "Criterios a inspeccionar",
+                      componentesOpen,
+                      setComponentesOpen,
+                      <div style={{ display: "grid", gap: 14 }}>
+                        {checklistItems.map((item, index) => (
+                          <React.Fragment key={item.key}>
+                            <div style={itemCardStyle}>
+                              {renderInnerRequiredField(item.status, item.label)}
+                            </div>
+                            {index < checklistItems.length - 1 ? renderDivider(`${item.key}_divider`) : null}
+                          </React.Fragment>
+                        ))}
                       </div>
-                    ) : null}
+                    )}
 
-                    {imagenOxicorte ? (
-                      <div style={{ display: "flex", justifyContent: "center" }}>
-                        <div
-                          style={{
-                            width: "100%",
-                            maxWidth: isMobile ? 260 : 360,
-                            textAlign: "center",
-                          }}
-                        >
-                          {renderField(imagenOxicorte)}
-                        </div>
-                      </div>
-                    ) : null}
+                    {renderCollapsibleSection(
+                      "Observaciones y nota final",
+                      observacionesOpen,
+                      setObservacionesOpen,
+                      <>
+                        {verificarJabonaduraText ? (
+                          <div
+                            style={{
+                              color: "#0f172a",
+                              fontSize: isMobile ? 14 : 14,
+                              lineHeight: 1.5,
+                              fontWeight: 800,
+                              textAlign: "center",
+                            }}
+                          >
+                            {verificarJabonaduraText.text}
+                          </div>
+                        ) : null}
 
-                    {indicacion1 ? (
-                      <div
-                        style={{
-                          color: "#111827",
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.5,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {indicacion1.text}
-                      </div>
-                    ) : null}
+                        {verificarJabonaduraText ? renderDivider("verificar_jabonadura_divider") : null}
 
-                    {renderInnerRequiredField(numeroIdentificacion)}
+                        {renderInnerField(observaciones, "Observaciones")}
 
-                    <div style={{ display: "grid", gap: 14 }}>
-                      {checklistItems.map((item) => (
-                        <div key={item.key} style={itemCardStyle}>
-                          {renderInnerRequiredField(item.status, item.label)}
-                        </div>
-                      ))}
-                    </div>
+                        {observaciones && notaFinal ? renderDivider("observaciones_divider") : null}
 
-                    {verificarJabonaduraText ? (
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.5,
-                          fontWeight: 800,
-                          textAlign: "center",
-                        }}
-                      >
-                        {verificarJabonaduraText.text}
-                      </div>
-                    ) : null}
-
-                    {renderInnerField(observaciones, "Observaciones")}
-
-                    {notaFinal ? (
-                      <div
-                        style={{
-                          color: "#991b1b",
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.6,
-                          fontWeight: 800,
-                        }}
-                      >
-                        {notaFinal.text}
-                      </div>
-                    ) : null}
+                        {notaFinal ? (
+                          <div
+                            style={{
+                              color: "#991b1b",
+                              fontSize: isMobile ? 14 : 14,
+                              lineHeight: 1.6,
+                              fontWeight: 800,
+                            }}
+                          >
+                            {notaFinal.text}
+                          </div>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 ) : null}
               </div>

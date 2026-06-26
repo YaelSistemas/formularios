@@ -19,50 +19,43 @@
 
         .sheet {
             width: 100%;
+            margin: 0;
         }
 
         .header-table {
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
+            padding: 4px 6px;
             vertical-align: middle;
-            box-sizing: border-box;
-            line-height: 1.05;
+            text-align: center;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            width: 18%;
-            text-align: center;
-            padding: 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
         .center-cell {
-            width: 45%;
-            text-align: center;
             font-weight: bold;
-            padding: 4px 6px;
         }
 
-        .right-cell {
-            width: 37%;
-            text-align: left;
+        .header-table td.right-cell {
             font-weight: bold;
-            padding: 4px 8px;
-        }
-
-        .row-3-center {
-            font-size: 10px;
-            text-transform: uppercase;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .info-block {
@@ -230,7 +223,7 @@
 
         .signatures-table {
             width: 100%;
-            margin-top: 70px;
+            margin-top: 50px;
             border-collapse: collapse;
             table-layout: fixed;
         }
@@ -266,7 +259,6 @@
 
         .signature-name {
             font-size: 9px;
-            font-weight: bold;
             line-height: 1.2;
             min-height: 12px;
             margin-bottom: 0;
@@ -377,27 +369,46 @@
 
     <div class="sheet">
         <table class="header-table">
-            <colgroup>
-                <col style="width: 18%">
-                <col style="width: 45%">
-                <col style="width: 37%">
-            </colgroup>
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
                 <td rowspan="3" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}" alt="Logo">
                     @endif
                 </td>
-                <td class="center-cell">VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.</td>
-                <td class="right-cell">CODIFICACIÓN: SST-POP-TA-05-FO-02</td>
+
+                <td class="center-cell">
+                    VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
+                </td>
+
+                <td class="right-cell">
+                    CODIFICACIÓN: SST-POP-TA-05-FO-02
+                </td>
             </tr>
+
             <tr>
-                <td class="center-cell">SISTEMA DE GESTIÓN INTEGRAL</td>
-                <td class="right-cell">FECHA DE EMISIÓN: 27/03/2025</td>
+                <td class="center-cell">
+                    SISTEMA DE GESTIÓN INTEGRAL
+                </td>
+
+                <td class="right-cell">
+                    FECHA DE EMISIÓN: 27/03/2025
+                </td>
             </tr>
+
             <tr>
-                <td class="center-cell row-3-center">INSPECCIÓN DE EQUIPO DE OXICORTE</td>
-                <td class="right-cell">NÚMERO DE REVISIÓN: 03</td>
+                <td class="center-cell">
+                    INSPECCIÓN DE EQUIPO DE OXICORTE
+                </td>
+
+                <td class="right-cell">
+                    NÚMERO DE REVISIÓN: 03
+                </td>
             </tr>
         </table>
 
@@ -444,17 +455,21 @@
 
             @foreach($items as $index => $item)
                 @php
-                    $estado = strtoupper(trim((string) data_get($answers, $item['estado'], '')));
+                    $estadoRaw = trim((string) data_get($answers, $item['estado'], ''));
+                    $estado = mb_strtoupper($estadoRaw);
+                
+                    $esBien = str_contains($estado, 'BIEN');
+                    $esMal = str_contains($estado, 'MAL');
                 @endphp
                 <tr>
                     <td colspan="6" class="item-merged">{{ $item['n'] }}. {{ $item['label'] }}</td>
                     <td class="estado-col">
-                        @if($estado === 'BIEN')
-                            <span class="x-mark">X</span>
+                        @if($esBien)
+                            <span class="x-mark">✔︎</span>
                         @endif
                     </td>
                     <td class="estado-col">
-                        @if($estado === 'MAL')
+                        @if($esMal)
                             <span class="x-mark">X</span>
                         @endif
                     </td>
