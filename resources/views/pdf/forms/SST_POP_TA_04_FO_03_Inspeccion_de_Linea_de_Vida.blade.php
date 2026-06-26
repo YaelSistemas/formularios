@@ -19,33 +19,39 @@
         }
 
         .sheet {
-            width: 110%;
-            transform: scale(0.86);
+            width: 100%;
+            transform: scale(1);
             transform-origin: top left;
-            margin-left: 30px;
+            margin-left: 0px;
+        }
+
+        .page-break {
+            page-break-after: always;
         }
 
         .header-table {
-            width: 99.6%;
+            width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
@@ -53,30 +59,15 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
-        }
-
-        .row-2-center,
-        .row-3-center {
-            font-size: 10px;
-        }
-
-        .row-1-right,
-        .row-2-right,
-        .row-3-right {
-            font-size: 9px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
             width: 92%;
-            margin: 22px auto 0 auto;
+            margin: 7px auto 0 auto;
         }
 
         .inspection-row {
@@ -140,15 +131,15 @@
 
         .text-block {
             text-align: center;
-            margin-top: 12px;
-            font-size: 10px;
+            margin-top: 3px;
+            font-size: 7px;
             font-weight: bold;
             line-height: 1.4;
         }
 
         .criteria-table {
             width: 99.6%;
-            margin: 14px auto 0 auto;
+            margin: 5px auto 0 auto;
             border-collapse: collapse;
             table-layout: fixed;
             font-size: 7px;
@@ -254,10 +245,33 @@
         }
     @endphp
 
+    @php
+        $rows = data_get($answers, 'tabla_linea_vida', []);
+
+        $filasConDatos = collect($rows)->filter(function ($row) {
+            return !empty(array_filter($row, fn($value) => $value !== null && $value !== ''));
+        })->values();
+
+        $pages = $filasConDatos->chunk(6)->map(function ($chunk) {
+            return $chunk->values();
+        })->values();
+
+        if ($pages->isEmpty()) {
+            $pages = collect([collect()]);
+        }
+    @endphp
+
+    @foreach($pages as $pageIndex => $chunk)
     <div class="sheet">
 
         <!-- HEADER -->
         <table class="header-table">
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
                 <td rowspan="3" class="logo-cell">
                     @if($logoSrc)
@@ -265,32 +279,32 @@
                     @endif
                 </td>
 
-                <td colspan="2" class="center-cell row-1-center">
+                <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
                     CODIFICACIÓN: SST-POP-TA-04-FO-03
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    FECHA DE EMISIÓN: 27/03/2025
+                <td class="right-cell">
+                    NÚMERO DE REVISIÓN: 03
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     INSPECCIÓN DE LÍNEA DE VIDA
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    NÚMERO DE REVISIÓN: 03
+                <td class="right-cell">
+                    FECHA DE EMISIÓN: 27/03/2025
                 </td>
             </tr>
         </table>
@@ -322,90 +336,164 @@
             Considerar los siguientes criterios de acuerdo a las condiciones de la línea de vida.
         </div>
 
+
+        @php
+            /*
+             |--------------------------------------------------------------
+             | ANCHOS DE COLUMNAS - TABLA PRINCIPAL
+             |--------------------------------------------------------------
+             | Puedes modificar estos valores para ajustar el ancho.
+             | La columna de Observaciones queda más amplia.
+             */
+            $wNumeroLineaVida = '9%';
+
+            $wLineaVida11 = '5%';
+            $wLineaVida12 = '5%';
+            $wLineaVida13 = '5%';
+
+            $wAmortiguador21 = '5%';
+            $wAmortiguador22 = '5%';
+            $wAmortiguador23 = '5%';
+
+            $wGanchos31 = '5%';
+            $wGanchos32 = '5%';
+            $wGanchos33 = '5%';
+            $wGanchos34 = '5%';
+            $wGanchos35 = '5%';
+
+            $wEtiquetaFaltante = '5%';
+            $wEtiquetaLegible  = '5%';
+
+            $wAccionDaniada = '5%';
+            $wAccionBuenas  = '5%';
+
+            $wObservaciones = '15.96%';
+
+            $columnWidths = [
+                $wNumeroLineaVida,
+                $wLineaVida11,
+                $wLineaVida12,
+                $wLineaVida13,
+                $wAmortiguador21,
+                $wAmortiguador22,
+                $wAmortiguador23,
+                $wGanchos31,
+                $wGanchos32,
+                $wGanchos33,
+                $wGanchos34,
+                $wGanchos35,
+                $wEtiquetaFaltante,
+                $wEtiquetaLegible,
+                $wAccionDaniada,
+                $wAccionBuenas,
+                $wObservaciones,
+            ];
+        @endphp
+
         <!-- TABLA -->
         <table class="criteria-table">
+            <colgroup>
+                @foreach($columnWidths as $width)
+                    <col style="width: {{ $width }};">
+                @endforeach
+            </colgroup>
+
+            <!-- Fila técnica para que Dompdf respete los anchos también en los títulos -->
+            <tr style="height:0; line-height:0;">
+                <td style="width:{{ $wNumeroLineaVida }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wLineaVida11 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wLineaVida12 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wLineaVida13 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wAmortiguador21 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wAmortiguador22 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wAmortiguador23 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wGanchos31 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wGanchos32 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wGanchos33 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wGanchos34 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wGanchos35 }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wEtiquetaFaltante }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wEtiquetaLegible }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wAccionDaniada }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wAccionBuenas }}; padding:0; border:none; height:0;"></td>
+                <td style="width:{{ $wObservaciones }}; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
                 <td style="border:none;"></td>
                 <td colspan="16" class="top-title">
-                    Criterios (✓ Buen Estado &nbsp;&nbsp; X Mal Estado &nbsp;&nbsp; NA No Aplica)
+                    Criterios (&nbsp; ( ✓ ) Buen Estado &nbsp;&nbsp; ( X ) Mal Estado &nbsp;&nbsp; ( NA ) No Aplica &nbsp;)
                 </td>
             </tr>
 
             <tr>
-                <td rowspan="2" class="group-title">N° de Línea de vida:</td>
+                <td rowspan="2" class="group-title" style="width:{{ $wNumeroLineaVida }};">N° de Línea de vida:</td>
 
                 <td colspan="3" class="group-title">1. LÍNEA DE VIDA</td>
                 <td colspan="3" class="group-title">2. AMORTIGUADOR</td>
                 <td colspan="5" class="group-title">3. GANCHOS</td>
                 <td colspan="2" class="group-title">4. ETIQUETA</td>
                 <td colspan="2" class="group-title">Acciones:</td>
-                <td rowspan="2" class="group-title">Observaciones</td>
+                <td rowspan="2" class="group-title" style="width:{{ $wObservaciones }};">Observaciones</td>
             </tr>
 
             <tr>
-                <td class="sub-title">1.1. Costuras (Cortadas, Quemadas, Agujeradas, Deshilachadas, Decoloradas)</td>
-                <td class="sub-title">1.2. Terminación (Cortada, Quemada, Agujerada, Deshilachada, Decolorada, Empalmada)</td>
-                <td class="sub-title">1.3. Cuerpo de la Línea de Vida (Cortado, Quemado, Agujerado, Deshilachado, Decolorado, Empalmado)</td>
-                <td class="sub-title">2.1. Daño en Cubierta</td>
-                <td class="sub-title">2.2. Deformación</td>
-                <td class="sub-title">2.3. Señales de Activación</td>
-                <td class="sub-title">3.1. Desgaste Excesivo, Deformaciones</td>
-                <td class="sub-title">3.2. Picaduras, Grietas</td>
-                <td class="sub-title">3.3. Resorte con Fallas</td>
-                <td class="sub-title">3.4. Función de Bloqueo de Conector</td>
-                <td class="sub-title">3.5. Corrosión</td>
-                <td class="sub-title">Faltante</td>
-                <td class="sub-title">Legible</td>
-                <td class="sub-title">La Línea de Vida se Marca como Dañada y es Sacado de Uso</td>
-                <td class="sub-title">La Línea de Vida está en Buenas Condiciones</td>
+                <td class="sub-title" style="width:{{ $wLineaVida11 }};">1.1. Costuras (Cortadas, Quemadas, Agujeradas, Deshilachadas, Decoloradas)</td>
+                <td class="sub-title" style="width:{{ $wLineaVida12 }};">1.2. Terminación (Cortada, Quemada, Agujerada, Deshilachada, Decolorada, Empalmada)</td>
+                <td class="sub-title" style="width:{{ $wLineaVida13 }};">1.3. Cuerpo de la Línea de Vida (Cortado, Quemado, Agujerado, Deshilachado, Decolorado, Empalmado)</td>
+                <td class="sub-title" style="width:{{ $wAmortiguador21 }};">2.1. Daño en Cubierta</td>
+                <td class="sub-title" style="width:{{ $wAmortiguador22 }};">2.2. Deformación</td>
+                <td class="sub-title" style="width:{{ $wAmortiguador23 }};">2.3. Señales de Activación</td>
+                <td class="sub-title" style="width:{{ $wGanchos31 }};">3.1. Desgaste Excesivo, Deformaciones</td>
+                <td class="sub-title" style="width:{{ $wGanchos32 }};">3.2. Picaduras, Grietas</td>
+                <td class="sub-title" style="width:{{ $wGanchos33 }};">3.3. Resorte con Fallas</td>
+                <td class="sub-title" style="width:{{ $wGanchos34 }};">3.4. Función de Bloqueo de Conector</td>
+                <td class="sub-title" style="width:{{ $wGanchos35 }};">3.5. Corrosión</td>
+                <td class="sub-title" style="width:{{ $wEtiquetaFaltante }};">Faltante</td>
+                <td class="sub-title" style="width:{{ $wEtiquetaLegible }};">Legible</td>
+                <td class="sub-title" style="width:{{ $wAccionDaniada }};">La Línea de Vida se Marca como Dañada y es Sacado de Uso</td>
+                <td class="sub-title" style="width:{{ $wAccionBuenas }};">La Línea de Vida está en Buenas Condiciones</td>
             </tr>
         </table>
 
-        @php
-            $rows = data_get($answers, 'tabla_linea_vida', []);
-        
-            $filasConDatos = collect($rows)->filter(function ($row) {
-                return !empty(array_filter($row, fn($value) => $value !== null && $value !== ''));
-            })->values();
-        @endphp
-
         <table class="data-table" style="margin-top: 6px;">
-            @php
-                $minFilas = 7;
-                $totalFilas = max($minFilas, $filasConDatos->count());
-            @endphp
-        
-            @for ($i = 0; $i < $totalFilas; $i++)
+            <colgroup>
+                @foreach($columnWidths as $width)
+                    <col style="width: {{ $width }};">
+                @endforeach
+            </colgroup>
+
+            @for ($i = 0; $i < 6; $i++)
                 @php
-                    $row = $filasConDatos[$i] ?? [];
+                    $row = $chunk[$i] ?? [];
                     $accion = data_get($row, 'acciones', '');
                 @endphp
-        
+
                 <tr>
-                    <td>{{ data_get($row, 'numero_linea_vida') }}</td>
-        
-                    <td>{{ data_get($row, 'linea_vida_1_1') }}</td>
-                    <td>{{ data_get($row, 'linea_vida_1_2') }}</td>
-                    <td>{{ data_get($row, 'linea_vida_1_3') }}</td>
-        
-                    <td>{{ data_get($row, 'amortiguador_2_1') }}</td>
-                    <td>{{ data_get($row, 'amortiguador_2_2') }}</td>
-                    <td>{{ data_get($row, 'amortiguador_2_3') }}</td>
-        
-                    <td>{{ data_get($row, 'ganchos_3_1') }}</td>
-                    <td>{{ data_get($row, 'ganchos_3_2') }}</td>
-                    <td>{{ data_get($row, 'ganchos_3_3') }}</td>
-                    <td>{{ data_get($row, 'ganchos_3_4') }}</td>
-                    <td>{{ data_get($row, 'ganchos_3_5') }}</td>
-        
-                    <td>{{ data_get($row, 'etiqueta_faltante') }}</td>
-                    <td>{{ data_get($row, 'etiqueta_legible') }}</td>
-        
-                    <td colspan="2" style="text-align: center;">
+                    <td style="width:{{ $wNumeroLineaVida }};">{{ data_get($row, 'numero_linea_vida') }}</td>
+
+                    <td style="width:{{ $wLineaVida11 }};">{{ data_get($row, 'linea_vida_1_1') }}</td>
+                    <td style="width:{{ $wLineaVida12 }};">{{ data_get($row, 'linea_vida_1_2') }}</td>
+                    <td style="width:{{ $wLineaVida13 }};">{{ data_get($row, 'linea_vida_1_3') }}</td>
+
+                    <td style="width:{{ $wAmortiguador21 }};">{{ data_get($row, 'amortiguador_2_1') }}</td>
+                    <td style="width:{{ $wAmortiguador22 }};">{{ data_get($row, 'amortiguador_2_2') }}</td>
+                    <td style="width:{{ $wAmortiguador23 }};">{{ data_get($row, 'amortiguador_2_3') }}</td>
+
+                    <td style="width:{{ $wGanchos31 }};">{{ data_get($row, 'ganchos_3_1') }}</td>
+                    <td style="width:{{ $wGanchos32 }};">{{ data_get($row, 'ganchos_3_2') }}</td>
+                    <td style="width:{{ $wGanchos33 }};">{{ data_get($row, 'ganchos_3_3') }}</td>
+                    <td style="width:{{ $wGanchos34 }};">{{ data_get($row, 'ganchos_3_4') }}</td>
+                    <td style="width:{{ $wGanchos35 }};">{{ data_get($row, 'ganchos_3_5') }}</td>
+
+                    <td style="width:{{ $wEtiquetaFaltante }};">{{ data_get($row, 'etiqueta_faltante') }}</td>
+                    <td style="width:{{ $wEtiquetaLegible }};">{{ data_get($row, 'etiqueta_legible') }}</td>
+
+                    <td colspan="2" style="width:{{ ((float) $wAccionDaniada + (float) $wAccionBuenas) }}%; text-align: center;">
                         {{ $accion }}
                     </td>
-        
-                    <td>{{ data_get($row, 'observaciones') }}</td>
+
+                    <td style="width:{{ $wObservaciones }}; text-align:left; padding-left:4px;">{{ data_get($row, 'observaciones') }}</td>
                 </tr>
             @endfor
         </table>
@@ -443,6 +531,7 @@
                 <!-- IZQUIERDA (IMAGEN) -->
                 <td colspan="4" style="
                     border: 1px solid #000;
+                    border: none;
                     text-align: center;
                 ">
                     <img
@@ -458,10 +547,10 @@
                 </td>
             
                 <!-- ESPACIO VACÍO -->
-                <td colspan="3" style="border: none;"></td>
+                <td colspan="2" style="border: none;"></td>
             
                 <!-- FIRMA (COLUMNAS 8-9-10) -->
-                <td colspan="3" style="
+                <td colspan="4" style="
                     border: none;
                     text-align: center;
                     vertical-align: middle;
@@ -482,7 +571,7 @@
             
                     <!-- NOMBRE -->
                     <div style="
-                        font-size: 9px;
+                        font-size: 8px;
                         margin-bottom: 0px;
                     ">
                         {{ $nombreInspector }}
@@ -490,14 +579,15 @@
             
                     <!-- LÍNEA -->
                     <div style="
-                        width: 160px;
+                        width: 250px;
                         border-bottom: 1px solid #000;
                         margin: 0 auto;
                     "></div>
             
                     <!-- TEXTO -->
                     <div style="
-                        font-size: 6px;
+                        font-size: 7px;
+                        font-weight:bold;
                         margin-top: 2px;
                     ">
                         Nombre y Firma del colaborador que realiza el checklist
@@ -511,5 +601,10 @@
         </table>
 
     </div>
+
+    @if(!$loop->last)
+        <div class="page-break"></div>
+    @endif
+@endforeach
 </body>
 </html>

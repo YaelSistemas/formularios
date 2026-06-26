@@ -33,17 +33,17 @@ class SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida implements FormDefinition
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTION INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'INSPECCIÓN DE LÍNEA DE VIDA',
+                    'text' => 'Inspección de Línea de Vida',
                 ],
                 [
                     'id' => 'header_line_4',
@@ -156,21 +156,21 @@ class SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida implements FormDefinition
                             'label' => '1.1. Costuras (Cortadas, Quemadas, Agujeradas, Deshilachadas, Decoloradas)',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'linea_vida_1_2',
                             'label' => '1.2. Terminación (Cortada, Quemada, Agujerada, Deshilachada, Decolorada, Empalmada)',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'linea_vida_1_3',
                             'label' => '1.3. Cuerpo de la Línea de Vida (Cortado, Quemado, Agujerado, Deshilachado, Decolorado, Empalmado)',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
 
                         [
@@ -185,21 +185,21 @@ class SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida implements FormDefinition
                             'label' => '2.1. Daño en Cubierta',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'amortiguador_2_2',
                             'label' => '2.2. Deformación',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'amortiguador_2_3',
                             'label' => '2.3. Señales de Activación',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
 
                         [
@@ -214,35 +214,35 @@ class SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida implements FormDefinition
                             'label' => '3.1. Desgaste Excesivo, Deformaciones',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'ganchos_3_2',
                             'label' => '3.2. Picaduras, Grietas',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'ganchos_3_3',
                             'label' => '3.3. Resorte con Fallas',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'ganchos_3_4',
                             'label' => '3.4. Función de Bloqueo de Conector',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
                         [
                             'id' => 'ganchos_3_5',
                             'label' => '3.5. Corrosión',
                             'type' => 'radio',
                             'required' => true,
-                            'options' => ['(✓) Buen Estado', '(X) Mal Estado', '(NA) No Aplica'],
+                            'options' => ['( ✓ ) Buen Estado', '( X ) Mal Estado', '( NA ) No Aplica'],
                         ],
 
                         [
