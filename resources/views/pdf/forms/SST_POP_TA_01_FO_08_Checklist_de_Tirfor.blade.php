@@ -27,6 +27,7 @@
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
@@ -52,14 +53,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 8px;
-        }
-
-        .row-1-center {
-            font-size: 10px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -154,6 +151,12 @@
 
         <!-- HEADER -->
         <table class="header-table">
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
                 <td rowspan="3" class="logo-cell">
                     @if($logoSrc)
@@ -161,32 +164,32 @@
                     @endif
                 </td>
 
-                <td colspan="2" class="center-cell row-1-center">
+                <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    CODIFICACIÓN: SST-POP-TA-01-FO-08
+                <td class="right-cell">
+                    CÓDIGO: SST-POP-TA-01-FO-08
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    FECHA DE EMISIÓN: 13/06/2025
+                <td class="right-cell">
+                    EMISIÓN: 13/06/2025
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     CHECKLIST DE TIRFOR
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    NÚMERO DE REVISIÓN: 00
+                <td class="right-cell">
+                    REVISIÓN: 00
                 </td>
             </tr>
         </table>
@@ -208,7 +211,7 @@
                     vertical-align:middle;
                     padding:1px 4px;
                 ">
-                    Fecha
+                    Fecha:
                 </td>
         
                 <td style="
@@ -234,7 +237,7 @@
                     vertical-align:middle;
                     padding:1px 4px;
                 ">
-                    Taller
+                    Taller / US:
                 </td>
         
                 <td style="
@@ -307,10 +310,10 @@
                         border:1px solid #000;
                         text-align:center;
                         font-weight:bold;
-                        padding:2px 4px;
+                        padding:2px 2px;
                         background:#f3f4f6;
                     ">
-                        NO. DE IDENTIFICACIÓN
+                        NO. DE IDENTIFICACIÓN:
                     </td>
                 </tr>
             </table>
@@ -350,10 +353,10 @@
                         border:1px solid #000;
                         text-align:center;
                         font-weight:bold;
-                        padding:2px 4px;
+                        padding:2px 2px;
                         background:#f3f4f6;
                     ">
-                        CAPACIDAD DE TIRFOR
+                        CAPACIDAD DE TIRFOR:
                     </td>
                 </tr>
             </table>
@@ -381,7 +384,7 @@
             text-align:center;
             font-weight:bold;
             font-size:9px;
-            margin-top:30px;
+            margin-top:15px;
         ">
             Considerar los siguientes criterios de acuerdo a las condiciones del tirfor
         </div>
@@ -465,15 +468,15 @@
                     </td>
         
                     <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px;">
-                        {{ data_get($rowTirfor, $criterio['estado']) === 'Buen estado' ? '●' : '' }}
+                        {{ data_get($rowTirfor, $criterio['estado']) === 'Buen estado' ? '✔︎' : '' }}
                     </td>
         
                     <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px;">
-                        {{ data_get($rowTirfor, $criterio['estado']) === 'Dañado' ? '●' : '' }}
+                        {{ data_get($rowTirfor, $criterio['estado']) === 'Dañado' ? 'X' : '' }}
                     </td>
         
                     <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px;">
-                        {{ data_get($rowTirfor, $criterio['estado']) === 'No Aplica' ? '●' : '' }}
+                        {{ data_get($rowTirfor, $criterio['estado']) === 'No Aplica' ? 'NA' : '' }}
                     </td>
         
                     <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px 4px;">
@@ -520,8 +523,8 @@
                         <img
                             src="{{ $firmaInspectorSrc }}"
                             style="
-                                width:140px;
-                                height:55px;
+                                width:150px;
+                                height:60px;
                                 object-fit:contain;
                             "
                         >

@@ -97,6 +97,15 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
     }));
   };
 
+  const openIndicacionesSection = () => {
+    if (!indicacionesToggle?.id) return;
+
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [indicacionesToggle.id]: false,
+    }));
+  };
+
   const buildRowDraft = (field, preload = null) => {
     const rowSchema = Array.isArray(field?.row_schema) ? field.row_schema : [];
     const init = {};
@@ -168,9 +177,14 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
     setFormFieldError(message);
     setFormFieldErrorId(fieldId);
 
+    const fieldIdText = String(fieldId || "");
+    if (fieldIdText.startsWith("tirfor_")) {
+      openIndicacionesSection();
+    }
+
     if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
 
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       const wrapEl = formFieldWrapRefs.current[fieldId];
       const inputEl = formFieldRefs.current[fieldId];
 
@@ -246,6 +260,24 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
     return id.includes("observaciones") || label.includes("observaciones");
   };
 
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+
+    return isObservationColumn(col) || isNotesColumn(col);
+  };
+
+  const getCleanFieldLabel = (col) => {
+    return String(col?.text || col?.label || "");
+  };
+
   const isEmptyValue = (value, type) => {
     if (type === "checkbox") return value !== true;
     return value === null || value === undefined || String(value).trim() === "";
@@ -275,12 +307,12 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
       if (col.type === "static_text" || col.type === "fixed_image") continue;
       const v = tableRowDraft[col.id];
 
-      if (isObservationColumn(col)) {
+      if (isOptionalColumn(col)) {
         continue;
       }
 
       if (isEmptyValue(v, col.type)) {
-        showTableModalFieldError(col.id, `Falta responder: ${col.label}`);
+        showTableModalFieldError(col.id, `Falta responder: ${getCleanFieldLabel(col)}`);
         return;
       }
 
@@ -289,7 +321,7 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
         if (opts.length && !opts.includes(v)) {
           showTableModalFieldError(
             col.id,
-            `Selecciona una opción válida para: ${col.label}`
+            `Selecciona una opción válida para: ${getCleanFieldLabel(col)}`
           );
           return;
         }
@@ -1053,7 +1085,7 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
             fontWeight: 800,
           }}
         >
-          {col.label || "—"}
+          {getCleanFieldLabel(col) || "—"}
         </div>
       );
     }
@@ -1379,6 +1411,16 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
     };
   };
 
+  const renderDivider = (key) => (
+    <div
+      key={key}
+      style={{
+        borderBottom: "1px solid #d1d5db",
+        margin: "4px 0 0 0",
+      }}
+    />
+  );
+
   const renderOuterRequiredField = (f) => {
     if (!f) return null;
 
@@ -1659,25 +1701,27 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
 
     const row = getTirforRow();
 
+    openIndicacionesSection();
+
     for (const col of rowSchema) {
       if (!col?.id) continue;
       if (col.type === "static_text" || col.type === "fixed_image") continue;
 
-      if (isObservationColumn(col)) {
+      if (isOptionalColumn(col)) {
         continue;
       }
 
       const value = row[col.id];
 
       if (isEmptyValue(value, col.type)) {
-        showFormFieldError(col.id, `Falta responder: ${col.label}`);
+        showFormFieldError(col.id, `Falta responder: ${getCleanFieldLabel(col)}`);
         return false;
       }
 
       if (col.type === "select" || col.type === "radio") {
         const opts = Array.isArray(col.options) ? col.options : [];
         if (opts.length && !opts.includes(value)) {
-          showFormFieldError(col.id, `Selecciona una opción válida para: ${col.label}`);
+          showFormFieldError(col.id, `Selecciona una opción válida para: ${getCleanFieldLabel(col)}`);
           return false;
         }
       }
@@ -1942,44 +1986,42 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "grid",
-                gap: isMobile ? 10 : 6,
-                textAlign: "left",
-              }}
-            >
-              {headerLines.map((line) => (
-                <div
-                  key={line.id}
-                  style={{
-                    width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
-                    color: "#111827",
-                    textAlign: "left",
-                    lineHeight: isMobile ? 1.45 : 1.35,
-                  }}
-                >
-                  {line.text}
-                </div>
-              ))}
-            </div>
+            {headerLines.length ? (
+              <div
+                style={{
+                  display: "grid",
+                  gap: isMobile ? 10 : 6,
+                  textAlign: "left",
+                }}
+              >
+                {headerLines.map((line) => (
+                  <div
+                    key={line.id}
+                    style={{
+                      width: "100%",
+                      fontWeight: 700,
+                      fontSize: isMobile ? 12 : 14,
+                      color: "#111827",
+                      textAlign: "left",
+                      lineHeight: isMobile ? 1.45 : 1.35,
+                    }}
+                  >
+                    {line.text}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {logo || headerLines.length ? renderDivider("header_divider") : null}
 
             {renderOuterRequiredField(taller)}
+            {renderDivider("taller_divider")}
+
             {renderOuterRequiredField(numeroIdentificacion)}
+            {renderDivider("numero_identificacion_divider")}
+
             {renderOuterRequiredField(capacidadTirfor)}
+            {renderDivider("capacidad_tirfor_divider")}
 
             {indicacionesToggle ? (
               <div
@@ -2039,7 +2081,11 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
               </div>
             ) : null}
 
+            {renderDivider("responsable_divider")}
+
             {renderOuterRequiredField(nombreTrabajadorElaboraChecklist)}
+            {renderDivider("nombre_trabajador_divider")}
+
             {renderOuterRequiredField(firmaTrabajadorElaboraChecklist)}
           </div>
 
@@ -2252,7 +2298,7 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
                           }}
                         >
                           {group.fields.map((col) => {
-                            const isRequiredVisual = !isObservationColumn(col);
+                            const isRequiredVisual = !isOptionalColumn(col);
                             const hasError = tableModalErrorFieldId === col.id;
 
                             return (
@@ -2315,7 +2361,7 @@ export default function SST_POP_TA_01_FO_08_Checklist_de_Tirfor({
 
                   const col = group.fields[0];
                   const hasError = tableModalErrorFieldId === col.id;
-                  const isRequiredVisual = !isObservationColumn(col);
+                  const isRequiredVisual = !isOptionalColumn(col);
 
                   return (
                     <div
