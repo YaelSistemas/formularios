@@ -33,17 +33,17 @@ class SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad implements FormDefini
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTION INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'INSPECCIÓN DE ARNÉS DE SEGURIDAD',
+                    'text' => 'Inspección de Arnés de Seguridad',
                 ],
                 [
                     'id' => 'header_line_4',
