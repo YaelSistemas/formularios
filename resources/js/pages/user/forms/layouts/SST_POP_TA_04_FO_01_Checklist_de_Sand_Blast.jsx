@@ -19,6 +19,10 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
     indicaciones_toggle: false,
   });
 
+  const [modalCollapsedSections, setModalCollapsedSections] = useState({
+    criterios_sand_blast: false,
+  });
+
   const [tableModal, setTableModal] = useState({
     open: false,
     field: null,
@@ -68,6 +72,17 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
       if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableModal.open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [tableModal.open]);
 
   const normalizeAssetUrl = (url) => {
     if (!url) return "";
@@ -127,6 +142,11 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
   const showTableModalFieldError = (fieldId, message) => {
     setTableModalError(message);
     setTableModalErrorFieldId(fieldId);
+
+    setModalCollapsedSections((prev) => ({
+      ...prev,
+      criterios_sand_blast: false,
+    }));
 
     if (tableErrorTimerRef.current) clearTimeout(tableErrorTimerRef.current);
 
@@ -196,7 +216,18 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
   const openTableModal = (field) => {
     if (readOnly) return;
 
+    const currentRows = Array.isArray(answers[field.id]) ? answers[field.id] : [];
+
+    if (currentRows.length >= 1) {
+      setMsg("Solo se permite un registro en la tabla de Sand Blast.");
+      scrollToTopSafe();
+      return;
+    }
+
     clearTableModalError();
+    setModalCollapsedSections({
+      criterios_sand_blast: false,
+    });
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -212,6 +243,9 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
     const currentRow = rows[rowIndex] || {};
 
     clearTableModalError();
+    setModalCollapsedSections({
+      criterios_sand_blast: false,
+    });
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -246,6 +280,20 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
     return id.includes("observaciones") || label.includes("observaciones");
   };
 
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+
+    return isObservationColumn(col) || isNotesColumn(col);
+  };
+
   const isEmptyValue = (value, type) => {
     if (type === "checkbox") return value !== true;
     return value === null || value === undefined || String(value).trim() === "";
@@ -275,12 +323,13 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
       if (col.type === "static_text" || col.type === "fixed_image") continue;
       const v = tableRowDraft[col.id];
 
-      if (isObservationColumn(col)) {
+      if (isOptionalColumn(col)) {
         continue;
       }
-      
+
+
       if (isEmptyValue(v, col.type)) {
-        showTableModalFieldError(col.id, `Falta responder: ${col.label}`);
+        showTableModalFieldError(col.id, `Falta responder: ${getCleanFieldLabel(col)}`);
         return;
       }
 
@@ -289,7 +338,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
         if (opts.length && !opts.includes(v)) {
           showTableModalFieldError(
             col.id,
-            `Selecciona una opción válida para: ${col.label}`
+            `Selecciona una opción válida para: ${getCleanFieldLabel(col)}`
           );
           return;
         }
@@ -299,6 +348,11 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
     const currentRows = Array.isArray(answers[field.id]) ? answers[field.id] : [];
 
     if (tableModal.editIndex === null || tableModal.editIndex === undefined) {
+      if (currentRows.length >= 1) {
+        setTableModalError("Solo se permite un registro en la tabla de Sand Blast.");
+        return;
+      }
+
       setVal(field.id, [...currentRows, { ...tableRowDraft }]);
     } else {
       const nextRows = currentRows.map((row, idx) =>
@@ -469,124 +523,52 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
     if (formFieldErrorId === fieldId) clearFormFieldError();
   };
 
-  const getSectionTheme = (titleId) => {
-    const id = String(titleId || "").toLowerCase();
+  const buildModalGroups = (rowSchema) => {
+    const schema = Array.isArray(rowSchema) ? rowSchema : [];
 
-    if (id.includes("linea_vida")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
+    const criteriosFields = schema.filter(
+      (col) =>
+        col.id !== "observaciones" &&
+        col.type !== "fixed_image" &&
+        col.type !== "static_text"
+    );
 
-    if (id.includes("amortiguador")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
+    const observacionesField = schema.find((col) => col.id === "observaciones");
 
-    if (id.includes("ganchos")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
+    return [
+      {
+        kind: "collapsible_section",
+        id: "criterios_sand_blast",
+        title: "Considerar los siguientes criterios de acuerdo a las condiciones del equipo de Sand Blast",
+        titleField: {
+          id: "texto_criterios_sand_blast",
+          type: "static_text",
+          text: "Considerar los siguientes criterios de acuerdo a las condiciones del equipo de Sand Blast",
+        },
+        fields: criteriosFields,
+      },
 
-    if (id.includes("etiqueta")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
-
-    if (id.includes("condiciones")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
-
-    if (id.includes("mosqueton")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
-    
-    if (id.includes("gancho")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
-    
-    if (id.includes("conector")) {
-      return {
-        border: "1px solid #dbe4ee",
-        background: "#f8fafc",
-        titleBg: "#eef2f7",
-      };
-    }
-
-    return {
-      border: "1px solid #dbe4ee",
-      background: "#f8fafc",
-      titleBg: "#eef2f7",
-    };
+      observacionesField
+        ? {
+            kind: "single",
+            id: observacionesField.id,
+            titleField: null,
+            fields: [observacionesField],
+          }
+        : null,
+    ].filter(Boolean);
   };
 
-  const buildModalGroups = (rowSchema) => {
-    const groups = [];
-    let currentGroup = null;
+  const getCleanFieldLabel = (col) => {
+    return String(col?.text || col?.label || "");
+  };
 
-    rowSchema.forEach((col) => {
-      if (col.type === "fixed_image") {
-        groups.push({
-          kind: "image",
-          id: col.id,
-          titleField: null,
-          fields: [col],
-        });
-        return;
-      }
+  const getGroupTitle = (group) => {
+    return String(group?.title || group?.titleField?.text || group?.titleField?.label || "");
+  };
 
-      if (col.type === "static_text") {
-        currentGroup = {
-          kind: "section",
-          id: col.id,
-          titleField: col,
-          fields: [],
-        };
-        groups.push(currentGroup);
-        return;
-      }
-
-      const id = String(col.id || "");
-      const belongsToSection =
-        id.startsWith("sand_blast_");
-
-      if (belongsToSection && currentGroup) {
-        currentGroup.fields.push(col);
-        return;
-      }
-
-      groups.push({
-        kind: "single",
-        id: col.id,
-        titleField: null,
-        fields: [col],
-      });
-    });
-
-    return groups;
+  const getModalFieldDisplayLabel = (col) => {
+    return getCleanFieldLabel(col);
   };
 
   const renderBasicInput = (f) => {
@@ -861,8 +843,8 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
             style={{
               display: "block",
               width: "100%",
-              maxWidth: isMobile ? 260 : 380,
-              maxHeight: isMobile ? 190 : 280,
+              maxWidth: isMobile ? 320 : 560,
+              maxHeight: isMobile ? 240 : 360,
               objectFit: "contain",
               borderRadius: 10,
               margin: "0 auto",
@@ -1053,7 +1035,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
             fontWeight: 800,
           }}
         >
-          {col.label || "—"}
+          {col.text || col.label || "—"}
         </div>
       );
     }
@@ -1083,6 +1065,25 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
       );
     }
 
+    if (f.type === "static_text") {
+      return (
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid #cbd5e1",
+            background: "#eef2f7",
+            color: "#0f172a",
+            padding: isMobile ? "12px 14px" : "12px 14px",
+            fontSize: isMobile ? 14 : 15,
+            fontWeight: 900,
+            lineHeight: 1.4,
+          }}
+        >
+          {f.text || f.label}
+        </div>
+      );
+    }
+
     if (f.type === "table") {
       const rows = Array.isArray(answers[f.id]) ? answers[f.id] : [];
       const rowSchema = Array.isArray(f.row_schema) ? f.row_schema : [];
@@ -1101,7 +1102,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                minWidth: isMobile ? 1200 : 1700,
+                minWidth: isMobile ? 1100 : 1450,
                 background: "#fff",
               }}
             >
@@ -1122,7 +1123,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
                   </th>
                 
                   {rowSchema
-                    .filter((col) => col.type !== "fixed_image")
+                    .filter((col) => col.type !== "fixed_image" && col.type !== "static_text")
                     .map((col) => (
                     <th
                       key={`${f.id}_col_${col.id}`}
@@ -1135,7 +1136,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {col.label}
+                      {getCleanFieldLabel(col)}
                     </th>
                   ))}
                   {!readOnly ? (
@@ -1175,7 +1176,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
                       </td>
                     
                       {rowSchema
-                        .filter((col) => col.type !== "fixed_image")
+                        .filter((col) => col.type !== "fixed_image" && col.type !== "static_text")
                         .map((col) => (
                         <td
                           key={`${f.id}_${rowIndex}_${col.id}`}
@@ -1249,7 +1250,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
                   <tr>
                     <td
                       colSpan={
-                        rowSchema.filter((col) => col.type !== "fixed_image").length +
+                        rowSchema.filter((col) => col.type !== "fixed_image" && col.type !== "static_text").length +
                         (readOnly ? 0 : 1) +
                         1
                       }
@@ -1269,7 +1270,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
             </table>
           </div>
 
-          {!readOnly ? (
+          {!readOnly && rows.length < 1 ? (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 type="button"
@@ -1483,12 +1484,13 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
         if (col.type === "static_text" || col.type === "fixed_image") continue;
         const value = row[col.id];
 
-        if (isObservationColumn(col)) {
+        if (isOptionalColumn(col)) {
           continue;
         }
-        
+
+
         if (isEmptyValue(value, col.type)) {
-          setMsg(`En la fila ${i + 1} falta responder: ${col.label}`);
+          setMsg(`En la fila ${i + 1} falta responder: ${getCleanFieldLabel(col)}`);
           scrollToTopSafe();
           return false;
         }
@@ -1496,7 +1498,7 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
         if (col.type === "select" || col.type === "radio") {
           const opts = Array.isArray(col.options) ? col.options : [];
           if (opts.length && !opts.includes(value)) {
-            setMsg(`En la fila ${i + 1} selecciona una opción válida para: ${col.label}`);
+            setMsg(`En la fila ${i + 1} selecciona una opción válida para: ${getCleanFieldLabel(col)}`);
             scrollToTopSafe();
             return false;
           }
@@ -1558,6 +1560,190 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
     if (saving) return isEditing ? "Actualizando..." : "Guardando...";
     if (isEditing) return "Actualizar registro";
     return isOnline ? "Enviar formulario" : "Guardar offline";
+  };
+
+  const renderModalGroupContent = (group, index, filteredGroups) => {
+    if (group.kind === "collapsible_section") {
+      const isModalSectionCollapsed = !!modalCollapsedSections[group.id];
+
+      return (
+        <React.Fragment key={group.id}>
+          <div
+            style={{
+              borderRadius: 16,
+              overflow: "hidden",
+              border: "1px solid #dbe4ee",
+              background: "#f8fafc",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setModalCollapsedSections((prev) => ({
+                  ...prev,
+                  [group.id]: !prev[group.id],
+                }))
+              }
+              style={{
+                width: "100%",
+                border: "none",
+                background: "#eef2f7",
+                padding: "12px 14px",
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontWeight: 900,
+                color: "#0f172a",
+                fontSize: isMobile ? 14 : 15,
+                textAlign: "left",
+              }}
+            >
+              <span>{getGroupTitle(group)}</span>
+              <span>{isModalSectionCollapsed ? "＋" : "－"}</span>
+            </button>
+
+            {!isModalSectionCollapsed ? (
+              <div style={{ padding: 14, display: "grid", gap: 14 }}>
+                {group.fields.map((col) => {
+                  const hasError = tableModalErrorFieldId === col.id;
+                  const isRequiredVisual = !isOptionalColumn(col);
+
+                  return (
+                    <div
+                      key={col.id}
+                      ref={(el) => {
+                        tableFieldWrapRefs.current[col.id] = el;
+                      }}
+                      style={{
+                        borderRadius: 14,
+                        border: hasError
+                          ? "1px solid #fdba74"
+                          : "1px solid rgba(15,23,42,0.08)",
+                        background: "#fff",
+                        padding: 12,
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: isMobile ? 14 : 14,
+                          lineHeight: 1.4,
+                          color: "#0f172a",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {getModalFieldDisplayLabel(col)}{" "}
+                        {isRequiredVisual ? (
+                          <span style={{ color: "crimson" }}>*</span>
+                        ) : null}
+                      </label>
+
+                      {hasError && tableModalError ? (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            borderRadius: 10,
+                            border: "1px solid #fdba74",
+                            background: "#fff7ed",
+                            color: "#9a3412",
+                            padding: "8px 10px",
+                            fontSize: 13,
+                            lineHeight: 1.4,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {tableModalError}
+                        </div>
+                      ) : null}
+
+                      <div style={{ marginTop: 10 }}>
+                        {renderTableModalField(col)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          {index < filteredGroups.length - 1 ? (
+            <div
+              style={{
+                borderBottom: "1px solid #cbd5e1",
+                margin: "4px 0 2px 0",
+              }}
+            ></div>
+          ) : null}
+        </React.Fragment>
+      );
+    }
+
+    const col = group.fields[0];
+    const hasError = tableModalErrorFieldId === col.id;
+    const isRequiredVisual = !isOptionalColumn(col);
+
+    return (
+      <React.Fragment key={group.id}>
+        <div
+          ref={(el) => {
+            tableFieldWrapRefs.current[col.id] = el;
+          }}
+          style={{
+            borderRadius: 14,
+            border: hasError
+              ? "1px solid #fdba74"
+              : "1px solid rgba(15,23,42,0.08)",
+            background: "#fff",
+            padding: 12,
+          }}
+        >
+          <label
+            style={{
+              fontSize: isMobile ? 14 : 14,
+              lineHeight: 1.4,
+              color: "#0f172a",
+              fontWeight: 700,
+            }}
+          >
+            {getModalFieldDisplayLabel(col)}{" "}
+            {isRequiredVisual ? (
+              <span style={{ color: "crimson" }}>*</span>
+            ) : null}
+          </label>
+
+          {hasError && tableModalError ? (
+            <div
+              style={{
+                marginTop: 8,
+                borderRadius: 10,
+                border: "1px solid #fdba74",
+                background: "#fff7ed",
+                color: "#9a3412",
+                padding: "8px 10px",
+                fontSize: 13,
+                lineHeight: 1.4,
+                fontWeight: 700,
+              }}
+            >
+              {tableModalError}
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 10 }}>
+            {renderTableModalField(col)}
+          </div>
+        </div>
+
+        {index < filteredGroups.length - 1 ? (
+          <div
+            style={{
+              borderBottom: "1px solid #cbd5e1",
+              margin: "4px 0 2px 0",
+            }}
+          ></div>
+        ) : null}
+      </React.Fragment>
+    );
   };
 
   const desktopContentWidth = 900;
@@ -1765,31 +1951,21 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "grid",
-                gap: isMobile ? 10 : 6,
-                textAlign: "left",
-              }}
-            >
-              {headerLines.map((line) => (
+            {headerLines.length ? (
+              <div
+                style={{
+                  display: "grid",
+                  gap: isMobile ? 10 : 6,
+                  textAlign: "left",
+                }}
+              >
+                {headerLines.map((line) => (
                 <div
                   key={line.id}
                   style={{
                     width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
+                    fontWeight: 700,
+                    fontSize: isMobile ? 12 : 14,
                     color: "#111827",
                     textAlign: "left",
                     lineHeight: isMobile ? 1.45 : 1.35,
@@ -1798,9 +1974,26 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
                   {line.text}
                 </div>
               ))}
-            </div>
+              </div>
+            ) : null}
+
+            {logo || headerLines.length ? (
+              <div
+                style={{
+                  borderBottom: "1px solid #d1d5db",
+                  margin: "4px 0 0 0",
+                }}
+              />
+            ) : null}
 
             {renderOuterRequiredField(taller)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
 
             {indicacionesToggle ? (
               <div
@@ -1889,9 +2082,40 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
               </div>
             ) : null}
 
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(nombreInspecciona)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(firmaInspecciona)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(nombreSupervisa)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(firmaSupervisa)}
           </div>
 
@@ -2059,169 +2283,17 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
                     }}
                   />
                 </div>
-            
+
                 <div
                   style={{
                     borderTop: "1px solid #e5e7eb",
                   }}
                 />
               </div>
-            
-              {modalGroups
-                .filter((group) => group.kind !== "image")
-                .map((group) => {
-                  if (group.kind === "section") {
-                    const theme = getSectionTheme(group.titleField?.id);
-                    return (
-                      <div
-                        key={group.id}
-                        style={{
-                          borderRadius: 16,
-                          overflow: "hidden",
-                          border: theme.border,
-                          background: theme.background,
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "12px 14px",
-                            fontWeight: 800,
-                            color: "#0f172a",
-                            background: theme.titleBg,
-                            borderBottom: "1px solid rgba(15,23,42,0.08)",
-                            fontSize: isMobile ? 14 : 15,
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {group.titleField?.text || group.titleField?.label}
-                        </div>
 
-                        <div
-                          style={{
-                            padding: 14,
-                            display: "grid",
-                            gap: 14,
-                          }}
-                        >
-                          {group.fields.map((col) => {
-                            const isRequiredVisual = !isObservationColumn(col);
-                            const hasError = tableModalErrorFieldId === col.id;
-
-                            return (
-                              <div
-                                key={col.id}
-                                ref={(el) => {
-                                  tableFieldWrapRefs.current[col.id] = el;
-                                }}
-                                style={{
-                                  borderRadius: 14,
-                                  border: hasError
-                                    ? "1px solid #fdba74"
-                                    : "1px solid rgba(15,23,42,0.08)",
-                                  background: "#fff",
-                                  padding: 12,
-                                }}
-                              >
-                                <label
-                                  style={{
-                                    fontSize: isMobile ? 14 : 14,
-                                    lineHeight: 1.4,
-                                    color: "#0f172a",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  {col.label}{" "}
-                                  {isRequiredVisual ? (
-                                    <span style={{ color: "crimson" }}>*</span>
-                                  ) : null}
-                                </label>
-
-                                {hasError && tableModalError ? (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      borderRadius: 10,
-                                      border: "1px solid #fdba74",
-                                      background: "#fff7ed",
-                                      color: "#9a3412",
-                                      padding: "8px 10px",
-                                      fontSize: 13,
-                                      lineHeight: 1.4,
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    {tableModalError}
-                                  </div>
-                                ) : null}
-
-                                <div style={{ marginTop: 10 }}>
-                                  {renderTableModalField(col)}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const col = group.fields[0];
-                  const hasError = tableModalErrorFieldId === col.id;
-                  const isRequiredVisual = !isObservationColumn(col);
-
-                  return (
-                    <div
-                      key={group.id}
-                      ref={(el) => {
-                        tableFieldWrapRefs.current[col.id] = el;
-                      }}
-                      style={{
-                        borderRadius: 14,
-                        border: hasError
-                          ? "1px solid #fdba74"
-                          : "1px solid rgba(15,23,42,0.08)",
-                        background: "#fff",
-                        padding: 12,
-                      }}
-                    >
-                      <label
-                        style={{
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.4,
-                          color: "#0f172a",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {col.label}{" "}
-                        {isRequiredVisual ? (
-                          <span style={{ color: "crimson" }}>*</span>
-                        ) : null}
-                      </label>
-
-                      {hasError && tableModalError ? (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            borderRadius: 10,
-                            border: "1px solid #fdba74",
-                            background: "#fff7ed",
-                            color: "#9a3412",
-                            padding: "8px 10px",
-                            fontSize: 13,
-                            lineHeight: 1.4,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {tableModalError}
-                        </div>
-                      ) : null}
-
-                      <div style={{ marginTop: 10 }}>
-                        {renderTableModalField(col)}
-                      </div>
-                    </div>
-                  );
-                })}
+              {modalGroups.map((group, index, filteredGroups) =>
+                renderModalGroupContent(group, index, filteredGroups)
+              )}
             </div>
 
             <div

@@ -27,6 +27,7 @@
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
@@ -52,14 +53,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 8px;
-        }
-
-        .row-1-center {
-            font-size: 10px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -91,7 +88,7 @@
 
         .inspection-label {
             display: inline-block;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
             vertical-align: middle;
             margin-right: 8px;
@@ -111,7 +108,7 @@
             right: 0;
             bottom: 3px;
             text-align: center;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: normal;
             white-space: nowrap;
             overflow: hidden;
@@ -157,6 +154,12 @@
 
         <!-- HEADER -->
         <table class="header-table">
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
                 <td rowspan="3" class="logo-cell">
                     @if($logoSrc)
@@ -164,32 +167,32 @@
                     @endif
                 </td>
 
-                <td colspan="2" class="center-cell row-1-center">
+                <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
                     CODIFICACIÓN: SST-POP-TA-04-FO-01
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    FECHA DE EMISIÓN: 27/03/2025
+                <td class="right-cell">
+                    EMISIÓN: 27/03/2025
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     CHECKLIST DE SAND BLAST
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    NÚMERO DE REVISIÓN: 04
+                <td class="right-cell">
+                    REVISIÓN: 01
                 </td>
             </tr>
         </table>
@@ -206,7 +209,7 @@
                 </div>
 
                 <div class="inspection-item right">
-                    <span class="inspection-label">Taller:</span>
+                    <span class="inspection-label">Unidad de Servicio / Taller:</span>
                     <span class="inspection-line-wrap">
                         <span class="inspection-value">{{ $tallerValor }}</span>
                         <span class="inspection-underline"></span>
@@ -218,8 +221,8 @@
         <!-- TEXTO INDICACIONES -->
         <div style="
             text-align: center;
-            margin-top: 14px;
-            font-size: 10px;
+            margin-top: 5px;
+            font-size: 8px;
             font-weight: bold;
             line-height: 1.4;
         ">
@@ -259,7 +262,7 @@
         
         <table style="
             width: 95%;
-            margin: 18px auto 0 auto;
+            margin: 15px auto 0 auto;
             border-collapse: collapse;
             table-layout: fixed;
             font-size: 9px;

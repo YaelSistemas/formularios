@@ -35,17 +35,17 @@ class SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast implements FormDefinition
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTION INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'CHECKLIST DE SAND BLAST',
+                    'text' => 'Checklist de Sand Blast',
                 ],
                 [
                     'id' => 'header_line_4',
@@ -60,7 +60,7 @@ class SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast implements FormDefinition
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 04',
+                    'text' => 'Número de Revisión: 01',
                 ],
 
                 [
