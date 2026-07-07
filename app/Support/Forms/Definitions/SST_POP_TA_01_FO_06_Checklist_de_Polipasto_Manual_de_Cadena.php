@@ -43,17 +43,17 @@ class SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena implements For
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'CHECKLIST DE POLIPASTO MANUAL DE CADENA',
+                    'text' => 'Checklist de Polipasto Manual de Cadena',
                 ],
                 [
                     'id' => 'header_line_4',

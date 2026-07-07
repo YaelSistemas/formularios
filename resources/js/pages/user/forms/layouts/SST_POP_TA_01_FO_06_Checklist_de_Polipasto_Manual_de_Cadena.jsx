@@ -19,6 +19,8 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
     indicaciones_toggle: false,
   });
 
+  const [modalCollapsedSections, setModalCollapsedSections] = useState({});
+
   const [tableModal, setTableModal] = useState({
     open: false,
     field: null,
@@ -68,6 +70,17 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
       if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableModal.open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [tableModal.open]);
 
   const normalizeAssetUrl = (url) => {
     if (!url) return "";
@@ -127,6 +140,14 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
   const showTableModalFieldError = (fieldId, message) => {
     setTableModalError(message);
     setTableModalErrorFieldId(fieldId);
+
+    setModalCollapsedSections((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        next[key] = false;
+      });
+      return next;
+    });
 
     if (tableErrorTimerRef.current) clearTimeout(tableErrorTimerRef.current);
 
@@ -197,6 +218,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
     if (readOnly) return;
 
     clearTableModalError();
+    setModalCollapsedSections({});
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -212,6 +234,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
     const currentRow = rows[rowIndex] || {};
 
     clearTableModalError();
+    setModalCollapsedSections({});
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -242,8 +265,21 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
   const isObservationColumn = (col) => {
     const id = String(col?.id || "").toLowerCase();
     const label = String(col?.label || "").toLowerCase();
-  
+
     return id.includes("observaciones") || label.includes("observaciones");
+  };
+
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+    return isObservationColumn(col) || isNotesColumn(col);
   };
 
   const isEmptyValue = (value, type) => {
@@ -275,7 +311,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
       if (col.type === "static_text" || col.type === "fixed_image") continue;
       const v = tableRowDraft[col.id];
 
-      if (isObservationColumn(col)) {
+      if (isOptionalColumn(col)) {
         continue;
       }
       
@@ -560,8 +596,9 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
 
       if (col.type === "static_text") {
         currentGroup = {
-          kind: "section",
+          kind: "collapsible_section",
           id: col.id,
+          title: col.text || col.label || "Sección",
           titleField: col,
           fields: [],
         };
@@ -569,11 +606,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
         return;
       }
 
-      const id = String(col.id || "");
-      const belongsToSection =
-        Boolean(currentGroup) && col.type !== "static_text" && col.type !== "fixed_image";
-
-      if (belongsToSection && currentGroup) {
+      if (currentGroup) {
         currentGroup.fields.push(col);
         return;
       }
@@ -587,6 +620,18 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
     });
 
     return groups;
+  };
+
+  const getCleanFieldLabel = (col) => {
+    return String(col?.text || col?.label || "");
+  };
+
+  const getGroupTitle = (group) => {
+    return String(group?.title || group?.titleField?.text || group?.titleField?.label || "");
+  };
+
+  const getModalFieldDisplayLabel = (col) => {
+    return getCleanFieldLabel(col);
   };
 
   const renderBasicInput = (f) => {
@@ -1053,7 +1098,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
             fontWeight: 800,
           }}
         >
-          {col.label || "—"}
+          {col.text || col.label || "—"}
         </div>
       );
     }
@@ -1079,6 +1124,25 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
               borderRadius: 10,
             }}
           />
+        </div>
+      );
+    }
+
+    if (f.type === "static_text") {
+      return (
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid #cbd5e1",
+            background: "#eef2f7",
+            color: "#0f172a",
+            padding: isMobile ? "12px 14px" : "12px 14px",
+            fontSize: isMobile ? 14 : 15,
+            fontWeight: 900,
+            lineHeight: 1.4,
+          }}
+        >
+          {f.text || f.label}
         </div>
       );
     }
@@ -1122,7 +1186,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                   </th>
                 
                   {rowSchema
-                    .filter((col) => col.type !== "fixed_image")
+                    .filter((col) => col.type !== "fixed_image" && col.type !== "static_text")
                     .map((col) => (
                     <th
                       key={`${f.id}_col_${col.id}`}
@@ -1135,7 +1199,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {col.label}
+                      {getCleanFieldLabel(col)}
                     </th>
                   ))}
                   {!readOnly ? (
@@ -1175,7 +1239,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                       </td>
                     
                       {rowSchema
-                        .filter((col) => col.type !== "fixed_image")
+                        .filter((col) => col.type !== "fixed_image" && col.type !== "static_text")
                         .map((col) => (
                         <td
                           key={`${f.id}_${rowIndex}_${col.id}`}
@@ -1249,7 +1313,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                   <tr>
                     <td
                       colSpan={
-                        rowSchema.filter((col) => col.type !== "fixed_image").length +
+                        rowSchema.filter((col) => col.type !== "fixed_image" && col.type !== "static_text").length +
                         (readOnly ? 0 : 1) +
                         1
                       }
@@ -1499,6 +1563,12 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
       : [];
 
     if (!rows.length) {
+      if (indicacionesToggle?.id) {
+        setCollapsedSections((prev) => ({
+          ...prev,
+          [indicacionesToggle.id]: false,
+        }));
+      }
       setMsg("Debes agregar al menos una fila en la tabla de criterios a inspeccionar.");
       scrollToTopSafe();
       return false;
@@ -1516,11 +1586,17 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
         if (col.type === "static_text" || col.type === "fixed_image") continue;
         const value = row[col.id];
 
-        if (isObservationColumn(col)) {
+        if (isOptionalColumn(col)) {
           continue;
         }
         
         if (isEmptyValue(value, col.type)) {
+          if (indicacionesToggle?.id) {
+            setCollapsedSections((prev) => ({
+              ...prev,
+              [indicacionesToggle.id]: false,
+            }));
+          }
           setMsg(`En la fila ${i + 1} falta responder: ${col.label}`);
           scrollToTopSafe();
           return false;
@@ -1529,6 +1605,12 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
         if (col.type === "select" || col.type === "radio") {
           const opts = Array.isArray(col.options) ? col.options : [];
           if (opts.length && !opts.includes(value)) {
+            if (indicacionesToggle?.id) {
+              setCollapsedSections((prev) => ({
+                ...prev,
+                [indicacionesToggle.id]: false,
+              }));
+            }
             setMsg(`En la fila ${i + 1} selecciona una opción válida para: ${col.label}`);
             scrollToTopSafe();
             return false;
@@ -1591,6 +1673,224 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
     if (saving) return isEditing ? "Actualizando..." : "Guardando...";
     if (isEditing) return "Actualizar registro";
     return isOnline ? "Enviar formulario" : "Guardar offline";
+  };
+
+  const renderModalGroupContent = (group, index, filteredGroups) => {
+    if (group.kind === "image") return null;
+
+    if (group.kind === "collapsible_section") {
+      const isModalSectionCollapsed = !!modalCollapsedSections[group.id];
+
+      return (
+        <React.Fragment key={group.id}>
+          <div
+            style={{
+              borderRadius: 16,
+              overflow: "hidden",
+              border: "1px solid #dbe4ee",
+              background: "#f8fafc",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setModalCollapsedSections((prev) => ({
+                  ...prev,
+                  [group.id]: !prev[group.id],
+                }))
+              }
+              style={{
+                width: "100%",
+                border: "none",
+                background: "#eef2f7",
+                padding: "12px 14px",
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontWeight: 900,
+                color: "#0f172a",
+                fontSize: isMobile ? 14 : 15,
+                textAlign: "left",
+              }}
+            >
+              <span>{getGroupTitle(group)}</span>
+              <span>{isModalSectionCollapsed ? "＋" : "－"}</span>
+            </button>
+
+            {!isModalSectionCollapsed ? (
+              <div style={{ padding: 14, display: "grid", gap: 14 }}>
+                {group.fields.map((col) => {
+                  const hasError = tableModalErrorFieldId === col.id;
+                  const isRequiredVisual = !isOptionalColumn(col);
+
+                  return (
+                    <div
+                      key={col.id}
+                      ref={(el) => {
+                        tableFieldWrapRefs.current[col.id] = el;
+                      }}
+                      style={{
+                        borderRadius: 14,
+                        border: hasError
+                          ? "1px solid #fdba74"
+                          : "1px solid rgba(15,23,42,0.08)",
+                        background: "#fff",
+                        padding: 12,
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: isMobile ? 14 : 14,
+                          lineHeight: 1.4,
+                          color: "#0f172a",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {getModalFieldDisplayLabel(col)}{" "}
+                        {isRequiredVisual ? (
+                          <span style={{ color: "crimson" }}>*</span>
+                        ) : null}
+                      </label>
+
+                      {(col.description || getPolipastoDescription(col.id)) ? (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            marginBottom: 10,
+                            color: "#111827",
+                            fontSize: isMobile ? 13 : 14,
+                            lineHeight: 1.6,
+                            fontWeight: 500,
+                            whiteSpace: "pre-line",
+                          }}
+                        >
+                          {col.description || getPolipastoDescription(col.id)}
+                        </div>
+                      ) : null}
+
+                      {hasError && tableModalError ? (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            borderRadius: 10,
+                            border: "1px solid #fdba74",
+                            background: "#fff7ed",
+                            color: "#9a3412",
+                            padding: "8px 10px",
+                            fontSize: 13,
+                            lineHeight: 1.4,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {tableModalError}
+                        </div>
+                      ) : null}
+
+                      <div style={{ marginTop: 10 }}>
+                        {renderTableModalField(col)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          {index < filteredGroups.length - 1 ? (
+            <div
+              style={{
+                borderBottom: "1px solid #cbd5e1",
+                margin: "4px 0 2px 0",
+              }}
+            ></div>
+          ) : null}
+        </React.Fragment>
+      );
+    }
+
+    const col = group.fields[0];
+    const hasError = tableModalErrorFieldId === col.id;
+    const isRequiredVisual = !isOptionalColumn(col);
+
+    return (
+      <React.Fragment key={group.id}>
+        <div
+          ref={(el) => {
+            tableFieldWrapRefs.current[col.id] = el;
+          }}
+          style={{
+            borderRadius: 14,
+            border: hasError
+              ? "1px solid #fdba74"
+              : "1px solid rgba(15,23,42,0.08)",
+            background: "#fff",
+            padding: 12,
+          }}
+        >
+          <label
+            style={{
+              fontSize: isMobile ? 14 : 14,
+              lineHeight: 1.4,
+              color: "#0f172a",
+              fontWeight: 700,
+            }}
+          >
+            {getModalFieldDisplayLabel(col)}{" "}
+            {isRequiredVisual ? (
+              <span style={{ color: "crimson" }}>*</span>
+            ) : null}
+          </label>
+
+          {(col.description || getPolipastoDescription(col.id)) ? (
+            <div
+              style={{
+                marginTop: 8,
+                marginBottom: 10,
+                color: "#111827",
+                fontSize: isMobile ? 13 : 14,
+                lineHeight: 1.6,
+                fontWeight: 500,
+                whiteSpace: "pre-line",
+              }}
+            >
+              {col.description || getPolipastoDescription(col.id)}
+            </div>
+          ) : null}
+
+          {hasError && tableModalError ? (
+            <div
+              style={{
+                marginTop: 8,
+                borderRadius: 10,
+                border: "1px solid #fdba74",
+                background: "#fff7ed",
+                color: "#9a3412",
+                padding: "8px 10px",
+                fontSize: 13,
+                lineHeight: 1.4,
+                fontWeight: 700,
+              }}
+            >
+              {tableModalError}
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 10 }}>
+            {renderTableModalField(col)}
+          </div>
+        </div>
+
+        {index < filteredGroups.length - 1 ? (
+          <div
+            style={{
+              borderBottom: "1px solid #cbd5e1",
+              margin: "4px 0 2px 0",
+            }}
+          ></div>
+        ) : null}
+      </React.Fragment>
+    );
   };
 
   const desktopContentWidth = 900;
@@ -1810,19 +2110,8 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                   key={line.id}
                   style={{
                     width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
+                    fontWeight: 700,
+                    fontSize: isMobile ? 12 : 14,
                     color: "#111827",
                     textAlign: "left",
                     lineHeight: isMobile ? 1.45 : 1.35,
@@ -1833,7 +2122,23 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
               ))}
             </div>
 
+            {logo || headerLines.length ? (
+              <div
+                style={{
+                  borderBottom: "1px solid #d1d5db",
+                  margin: "4px 0 0 0",
+                }}
+              />
+            ) : null}
+
             {renderOuterRequiredField(taller)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
 
             {indicacionesToggle ? (
               <div
@@ -1879,7 +2184,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                       <div
                         style={{
                           color: "#111827",
-                          fontSize: isMobile ? 14 : 14,
+                          fontSize: isMobile ? 12 : 12,
                           lineHeight: 1.5,
                         }}
                       >
@@ -1891,7 +2196,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                       <div
                         style={{
                           color: "#111827",
-                          fontSize: isMobile ? 14 : 14,
+                          fontSize: isMobile ? 12 : 12,
                           lineHeight: 1.5,
                         }}
                       >
@@ -1902,10 +2207,10 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
                     {criteriosTitulo ? (
                       <div
                         style={{
-                          fontWeight: 800,
-                          color: "#0f172a",
-                          fontSize: isMobile ? 14 : 15,
-                          lineHeight: 1.4,
+                          fontWeight: 600,
+                          color: "#111827",
+                          fontSize: isMobile ? 12 : 12,
+                          lineHeight: 1.5,
                         }}
                       >
                         {criteriosTitulo.text}
@@ -1922,9 +2227,40 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
               </div>
             ) : null}
 
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(nombreTrabajadorElaboraChecklist)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(firmaTrabajadorElaboraChecklist)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(nombreSupervisorTrabajador)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(firmaSupervisorTrabajador)}
           </div>
 
@@ -2102,191 +2438,9 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
             
               {modalGroups
                 .filter((group) => group.kind !== "image")
-                .map((group) => {
-                  if (group.kind === "section") {
-                    const theme = getSectionTheme(group.titleField?.id);
-                    return (
-                      <div
-                        key={group.id}
-                        style={{
-                          borderRadius: 16,
-                          overflow: "hidden",
-                          border: theme.border,
-                          background: theme.background,
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "12px 14px",
-                            fontWeight: 800,
-                            color: "#0f172a",
-                            background: theme.titleBg,
-                            borderBottom: "1px solid rgba(15,23,42,0.08)",
-                            fontSize: isMobile ? 14 : 15,
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {group.titleField?.text || group.titleField?.label}
-                        </div>
-
-                        <div
-                          style={{
-                            padding: 14,
-                            display: "grid",
-                            gap: 14,
-                          }}
-                        >
-                          {group.fields.map((col) => {
-                            const isRequiredVisual = !isObservationColumn(col);
-                            const hasError = tableModalErrorFieldId === col.id;
-
-                            return (
-                              <div
-                                key={col.id}
-                                ref={(el) => {
-                                  tableFieldWrapRefs.current[col.id] = el;
-                                }}
-                                style={{
-                                  borderRadius: 14,
-                                  border: hasError
-                                    ? "1px solid #fdba74"
-                                    : "1px solid rgba(15,23,42,0.08)",
-                                  background: "#fff",
-                                  padding: 12,
-                                }}
-                              >
-                                <label
-                                  style={{
-                                    fontSize: isMobile ? 14 : 14,
-                                    lineHeight: 1.4,
-                                    color: "#0f172a",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  {col.label}{" "}
-                                  {isRequiredVisual ? (
-                                    <span style={{ color: "crimson" }}>*</span>
-                                  ) : null}
-                                </label>
-
-                                {(col.description || getPolipastoDescription(col.id)) ? (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      marginBottom: 10,
-                                      color: "#111827",
-                                      fontSize: isMobile ? 13 : 14,
-                                      lineHeight: 1.6,
-                                      fontWeight: 500,
-                                      whiteSpace: "pre-line",
-                                    }}
-                                  >
-                                    {col.description || getPolipastoDescription(col.id)}
-                                  </div>
-                                ) : null}
-
-                                {hasError && tableModalError ? (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      borderRadius: 10,
-                                      border: "1px solid #fdba74",
-                                      background: "#fff7ed",
-                                      color: "#9a3412",
-                                      padding: "8px 10px",
-                                      fontSize: 13,
-                                      lineHeight: 1.4,
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    {tableModalError}
-                                  </div>
-                                ) : null}
-
-                                <div style={{ marginTop: 10 }}>
-                                  {renderTableModalField(col)}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const col = group.fields[0];
-                  const hasError = tableModalErrorFieldId === col.id;
-                  const isRequiredVisual = !isObservationColumn(col);
-
-                  return (
-                    <div
-                      key={group.id}
-                      ref={(el) => {
-                        tableFieldWrapRefs.current[col.id] = el;
-                      }}
-                      style={{
-                        borderRadius: 14,
-                        border: hasError
-                          ? "1px solid #fdba74"
-                          : "1px solid rgba(15,23,42,0.08)",
-                        background: "#fff",
-                        padding: 12,
-                      }}
-                    >
-                      <label
-                        style={{
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.4,
-                          color: "#0f172a",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {col.label}{" "}
-                        {isRequiredVisual ? (
-                          <span style={{ color: "crimson" }}>*</span>
-                        ) : null}
-                      </label>
-
-                      {(col.description || getPolipastoDescription(col.id)) ? (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            marginBottom: 10,
-                            color: "#111827",
-                            fontSize: isMobile ? 13 : 14,
-                            lineHeight: 1.6,
-                            fontWeight: 500,
-                            whiteSpace: "pre-line",
-                          }}
-                        >
-                          {col.description || getPolipastoDescription(col.id)}
-                        </div>
-                      ) : null}
-
-                      {hasError && tableModalError ? (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            borderRadius: 10,
-                            border: "1px solid #fdba74",
-                            background: "#fff7ed",
-                            color: "#9a3412",
-                            padding: "8px 10px",
-                            fontSize: 13,
-                            lineHeight: 1.4,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {tableModalError}
-                        </div>
-                      ) : null}
-
-                      <div style={{ marginTop: 10 }}>
-                        {renderTableModalField(col)}
-                      </div>
-                    </div>
-                  );
-                })}
+                .map((group, index, filteredGroups) =>
+                  renderModalGroupContent(group, index, filteredGroups)
+                )}
             </div>
 
             <div

@@ -19,33 +19,39 @@
         }
 
         .sheet {
-            width: 110%;
-            transform: scale(0.86);
+            width: 100%;
+            transform: scale(1);
             transform-origin: top left;
-            margin-left: 30px;
+            margin-left: 0px;
+        }
+
+        .page-break {
+            page-break-before: always;
         }
 
         .header-table {
-            width: 99.6%;
+            width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
@@ -53,14 +59,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -126,6 +128,29 @@
             border-bottom: 1px solid #000;
             height: 1px;
         }
+
+
+        .main-polipasto-table {
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .main-polipasto-table td {
+            overflow: hidden;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+            box-sizing: border-box;
+        }
+
+        .polipasto-sizing-row td {
+            height: 0 !important;
+            line-height: 0 !important;
+            font-size: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            overflow: hidden !important;
+        }
     </style>
 </head>
 
@@ -146,12 +171,34 @@
 
         $fechaInspeccion = optional($submission->created_at)->format('d/m/Y') ?: '';
         $tallerValor = data_get($answers, 'taller', '') ?: '';
+
+        $rows = data_get($answers, 'tabla_polipasto_manual_cadena', []);
+
+        $filasConDatos = collect($rows)->filter(function ($row) {
+            return !empty(array_filter(
+                $row,
+                fn($value) => $value !== null && $value !== ''
+            ));
+        })->values();
+
+        $filasPorPagina = 6;
+        $paginasPolipasto = $filasConDatos->count()
+            ? $filasConDatos->chunk($filasPorPagina)->values()
+            : collect([collect([])]);
     @endphp
 
-    <div class="sheet">
+    @foreach($paginasPolipasto as $pageIndex => $filasPagina)
+    <div class="sheet {{ $pageIndex > 0 ? 'page-break' : '' }}">
 
         <!-- HEADER -->
         <table class="header-table">
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:22.5%; padding:0; border:none; height:0;"></td>
+                <td style="width:22.5%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
                 <td rowspan="3" class="logo-cell">
                     @if($logoSrc)
@@ -159,12 +206,12 @@
                     @endif
                 </td>
 
-                <td colspan="2" class="center-cell row-1-center">
+                <td colspan="2" class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    CODIFICACIÓN: SST-POP-TA-01-FO-06
+                <td class="right-cell">
+                    CÓDIGO: SST-POP-TA-01-FO-06
                 </td>
             </tr>
 
@@ -173,8 +220,8 @@
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    FECHA DE EMISIÓN: 27/03/2025
+                <td class="right-cell">
+                    EMISIÓN: 27/03/2025
                 </td>
             </tr>
 
@@ -183,8 +230,8 @@
                     CHECKLIST DE POLIPASTO MANUAL DE CADENA
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    NÚMERO DE REVISIÓN: 02
+                <td class="right-cell">
+                    REVISIÓN: 02
                 </td>
             </tr>
         </table>
@@ -213,31 +260,86 @@
         <!-- TEXTO -->
         <div style="
             text-align:center;
-            margin-top:12px;
-            font-size:10px;
+            margin-top:3px;
+            font-size:8px;
             font-weight:bold;
             line-height:1.4;
         ">
             Este formato deberá llenarse cada que se use el polipasto y en caso de no usarse, debe llenarse una vez al mes.
         </div>
 
+        @php
+            /*
+             |--------------------------------------------------------------
+             | CONFIGURACIÓN DE ANCHOS DE LA TABLA PRINCIPAL
+             |--------------------------------------------------------------
+             | Modifica estos valores para cambiar el ancho de cada columna.
+             | Se usan en la tabla de títulos y también en la tabla de registros.
+             | La suma debe dar aproximadamente 100%.
+             */
+            $wNoSeriePolipasto = '8%';
+            $wPolipasto1 = '8%';
+            
+            $wPolipasto2 = '6.1667%';
+            $wPolipasto3 = '6.1667%';
+            $wPolipasto4 = '6.1667%';
+            $wPolipasto5 = '6.1667%';
+            $wPolipasto6 = '6.1667%';
+            $wPolipasto7 = '6.1667%';
+            $wPolipasto8 = '6.1667%';
+            $wPolipasto9 = '6.1667%';
+            
+            $wCadenaDesplazaPolipasto = '6.1667%';
+            $wSonidoInusualPolipasto = '6.1667%';
+            $wEngranesLubricadosPolipasto = '6.1667%';
+            $wCondicionesGeneralesPolipasto = '6.1667%';
+            
+            $wObservacionesPolipasto = '10%';
+
+            $anchosTablaPolipasto = [
+                $wNoSeriePolipasto,
+                $wPolipasto1,
+                $wPolipasto2,
+                $wPolipasto3,
+                $wPolipasto4,
+                $wPolipasto5,
+                $wPolipasto6,
+                $wPolipasto7,
+                $wPolipasto8,
+                $wPolipasto9,
+                $wCadenaDesplazaPolipasto,
+                $wSonidoInusualPolipasto,
+                $wEngranesLubricadosPolipasto,
+                $wCondicionesGeneralesPolipasto,
+                $wObservacionesPolipasto,
+            ];
+        @endphp
+
         <!-- TABLA ENCABEZADO DE CRITERIOS -->
-        <table style="
+        <table class="main-polipasto-table" style="
             width: 85%;
-            margin: 12px 0 0 0;
+            margin: 10px 0 0 0;
             border-collapse: collapse;
             table-layout: fixed;
             font-size: 6px;
         ">
             <colgroup>
-                @for ($i = 0; $i < 15; $i++)
-                    <col style="width: {{ $i === 0 ? '8%' : '6.57%' }}">
-                @endfor
+                @foreach($anchosTablaPolipasto as $anchoColumnaPolipasto)
+                    <col style="width: {{ $anchoColumnaPolipasto }};">
+                @endforeach
             </colgroup>
+
+            <!-- FILA OCULTA PARA FORZAR ANCHOS EN DOMPDF -->
+            <tr class="polipasto-sizing-row">
+                @foreach($anchosTablaPolipasto as $anchoColumnaPolipasto)
+                    <td style="width: {{ $anchoColumnaPolipasto }}; max-width: {{ $anchoColumnaPolipasto }}; min-width: {{ $anchoColumnaPolipasto }};"></td>
+                @endforeach
+            </tr>
         
             <!-- FILA 1 -->
             <tr>
                 <td rowspan="3" style="
+                    width:{{ $anchosTablaPolipasto[0] }}; max-width:{{ $anchosTablaPolipasto[0] }}; min-width:{{ $anchosTablaPolipasto[0] }};
                     border:1px solid #000;
                     background:#f3f4f6;
                     font-weight:bold;
@@ -258,47 +360,47 @@
                     font-size:8px;
                     padding:4px 3px;
                 ">
-                    Características
+                    Criterios o inspeccionar (Buenas condiciones: B o Malas condiciones: M)
                 </td>
             </tr>
         
             <!-- FILA 2 -->
             <tr>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">1. Ganchos<br>(Superior e Inferior)</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">2. Seguros de los ganchos<br>(Superior e Inferior)</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">3. Tornillos</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">4. Perno del gancho</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">5. Marco</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">6. Placa del fabricante</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">7. Rótulo de la capacidad</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">8. Cadena manual</td>
-                <td style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">9. Cadena de carga</td>
+                <td style="width:{{ $anchosTablaPolipasto[1] }}; max-width:{{ $anchosTablaPolipasto[1] }}; min-width:{{ $anchosTablaPolipasto[1] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">1. Ganchos<br>(Superior e Inferior)</td>
+                <td style="width:{{ $anchosTablaPolipasto[2] }}; max-width:{{ $anchosTablaPolipasto[2] }}; min-width:{{ $anchosTablaPolipasto[2] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">2. Seguros de los ganchos<br>(Superior e Inferior)</td>
+                <td style="width:{{ $anchosTablaPolipasto[3] }}; max-width:{{ $anchosTablaPolipasto[3] }}; min-width:{{ $anchosTablaPolipasto[3] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">3. Tornillos</td>
+                <td style="width:{{ $anchosTablaPolipasto[4] }}; max-width:{{ $anchosTablaPolipasto[4] }}; min-width:{{ $anchosTablaPolipasto[4] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">4. Perno del gancho</td>
+                <td style="width:{{ $anchosTablaPolipasto[5] }}; max-width:{{ $anchosTablaPolipasto[5] }}; min-width:{{ $anchosTablaPolipasto[5] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">5. Marco</td>
+                <td style="width:{{ $anchosTablaPolipasto[6] }}; max-width:{{ $anchosTablaPolipasto[6] }}; min-width:{{ $anchosTablaPolipasto[6] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">6. Placa del fabricante</td>
+                <td style="width:{{ $anchosTablaPolipasto[7] }}; max-width:{{ $anchosTablaPolipasto[7] }}; min-width:{{ $anchosTablaPolipasto[7] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">7. Rótulo de la capacidad</td>
+                <td style="width:{{ $anchosTablaPolipasto[8] }}; max-width:{{ $anchosTablaPolipasto[8] }}; min-width:{{ $anchosTablaPolipasto[8] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">8. Cadena manual</td>
+                <td style="width:{{ $anchosTablaPolipasto[9] }}; max-width:{{ $anchosTablaPolipasto[9] }}; min-width:{{ $anchosTablaPolipasto[9] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">9. Cadena de carga</td>
         
-                <td rowspan="2" style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">¿La cadena se desplaza adecuadamente?</td>
-                <td rowspan="2" style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">¿Se escucha algún sonido inusual en los engranes?</td>
-                <td rowspan="2" style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">¿Los engranes están lubricados?</td>
-                <td rowspan="2" style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">Condiciones generales del polipasto manual de cadena</td>
-                <td rowspan="2" style="border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">Observaciones</td>
+                <td rowspan="2" style="width:{{ $anchosTablaPolipasto[10] }}; max-width:{{ $anchosTablaPolipasto[10] }}; min-width:{{ $anchosTablaPolipasto[10] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">¿La cadena se desplaza adecuadamente?</td>
+                <td rowspan="2" style="width:{{ $anchosTablaPolipasto[11] }}; max-width:{{ $anchosTablaPolipasto[11] }}; min-width:{{ $anchosTablaPolipasto[11] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">¿Se escucha algún sonido inusual en los engranes?</td>
+                <td rowspan="2" style="width:{{ $anchosTablaPolipasto[12] }}; max-width:{{ $anchosTablaPolipasto[12] }}; min-width:{{ $anchosTablaPolipasto[12] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">¿Los engranes están lubricados?</td>
+                <td rowspan="2" style="width:{{ $anchosTablaPolipasto[13] }}; max-width:{{ $anchosTablaPolipasto[13] }}; min-width:{{ $anchosTablaPolipasto[13] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">Condiciones generales del polipasto manual de cadena</td>
+                <td rowspan="2" style="width:{{ $anchosTablaPolipasto[14] }}; max-width:{{ $anchosTablaPolipasto[14] }}; min-width:{{ $anchosTablaPolipasto[14] }}; border:1px solid #000; background:#f3f4f6; font-weight:bold; text-align:center; vertical-align:middle; padding:4px 3px;">Observaciones</td>
             </tr>
         
             <!-- FILA 3 -->
             <tr>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Torcidos, flexionados, con demasiada apertura en la garganta, gastados, agrietados, con muescas, con estrías, oxidado</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Torcidos, gastados, faltante, oxidado, no funciona</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastados, flojos, oxidados, faltantes</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastados, flojos, oxidados, faltantes</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Decolorado, gastado, agrietado</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Faltante o Ilegible</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Faltante o Ilegible</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastada, oxidada, golpeada</td>
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastada, oxidada, golpeada</td>
+                <td style="width:{{ $anchosTablaPolipasto[1] }}; max-width:{{ $anchosTablaPolipasto[1] }}; min-width:{{ $anchosTablaPolipasto[1] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Torcidos, flexionados, con demasiada apertura en la garganta, gastados, agrietados, con muescas, con estrías, oxidado</td>
+                <td style="width:{{ $anchosTablaPolipasto[2] }}; max-width:{{ $anchosTablaPolipasto[2] }}; min-width:{{ $anchosTablaPolipasto[2] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Torcidos, gastados, faltante, oxidado, no funciona</td>
+                <td style="width:{{ $anchosTablaPolipasto[3] }}; max-width:{{ $anchosTablaPolipasto[3] }}; min-width:{{ $anchosTablaPolipasto[3] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastados, flojos, oxidados, faltantes</td>
+                <td style="width:{{ $anchosTablaPolipasto[4] }}; max-width:{{ $anchosTablaPolipasto[4] }}; min-width:{{ $anchosTablaPolipasto[4] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastados, flojos, oxidados, faltantes</td>
+                <td style="width:{{ $anchosTablaPolipasto[5] }}; max-width:{{ $anchosTablaPolipasto[5] }}; min-width:{{ $anchosTablaPolipasto[5] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Decolorado, gastado, agrietado</td>
+                <td style="width:{{ $anchosTablaPolipasto[6] }}; max-width:{{ $anchosTablaPolipasto[6] }}; min-width:{{ $anchosTablaPolipasto[6] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Faltante o Ilegible</td>
+                <td style="width:{{ $anchosTablaPolipasto[7] }}; max-width:{{ $anchosTablaPolipasto[7] }}; min-width:{{ $anchosTablaPolipasto[7] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Faltante o Ilegible</td>
+                <td style="width:{{ $anchosTablaPolipasto[8] }}; max-width:{{ $anchosTablaPolipasto[8] }}; min-width:{{ $anchosTablaPolipasto[8] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastada, oxidada, golpeada</td>
+                <td style="width:{{ $anchosTablaPolipasto[9] }}; max-width:{{ $anchosTablaPolipasto[9] }}; min-width:{{ $anchosTablaPolipasto[9] }}; border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 3px; line-height:1.15;">Gastada, oxidada, golpeada</td>
             </tr>
         </table>
 
         <!-- GUÍA DE INSPECCIÓN -->
         <table style="
             width: 13%;
-            margin-top: -245px;
+            margin-top: -225px;
             margin-left: 86%;
             border-collapse: collapse;
             table-layout: fixed;
@@ -341,46 +443,42 @@
             </tr>
         </table>
 
-        @php
-            $rows = data_get($answers, 'tabla_polipasto_manual_cadena', []);
-        
-            $filasConDatos = collect($rows)->filter(function ($row) {
-                return !empty(array_filter(
-                    $row,
-                    fn($value) => $value !== null && $value !== ''
-                ));
-            })->values();
-        @endphp
-        
         <!-- TABLA DATOS -->
-        <table style="
+        <table class="main-polipasto-table" style="
             width: 85%;
-            margin: -125 0 0 0;
+            margin: -182px 0 0 0;
             border-collapse: collapse;
             table-layout: fixed;
             font-size: 6px;
         ">
             <colgroup>
-                @for ($i = 0; $i < 15; $i++)
-                    <col style="width: {{ $i === 0 ? '8%' : '6.57%' }}">
-                @endfor
+                @foreach($anchosTablaPolipasto as $anchoColumnaPolipasto)
+                    <col style="width: {{ $anchoColumnaPolipasto }};">
+                @endforeach
             </colgroup>
+
+            <!-- FILA OCULTA PARA FORZAR ANCHOS EN DOMPDF -->
+            <tr class="polipasto-sizing-row">
+                @foreach($anchosTablaPolipasto as $anchoColumnaPolipasto)
+                    <td style="width: {{ $anchoColumnaPolipasto }}; max-width: {{ $anchoColumnaPolipasto }}; min-width: {{ $anchoColumnaPolipasto }};"></td>
+                @endforeach
+            </tr>
         
             @php
-                $minFilas = 6;
-                $totalFilas = max($minFilas, $filasConDatos->count());
+                $totalFilas = $filasPorPagina;
             @endphp
         
             @for ($i = 0; $i < $totalFilas; $i++)
         
                 @php
-                    $row = $filasConDatos[$i] ?? [];
+                    $row = $filasPagina->values()->get($i, []);
                 @endphp
         
                 <tr>
         
                     <!-- NO SERIE -->
                     <td style="
+                        width:{{ $anchosTablaPolipasto[0] }}; max-width:{{ $anchosTablaPolipasto[0] }}; min-width:{{ $anchosTablaPolipasto[0] }};
                         border:1px solid #000;
                         text-align:center;
                         vertical-align:middle;
@@ -391,72 +489,73 @@
                     </td>
         
                     <!-- 1 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[1] }}; max-width:{{ $anchosTablaPolipasto[1] }}; min-width:{{ $anchosTablaPolipasto[1] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_1_estado') }}
                     </td>
         
                     <!-- 2 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[2] }}; max-width:{{ $anchosTablaPolipasto[2] }}; min-width:{{ $anchosTablaPolipasto[2] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_2_estado') }}
                     </td>
         
                     <!-- 3 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[3] }}; max-width:{{ $anchosTablaPolipasto[3] }}; min-width:{{ $anchosTablaPolipasto[3] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_3_estado') }}
                     </td>
         
                     <!-- 4 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[4] }}; max-width:{{ $anchosTablaPolipasto[4] }}; min-width:{{ $anchosTablaPolipasto[4] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_4_estado') }}
                     </td>
         
                     <!-- 5 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[5] }}; max-width:{{ $anchosTablaPolipasto[5] }}; min-width:{{ $anchosTablaPolipasto[5] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_5_estado') }}
                     </td>
         
                     <!-- 6 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[6] }}; max-width:{{ $anchosTablaPolipasto[6] }}; min-width:{{ $anchosTablaPolipasto[6] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_6_estado') }}
                     </td>
         
                     <!-- 7 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[7] }}; max-width:{{ $anchosTablaPolipasto[7] }}; min-width:{{ $anchosTablaPolipasto[7] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_7_estado') }}
                     </td>
         
                     <!-- 8 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[8] }}; max-width:{{ $anchosTablaPolipasto[8] }}; min-width:{{ $anchosTablaPolipasto[8] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_8_estado') }}
                     </td>
         
                     <!-- 9 -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[9] }}; max-width:{{ $anchosTablaPolipasto[9] }}; min-width:{{ $anchosTablaPolipasto[9] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'polipasto_9_estado') }}
                     </td>
                     
                     <!-- CADENA -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[10] }}; max-width:{{ $anchosTablaPolipasto[10] }}; min-width:{{ $anchosTablaPolipasto[10] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'cadena_desplaza_adecuadamente') }}
                     </td>
         
                     <!-- SONIDO -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[11] }}; max-width:{{ $anchosTablaPolipasto[11] }}; min-width:{{ $anchosTablaPolipasto[11] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'sonido_inusual_engranes') }}
                     </td>
         
                     <!-- LUBRICADOS -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[12] }}; max-width:{{ $anchosTablaPolipasto[12] }}; min-width:{{ $anchosTablaPolipasto[12] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'engranes_lubricados') }}
                     </td>
         
                     <!-- CONDICIONES -->
-                    <td style="border:1px solid #000; text-align:center;">
+                    <td style="width:{{ $anchosTablaPolipasto[13] }}; max-width:{{ $anchosTablaPolipasto[13] }}; min-width:{{ $anchosTablaPolipasto[13] }}; border:1px solid #000; text-align:center;">
                         {{ data_get($row, 'condiciones_generales_polipasto') }}
                     </td>
         
                     <!-- OBS -->
                     <td style="
+                        width:{{ $anchosTablaPolipasto[14] }}; max-width:{{ $anchosTablaPolipasto[14] }}; min-width:{{ $anchosTablaPolipasto[14] }};
                         border:1px solid #000;
                         text-align:center;
                         vertical-align:middle;
@@ -499,7 +598,7 @@
         <!-- FIRMAS -->
         <table style="
             width: 60%;
-            margin: 30px auto 0 auto;
+            margin: 15px auto 0 auto;
             border-collapse: collapse;
             table-layout: fixed;
         ">
@@ -641,5 +740,6 @@
         </table>
 
     </div>
+    @endforeach
 </body>
 </html>
