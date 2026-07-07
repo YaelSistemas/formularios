@@ -44,17 +44,17 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'CHECKLIST DE INSPECCIÓN DE ESCALERAS PORTÁTILES',
+                    'text' => 'Checklist de Inspección de Escaleras Portátiles',
                 ],
                 [
                     'id' => 'header_line_4',
@@ -172,8 +172,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'zapatas_patas_estado',
-                            'label' => 'Zapatas/Patas',
-                            'description' => 'Gastado, Suelto, Rajado o Faltante',
+                            'label' => 'Zapatas/Patas: Gastado, Suelto, Rajado o Faltante',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -181,8 +180,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'rieles_planos_verticales_estado',
-                            'label' => 'Rieles/Planos Verticales',
-                            'description' => 'Bordes Afilados, Rajados o Doblados',
+                            'label' => 'Rieles/Planos Verticales: Bordes Afilados, Rajados o Doblados',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -190,8 +188,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'escalones_peldanos_estado',
-                            'label' => 'Escalones/Peldaños',
-                            'description' => 'Sueltos, Roto, Gastado o Faltante',
+                            'label' => 'Escalones/Peldaños: Sueltos, Roto, Gastado o Faltante',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -199,8 +196,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'tope_superior_estado',
-                            'label' => 'Tope Superior',
-                            'description' => 'Rajado, Suelto o Faltante',
+                            'label' => 'Tope Superior: Rajado, Suelto o Faltante',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -208,8 +204,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'ferreteria_estado',
-                            'label' => 'Ferretería',
-                            'description' => 'Difícil de Operar',
+                            'label' => 'Ferretería: Difícil de Operar',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -217,8 +212,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'limpieza_estado',
-                            'label' => 'Limpieza',
-                            'description' => 'Materiales Grasos, Aceitosos o Resbaladizos',
+                            'label' => 'Limpieza: Materiales Grasos, Aceitosos o Resbaladizos',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -226,8 +220,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'general_estado',
-                            'label' => 'General',
-                            'description' => 'Partes Oxidadas, Corroídas, Rajadas, Sueltas o Faltantes',
+                            'label' => 'General: Partes Oxidadas, Corroídas, Rajadas, Sueltas o Faltantes',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -235,8 +228,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'etiquetas_estado',
-                            'label' => 'Etiquetas',
-                            'description' => 'Faltante o No Legible',
+                            'label' => 'Etiquetas: Faltante o No Legible',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -244,8 +236,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'seguros_peldanos_estado',
-                            'label' => 'Seguros de Peldaños',
-                            'description' => 'Suelto, Roto o Faltante',
+                            'label' => 'Seguros de Peldaños: Suelto, Roto o Faltante',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
@@ -261,8 +252,7 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
 
                         [
                             'id' => 'cuerda_polea_estado',
-                            'label' => 'Cuerda/Polea (Opcional)',
-                            'description' => 'Gastado, Raído o Faltante',
+                            'label' => 'Cuerda/Polea (Opcional): Gastado, Raído o Faltante',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOpcionalOptions,

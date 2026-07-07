@@ -19,33 +19,35 @@
         }
 
         .sheet {
-            width: 110%;
-            transform: scale(0.86);
+            width: 100%;
+            transform: scale(1);
             transform-origin: top left;
-            margin-left: 30px;
+            margin-left: 0px;
         }
 
         .header-table {
-            width: 99.6%;
+            width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
@@ -53,14 +55,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -126,6 +124,10 @@
             border-bottom: 1px solid #000;
             height: 1px;
         }
+
+        .page-break {
+            page-break-after: always;
+        }
     </style>
 </head>
 
@@ -165,45 +167,80 @@
         $imagenEscalera = public_path(
             'images/forms/SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles/Inspeccion_Escalera_Portatil.png'
         );
+
+        $rows = data_get($answers, 'tabla_escaleras_portatiles', []);
+
+        $filasConDatos = collect($rows)->filter(function ($row) {
+            return !empty(array_filter(
+                $row,
+                fn($value) => $value !== null && $value !== ''
+            ));
+        })->values();
+
+        $registrosPorPagina = 8;
+        
+        $paginas = $filasConDatos
+            ->chunk($registrosPorPagina)
+            ->map(fn($chunk) => $chunk->values())
+            ->values();
+
+        if ($paginas->isEmpty()) {
+            $paginas = collect([collect([])]);
+        }
+
+        $totalPaginas = $paginas->count();
     @endphp
 
-    <div class="sheet">
+    @foreach($paginas as $pageIndex => $pageRows)
+        <div class="sheet{{ $pageIndex < $totalPaginas - 1 ? ' page-break' : '' }}">
 
         <!-- HEADER -->
         <table class="header-table">
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
-                <td rowspan="3" class="logo-cell">
+                <td rowspan="4" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}">
                     @endif
                 </td>
 
-                <td colspan="2" class="center-cell row-1-center">
+                <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
                     CODIFICACIÓN: SST-POP-TA-01-FO-04
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
                     FECHA DE EMISIÓN: 27/03/2025
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td rowspan="2" class="center-cell">
                     CHECKLIST DE INSPECCIÓN DE ESCALERAS PORTÁTILES
                 </td>
-
-                <td colspan="2" class="right-cell">
+            
+                <td class="right-cell">
                     NÚMERO DE REVISIÓN: 03
+                </td>
+            </tr>
+            
+            <tr>
+                <td class="right-cell">
+                    PÁGINA: {{ str_pad($pageIndex + 1, 2, '0', STR_PAD_LEFT) }}
                 </td>
             </tr>
         </table>
@@ -213,7 +250,7 @@
             width:100%;
             border-collapse:collapse;
             table-layout:fixed;
-            margin-top:15px;
+            margin-top:10px;
         ">
             <tr>
         
@@ -341,7 +378,7 @@
         <!-- TABLA CRITERIOS ESCALERAS -->
         <table style="
             width: 99.6%;
-            margin: 10px 0 0 0;
+            margin: 3px 0 0 0;
             border-collapse: collapse;
             table-layout: fixed;
             font-size: 5.5px;
@@ -361,6 +398,7 @@
                     text-align:center;
                     vertical-align:middle;
                     padding:4px 2px;
+                    font-size:7px;
                 ">
                     Tipo de Escalera:
                 </td>
@@ -408,20 +446,20 @@
                     Número de Identificación de la Escalera
                 </td>
         
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Zapatas/Patas:<br>Gastado, Suelto, Rajado o Faltante</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Rieles/Planos Verticales:<br>Bordes Afilados, Rajados o Doblados</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Escalones/Peldaños:<br>Sueltos, Roto, Gastado o Faltante</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Tope Superior:<br>Rajado, Suelto o Faltante</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Ferretería:<br>Difícil de Operar</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Limpieza:<br>Materiales Grasos, Aceitosos o Resbaladizos</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">General:<br>Partes Oxidadas, Corroídas, Rajadas, Sueltas o Faltantes</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Etiquetas:<br>Faltante o No Legible</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Seguros de Peldaños:<br>Suelto, Roto o Faltante</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">La Escalera está Libre de Grietas</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Cuerda/Polea:<br>Gastado, Raído o Faltante</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Brazos de Unión en Buenas Condiciones</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Seguros en Buenas Condiciones</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:6px;">Polea en Buenas Condiciones</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Zapatas/Patas: Gastado, Suelto, Rajado o Faltante</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Rieles/Planos Verticales: Bordes Afilados, Rajados o Doblados</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Escalones/Peldaños: Sueltos, Roto, Gastado o Faltante</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Tope Superior: Rajado, Suelto o Faltante</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Ferretería: Difícil de Operar</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Limpieza: Materiales Grasos, Aceitosos o Resbaladizos</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">General: Partes Oxidadas, Corroídas, Rajadas, Sueltas o Faltantes</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Etiquetas: Faltante o No Legible</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Seguros de Peldaños: Suelto, Roto o Faltante</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">La Escalera está Libre de Grietas</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Cuerda/Polea: Gastado, Raído o Faltante</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Los Brazos de Unión están en Buenas Condiciones</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Los Seguros están en Buenas Condiciones</td>
+                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">La Polea está en Buenas Condiciones</td>
             </tr>
         
             <!-- FILA 3 (Subtítulos con alto expandido emulando 3 filas) -->
@@ -456,23 +494,9 @@
             </tr>
         
             <!-- FILAS DE DATOS DENTRO DEL LOOP -->
-            @php
-                $rows = data_get($answers, 'tabla_escaleras_portatiles', []);
-            
-                $filasConDatos = collect($rows)->filter(function ($row) {
-                    return !empty(array_filter(
-                        $row,
-                        fn($value) => $value !== null && $value !== ''
-                    ));
-                })->values();
-            
-                $minFilas = 8;
-                $totalFilas = $filasConDatos->count() > 8 ? $filasConDatos->count() : 8;
-            @endphp
-            
-            @for ($i = 0; $i < $totalFilas; $i++)
+            @for ($i = 0; $i < $registrosPorPagina; $i++)
                 @php
-                    $row = $filasConDatos[$i] ?? [];
+                    $row = $pageRows[$i] ?? [];
                 @endphp
             
                 <tr>
@@ -549,7 +573,7 @@
         <!-- TABLA OBSERVACIONES --> 
         <table style="
             width:99.6%;
-            margin-top:15px;
+            margin-top:10px;
             border-collapse:collapse;
             table-layout:fixed;
         ">
@@ -569,7 +593,7 @@
                     height:20px;
                     vertical-align:middle;
                     font-weight:bold;
-                    font-size:9px;
+                    font-size:8px;
                 ">
                     <div style="
                         position:relative;
@@ -600,6 +624,7 @@
         
         </table>
 
-    </div>
+        </div>
+    @endforeach
 </body>
 </html>
