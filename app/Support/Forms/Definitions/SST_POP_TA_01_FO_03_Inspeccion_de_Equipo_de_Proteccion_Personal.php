@@ -41,17 +41,17 @@ class SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal implements
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'INSPECCIÓN DE EQUIPO DE PROTECCIÓN PERSONAL',
+                    'text' => 'Inspección de Equipo de Protección Personal',
                 ],
                 [
                     'id' => 'header_line_4',
@@ -61,7 +61,7 @@ class SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal implements
                 [
                     'id' => 'header_line_5',
                     'type' => 'static_text',
-                    'text' => 'Fecha de Emisión: 27/03/2025',
+                    'text' => 'Fecha de Emisión: 27/05/2025',
                 ],
                 [
                     'id' => 'header_line_6',

@@ -29,23 +29,25 @@
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
@@ -53,14 +55,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -135,6 +133,10 @@
             line-height: 1.1;
             width: 100%;
         }
+
+        .page-break {
+            page-break-after: always;
+        }
     </style>
 </head>
 
@@ -181,45 +183,98 @@
                 base64_encode(file_get_contents($pathFirma));
         }
     }
+
+    $rows = data_get($answers, 'tabla_inspeccion_epp', []);
+    $rows = is_array($rows) ? array_values($rows) : [];
+
+    $registrosPorPagina = 10;
+
+    if (count($rows) === 0) {
+        $paginas = collect([collect([])]);
+    } else {
+        $paginas = collect($rows)
+            ->chunk($registrosPorPagina)
+            ->map(fn($chunk) => $chunk->values())
+            ->values();
+    }
+
+    $totalPaginas = $paginas->count();
+
+    $criterios = [
+        'guante_carnaza',
+        'guantes_impacto',
+        'guantes_nitrilo_media_palma',
+        'guantes_nitrilo_sqp',
+        'guantes_corte',
+        'tapones_conchas',
+        'lentes_seguridad_goggles',
+        'casco_seguridad',
+        'barbiquejo',
+        'rodilleras',
+        'zapato_seguridad',
+        'uniforme_completo',
+        'respirador_media_cara',
+        'filtros_vapores_organicos',
+        'filtros_particulas',
+        'navajas_stanley',
+        'flexometro',
+        'candado',
+        'tarjeta_bloqueo',
+        'credencial_vysisa',
+    ];
 @endphp
 
-<div class="sheet">
+@foreach($paginas as $pageIndex => $pageRows)
+
+<div class="sheet{{ $pageIndex < $totalPaginas - 1 ? ' page-break' : '' }}">
 
     <!-- HEADER -->
     <table class="header-table">
+        <tr style="height:0; line-height:0;">
+            <td style="width:25%; padding:0; border:none; height:0;"></td>
+            <td style="width:45%; padding:0; border:none; height:0;"></td>
+            <td style="width:30%; padding:0; border:none; height:0;"></td>
+        </tr>
+
         <tr>
-            <td rowspan="3" class="logo-cell">
+            <td rowspan="4" class="logo-cell">
                 @if($logoSrc)
                     <img src="{{ $logoSrc }}">
                 @endif
             </td>
 
-            <td colspan="2" class="center-cell row-1-center">
+            <td class="center-cell">
                 VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
             </td>
 
-            <td colspan="2" class="right-cell">
-                CODIFICACIÓN: SST-POP-TA-01-FO-03
+            <td class="right-cell">
+                CÓDIGO: SST-POP-TA-01-FO-03
             </td>
         </tr>
 
         <tr>
-            <td colspan="2" class="center-cell">
+            <td class="center-cell">
                 SISTEMA DE GESTIÓN INTEGRAL
             </td>
 
-            <td colspan="2" class="right-cell">
-                FECHA DE EMISIÓN: 27/03/2025
+            <td class="right-cell">
+                FECHA DE EMISIÓN: 27/05/2025
             </td>
         </tr>
 
         <tr>
-            <td colspan="2" class="center-cell">
+            <td rowspan="2" class="center-cell">
                 INSPECCIÓN DE EQUIPO DE PROTECCIÓN PERSONAL
             </td>
-
-            <td colspan="2" class="right-cell">
-                NÚMERO DE REVISIÓN: 05
+        
+            <td class="right-cell">
+                REVISIÓN: 05
+            </td>
+        </tr>
+        
+        <tr>
+            <td class="right-cell">
+                PÁGINA: {{ str_pad($pageIndex + 1, 2, '0', STR_PAD_LEFT) }}
             </td>
         </tr>
     </table>
@@ -229,7 +284,7 @@
         width:100%;
         border-collapse:collapse;
         table-layout:fixed;
-        margin-top:15px;
+        margin-top:5px;
     ">
         <tr>
 
@@ -321,9 +376,9 @@
     <div style="
         width:99.6%;
         text-align:center;
-        font-size:9px;
+        font-size:8px;
         font-weight:bold;
-        margin-top:18px;
+        margin-top:10px;
         line-height:1.5;
     ">
         Considerar los siguientes criterios de acuerdo al estado del EPP
@@ -337,7 +392,7 @@
     <!-- TABLA ENCABEZADOS EPP -->
     <table style="
         width:99.6%;
-        margin-top:12px;
+        margin-top:10px;
         border-collapse:separate;
         border-spacing:0;
         table-layout:fixed;
@@ -362,7 +417,7 @@
                 font-weight:bold;
                 padding:4px 2px;
             ">
-                Nombre
+                NOMBRE
             </td>
     
             <!-- FIRMA -->
@@ -374,107 +429,107 @@
                 font-weight:bold;
                 padding:4px 2px;
             ">
-                Firma
+                FIRMA
             </td>
     
             <!-- GUANTE CARNAZA --> 
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Guante de<br>Carnaza</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">GUANTES DE<br>CARNAZA</div>
             </td>
     
             <!-- IMPACTO -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Guantes de<br>Impacto</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">GUANTES DE<br>IMPACTO</div>
             </td>
     
             <!-- NITRILO MEDIA PALMA -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Guantes de<br>Nitrilo Media<br>Palma</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">GUANTES DE<br>NITRILO MEDIA<br>PALMA</div>
             </td>
     
             <!-- NITRILO SQP -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Guantes de<br>Nitrilo SQP</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">GUANTES DE<br>NITRILO SQP</div>
             </td>
     
             <!-- CORTE -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Guantes de<br>Corte</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">GUANTES DE<br>CORTE</div>
             </td>
     
             <!-- TAPONES -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Tapones o<br>Conchas</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">TAPONES O<br>CONCHAS</div>
             </td>
     
             <!-- LENTES -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Lentes de<br>Seguridad /<br>Goggles</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">LENTES DE<br>SEGURIDAD /<br>GOGGLES</div>
             </td>
     
             <!-- CASCO -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Casco de<br>Seguridad<br>(Carcaza,<br>Suspension)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">CASCO DE<br>SEGURIDAD<br>(Carcaza,<br>Suspension)</div>
             </td>
     
             <!-- BARBIQUEJO -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Barbiquejo</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">BARBIQUEJO</div>
             </td>
     
             <!-- RODILLERAS -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Rodilleras<br>(Desgastes,<br>Roturas)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">RODILLERAS<br>(Desgastes,<br>Roturas)</div>
             </td>
     
             <!-- ZAPATO -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Zapato de<br>Seguridad<br>(Estado de Punta<br>y Suela)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">ZAPATO DE<br>SEGURIDAD<br>(Estado de Punta<br>y Suela)</div>
             </td>
     
             <!-- UNIFORME -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Uniforme Completo<br>(Estado de<br>Costuras)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">UNIFORME COMPLETO<br>(Estado de<br>Costuras)</div>
             </td>
     
             <!-- RESPIRADOR -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Respirador de<br>Media Cara</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">RESPIRADOR DE<br>MEDIA CARA</div>
             </td>
     
             <!-- FILTROS VO -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Filtros Vapores<br>Orgánicos</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">FILTROS VAPORES<br>ORGÁNICOS</div>
             </td>
     
             <!-- FILTROS PARTICULAS -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Filtros para<br>Partículas</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">FILTROS PARA<br>PARTÍCULAS</div>
             </td>
     
             <!-- NAVAJAS -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Navajas Stanley<br>(Funcional)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">NAVAJAS STANLEY<br>(Funcional)</div>
             </td>
     
             <!-- FLEXOMETRO -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Flexometro<br>(Funcional)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">FLEXOMETRO<br>(Funcional)</div>
             </td>
     
             <!-- CANDADO -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Candado<br>(Funcional)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">CANDADO<br>(Funcional)</div>
             </td>
     
             <!-- TARJETA -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Tarjeta de<br>Bloqueo<br>(Legible con<br>Fotografía)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">TARJETA DE<br>BLOQUEO<br>(Legible con<br>Fotografía)</div>
             </td>
     
             <!-- CREDENCIAL -->
-            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;font-weight:bold;padding:0;height:80px;">
-                <div class="vertical-text">Credencial VYSISA<br>(Vigente)</div>
+            <td rowspan="2" style="border:1px solid #000;vertical-align:middle;text-align:center;padding:0;height:80px;">
+                <div class="vertical-text">CREDENCIAL VYSISA<br>(Vigente)</div>
             </td>
     
             <!-- OBSERVACIONES -->
@@ -486,28 +541,20 @@
                 font-weight:bold;
                 padding:4px 2px;
             ">
-                Observaciones
+                OBSERVACIONES
             </td>
         </tr>
     
         <!-- FILA 2 VACÍA -->
         <tr></tr>
 
+        @for ($row = 0; $row < $registrosPorPagina; $row++)
+
         @php
-            $rows = data_get($answers, 'tabla_inspeccion_epp', []);
-        
-            $rows = is_array($rows) ? $rows : [];
-        
-            $totalRows = max(count($rows), 10);
-        @endphp
-        
-        @for ($row = 0; $row < $totalRows; $row++)
-        
-        @php
-            $item = $rows[$row] ?? [];
-        
+            $item = $pageRows[$row] ?? [];
+
             $firmaColaborador = data_get($item, 'firma_colaborador');
-        
+
             $firmaColaboradorSrc = null;
 
             if ($firmaColaborador) {
@@ -516,9 +563,9 @@
                 } else {
                     $firmaColaborador = str_replace('/storage/', '', $firmaColaborador);
                     $firmaColaborador = ltrim($firmaColaborador, '/');
-            
+
                     $firmaPath = storage_path('app/public/' . $firmaColaborador);
-            
+
                     if (file_exists($firmaPath)) {
                         $firmaColaboradorSrc =
                             'data:image/png;base64,' .
@@ -526,33 +573,10 @@
                     }
                 }
             }
-        
-            $criterios = [
-                'guante_carnaza',
-                'guantes_impacto',
-                'guantes_nitrilo_media_palma',
-                'guantes_nitrilo_sqp',
-                'guantes_corte',
-                'tapones_conchas',
-                'lentes_seguridad_goggles',
-                'casco_seguridad',
-                'barbiquejo',
-                'rodilleras',
-                'zapato_seguridad',
-                'uniforme_completo',
-                'respirador_media_cara',
-                'filtros_vapores_organicos',
-                'filtros_particulas',
-                'navajas_stanley',
-                'flexometro',
-                'candado',
-                'tarjeta_bloqueo',
-                'credencial_vysisa',
-            ];
         @endphp
-        
+
         <tr>
-        
+
             <!-- NOMBRE -->
             <td colspan="2" style="
                 border:1px solid #000;
@@ -564,7 +588,7 @@
             ">
                 {{ data_get($item, 'nombre_colaborador', '') }}
             </td>
-        
+
             <!-- FIRMA -->
             <td colspan="2" style="
                 border:1px solid #000;
@@ -574,7 +598,7 @@
                 vertical-align:middle;
                 position:relative;
             ">
-        
+
                 @if($firmaColaboradorSrc)
                     <img
                         src="{{ $firmaColaboradorSrc }}"
@@ -589,12 +613,12 @@
                         "
                     >
                 @endif
-        
+
             </td>
-        
+
             <!-- COLUMNAS EPP -->
             @foreach ($criterios as $criterio)
-        
+
                 <td style="
                     border:1px solid #000;
                     height:28px;
@@ -604,9 +628,9 @@
                 ">
                     {{ data_get($item, $criterio, '') }}
                 </td>
-        
+
             @endforeach
-        
+
             <!-- OBSERVACIONES -->
             <td colspan="2" style="
                 border:1px solid #000;
@@ -618,13 +642,15 @@
             ">
                 {{ data_get($item, 'observaciones', '') }}
             </td>
-        
+
         </tr>
-        
+
         @endfor
     </table>
 
 </div>
+
+@endforeach
 
 </body>
 </html>

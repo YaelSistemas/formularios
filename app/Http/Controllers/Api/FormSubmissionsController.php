@@ -475,6 +475,32 @@ class FormSubmissionsController extends Controller
                         $cleanRow = $row;
                     }
 
+                    if (
+                        $formCodeKey === 'sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal'
+                        && $id === 'tabla_inspeccion_epp'
+                    ) {
+                        $firmaColaborador = $cleanRow['firma_colaborador'] ?? '';
+                    
+                        if (
+                            is_string($firmaColaborador)
+                            && str_starts_with($firmaColaborador, 'data:image/')
+                        ) {
+                            $storedPath = $this->storeSignatureForInspeccionEquipoProteccionPersonal(
+                                $firmaColaborador,
+                                $userId,
+                                'firma_colaborador'
+                            );
+                    
+                            if (!$storedPath) {
+                                return response()->json([
+                                    'message' => 'No se pudo guardar la firma del colaborador en la tabla.'
+                                ], 422);
+                            }
+                    
+                            $cleanRow['firma_colaborador'] = $storedPath;
+                        }
+                    }
+
                     $normalizedRows[] = $cleanRow;
                 }
 
