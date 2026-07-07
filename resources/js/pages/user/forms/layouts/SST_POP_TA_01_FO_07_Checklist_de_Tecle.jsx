@@ -19,6 +19,8 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
     indicaciones_toggle: false,
   });
 
+  const [modalCollapsedSections, setModalCollapsedSections] = useState({});
+
   const [tableModal, setTableModal] = useState({
     open: false,
     field: null,
@@ -68,6 +70,17 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
       if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableModal.open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [tableModal.open]);
 
   const normalizeAssetUrl = (url) => {
     if (!url) return "";
@@ -127,6 +140,13 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
   const showTableModalFieldError = (fieldId, message) => {
     setTableModalError(message);
     setTableModalErrorFieldId(fieldId);
+
+    setModalCollapsedSections((prev) =>
+      Object.keys(prev).reduce((acc, key) => {
+        acc[key] = false;
+        return acc;
+      }, {})
+    );
 
     if (tableErrorTimerRef.current) clearTimeout(tableErrorTimerRef.current);
 
@@ -197,6 +217,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
     if (readOnly) return;
 
     clearTableModalError();
+    setModalCollapsedSections({});
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -212,6 +233,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
     const currentRow = rows[rowIndex] || {};
 
     clearTableModalError();
+    setModalCollapsedSections({});
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -242,8 +264,26 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
   const isObservationColumn = (col) => {
     const id = String(col?.id || "").toLowerCase();
     const label = String(col?.label || "").toLowerCase();
-  
+
     return id.includes("observaciones") || label.includes("observaciones");
+  };
+
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+
+    return isObservationColumn(col) || isNotesColumn(col);
+  };
+
+  const getCleanFieldLabel = (col) => {
+    return String(col?.text || col?.label || "");
   };
 
   const isEmptyValue = (value, type) => {
@@ -275,12 +315,12 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
       if (col.type === "static_text" || col.type === "fixed_image") continue;
       const v = tableRowDraft[col.id];
 
-      if (isObservationColumn(col)) {
+      if (isOptionalColumn(col)) {
         continue;
       }
       
       if (isEmptyValue(v, col.type)) {
-        showTableModalFieldError(col.id, `Falta responder: ${col.label}`);
+        showTableModalFieldError(col.id, `Falta responder: ${getCleanFieldLabel(col)}`);
         return;
       }
 
@@ -289,7 +329,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
         if (opts.length && !opts.includes(v)) {
           showTableModalFieldError(
             col.id,
-            `Selecciona una opción válida para: ${col.label}`
+            `Selecciona una opción válida para: ${getCleanFieldLabel(col)}`
           );
           return;
         }
@@ -1053,7 +1093,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
             fontWeight: 800,
           }}
         >
-          {col.label || "—"}
+          {getCleanFieldLabel(col) || "—"}
         </div>
       );
     }
@@ -1135,7 +1175,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {col.label}
+                      {getCleanFieldLabel(col)}
                     </th>
                   ))}
                   {!readOnly ? (
@@ -1423,6 +1463,16 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
     };
   };
 
+  const renderDivider = (key) => (
+    <div
+      key={key}
+      style={{
+        borderBottom: "1px solid #d1d5db",
+        margin: "4px 0 0 0",
+      }}
+    />
+  );
+
   const renderOuterRequiredField = (f) => {
     if (!f) return null;
 
@@ -1498,6 +1548,10 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
     if (!validateSimpleRequiredField(taller, "Debes seleccionar el Taller.")) return false;
 
     if (!tablaTecle) {
+      setCollapsedSections((prev) => ({
+        ...prev,
+        [indicacionesToggle?.id || "indicaciones_toggle"]: false,
+      }));
       setMsg("No se encontró la tabla de Tecle.");
       scrollToTopSafe();
       return false;
@@ -1508,6 +1562,10 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
       : [];
 
     if (!rows.length) {
+      setCollapsedSections((prev) => ({
+        ...prev,
+        [indicacionesToggle?.id || "indicaciones_toggle"]: false,
+      }));
       setMsg("Debes agregar al menos una fila en la tabla de criterios a inspeccionar.");
       scrollToTopSafe();
       return false;
@@ -1530,7 +1588,11 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
         }
         
         if (isEmptyValue(value, col.type)) {
-          setMsg(`En la fila ${i + 1} falta responder: ${col.label}`);
+          setCollapsedSections((prev) => ({
+            ...prev,
+            [indicacionesToggle?.id || "indicaciones_toggle"]: false,
+          }));
+          setMsg(`En la fila ${i + 1} falta responder: ${getCleanFieldLabel(col)}`);
           scrollToTopSafe();
           return false;
         }
@@ -1538,7 +1600,11 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
         if (col.type === "select" || col.type === "radio") {
           const opts = Array.isArray(col.options) ? col.options : [];
           if (opts.length && !opts.includes(value)) {
-            setMsg(`En la fila ${i + 1} selecciona una opción válida para: ${col.label}`);
+            setCollapsedSections((prev) => ({
+              ...prev,
+              [indicacionesToggle?.id || "indicaciones_toggle"]: false,
+            }));
+            setMsg(`En la fila ${i + 1} selecciona una opción válida para: ${getCleanFieldLabel(col)}`);
             scrollToTopSafe();
             return false;
           }
@@ -1819,19 +1885,8 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
                   key={line.id}
                   style={{
                     width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
+                    fontWeight: 700,
+                    fontSize: isMobile ? 12 : 14,
                     color: "#111827",
                     textAlign: "left",
                     lineHeight: isMobile ? 1.45 : 1.35,
@@ -1842,7 +1897,11 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
               ))}
             </div>
 
+            {logo || headerLines.length ? renderDivider("header_divider") : null}
+
             {renderOuterRequiredField(taller)}
+
+            {renderDivider("taller_divider")}
 
             {indicacionesToggle ? (
               <div
@@ -1931,9 +1990,17 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
               </div>
             ) : null}
 
+            {renderDivider("responsable_divider")}
+
             {renderOuterRequiredField(nombreTrabajadorElaboraChecklist)}
+            {renderDivider("nombre_trabajador_divider")}
+
             {renderOuterRequiredField(firmaTrabajadorElaboraChecklist)}
+            {renderDivider("firma_trabajador_divider")}
+
             {renderOuterRequiredField(nombreSupervisorTrabajador)}
+            {renderDivider("nombre_supervisor_divider")}
+
             {renderOuterRequiredField(firmaSupervisorTrabajador)}
           </div>
 
@@ -2146,7 +2213,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
                           }}
                         >
                           {group.fields.map((col) => {
-                            const isRequiredVisual = !isObservationColumn(col);
+                            const isRequiredVisual = !isOptionalColumn(col);
                             const hasError = tableModalErrorFieldId === col.id;
 
                             return (
@@ -2172,7 +2239,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
                                     fontWeight: 700,
                                   }}
                                 >
-                                  {col.label}{" "}
+                                  {getCleanFieldLabel(col)}{" "}
                                   {isRequiredVisual ? (
                                     <span style={{ color: "crimson" }}>*</span>
                                   ) : null}
@@ -2225,7 +2292,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
 
                   const col = group.fields[0];
                   const hasError = tableModalErrorFieldId === col.id;
-                  const isRequiredVisual = !isObservationColumn(col);
+                  const isRequiredVisual = !isOptionalColumn(col);
 
                   return (
                     <div
@@ -2250,7 +2317,7 @@ export default function SST_POP_TA_01_FO_07_Checklist_de_Tecle({
                           fontWeight: 700,
                         }}
                       >
-                        {col.label}{" "}
+                        {getCleanFieldLabel(col)}{" "}
                         {isRequiredVisual ? (
                           <span style={{ color: "crimson" }}>*</span>
                         ) : null}

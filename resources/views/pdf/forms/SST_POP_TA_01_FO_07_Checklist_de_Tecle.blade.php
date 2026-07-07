@@ -25,27 +25,33 @@
             margin-left: 30px;
         }
 
+        .page-break {
+            page-break-before: always;
+        }
+
         .header-table {
-            width: 99.6%;
+            width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
@@ -53,14 +59,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -146,12 +148,35 @@
 
         $fechaInspeccion = optional($submission->created_at)->format('d/m/Y') ?: '';
         $tallerValor = data_get($answers, 'taller', '') ?: '';
+
+        $rows = data_get($answers, 'tabla_tecle', []);
+
+        $filasConDatos = collect($rows)->filter(function ($row) {
+            return !empty(array_filter(
+                $row,
+                fn($value) => $value !== null && $value !== ''
+            ));
+        })->values();
+
+        $filasPorPagina = 6;
+        $paginasTecle = $filasConDatos->count()
+            ? $filasConDatos
+                ->chunk($filasPorPagina)
+                ->map(fn($chunk) => $chunk->values())
+            : collect([collect([])]);
     @endphp
 
-    <div class="sheet">
+    @foreach($paginasTecle as $pageIndex => $filasPagina)
+    <div class="sheet {{ $pageIndex > 0 ? 'page-break' : '' }}">
 
         <!-- HEADER -->
         <table class="header-table">
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
                 <td rowspan="3" class="logo-cell">
                     @if($logoSrc)
@@ -159,31 +184,31 @@
                     @endif
                 </td>
 
-                <td colspan="2" class="center-cell row-1-center">
+                <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
                     CODIFICACIÓN: SST-POP-TA-01-FO-07
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
                     FECHA DE EMISIÓN: 27/03/2025
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     CHECKLIST DE TECLE
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
                     NÚMERO DE REVISIÓN: 02
                 </td>
             </tr>
@@ -213,8 +238,8 @@
         <!-- TEXTO -->
         <div style="
             text-align:center;
-            margin-top:12px;
-            font-size:10px;
+            margin-top:5px;
+            font-size:8px;
             font-weight:bold;
             line-height:1.4;
         ">
@@ -224,7 +249,7 @@
         <!-- TABLA ENCABEZADO DE CRITERIOS -->
         <table style="
             width: 85%;
-            margin: 12px 0 0 0;
+            margin: 5px 0 0 0;
             border-collapse: collapse;
             table-layout: fixed;
             font-size: 6px;
@@ -243,8 +268,8 @@
                     font-weight:bold;
                     text-align:center;
                     vertical-align:middle;
-                    line-height:1.15;
-                    padding:4px 3px;
+                    line-height:0.95;
+                    padding:1px 2px;
                 ">
                     No. de Serie/<br>Identificación
                 </td>
@@ -347,17 +372,6 @@
             </tr>
         </table>
 
-        @php
-            $rows = data_get($answers, 'tabla_tecle', []);
-        
-            $filasConDatos = collect($rows)->filter(function ($row) {
-                return !empty(array_filter(
-                    $row,
-                    fn($value) => $value !== null && $value !== ''
-                ));
-            })->values();
-        @endphp
-        
         <!-- TABLA DATOS -->
         <table style="
             width: 85%;
@@ -373,14 +387,13 @@
             </colgroup>
         
             @php
-                $minFilas = 6;
-                $totalFilas = max($minFilas, $filasConDatos->count());
+                $totalFilas = $filasPorPagina;
             @endphp
         
             @for ($i = 0; $i < $totalFilas; $i++)
         
                 @php
-                    $row = $filasConDatos[$i] ?? [];
+                    $row = $filasPagina[$i] ?? [];
                 @endphp
         
                 <tr>
@@ -662,5 +675,6 @@
         </table>
 
     </div>
+    @endforeach
 </body>
 </html>
