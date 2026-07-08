@@ -198,27 +198,57 @@ export default function SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles({
     }
   };
 
+  const getCollapsedSectionKeyForField = (fieldId) => {
+    if (!fieldId) return null;
+
+    if (["placas", "kilometraje"].includes(fieldId)) {
+      return "indicaciones_toggle";
+    }
+
+    const section = sectionGroups.find((group) => {
+      return group.fieldIds.some((id) => {
+        return id === fieldId || `${id}_observaciones` === fieldId;
+      });
+    });
+
+    return section ? `section_${section.title}` : null;
+  };
+
+  const openSectionForFieldError = (fieldId) => {
+    const sectionKey = getCollapsedSectionKeyForField(fieldId);
+
+    if (!sectionKey) return;
+
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [sectionKey]: false,
+    }));
+  };
+
   const showFormFieldError = (fieldId, message) => {
     setMsg("");
     setFormFieldError(message);
     setFormFieldErrorId(fieldId);
+    openSectionForFieldError(fieldId);
 
     if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
 
     requestAnimationFrame(() => {
-      const wrapEl = formFieldWrapRefs.current[fieldId];
-      const inputEl = formFieldRefs.current[fieldId];
-
-      if (wrapEl?.scrollIntoView) {
-        wrapEl.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      }
-
       setTimeout(() => {
-        if (inputEl?.focus) inputEl.focus();
-      }, 180);
+        const wrapEl = formFieldWrapRefs.current[fieldId];
+        const inputEl = formFieldRefs.current[fieldId];
+
+        if (wrapEl?.scrollIntoView) {
+          wrapEl.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+
+        setTimeout(() => {
+          if (inputEl?.focus) inputEl.focus();
+        }, 180);
+      }, 80);
     });
 
     formErrorTimerRef.current = setTimeout(() => {
@@ -655,7 +685,39 @@ export default function SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles({
 
     if (f.type === "file") {
       const current = answers[f.id];
-      const label = getFilesLabel(current);
+      const currentFiles = Array.isArray(current)
+        ? current
+        : current
+        ? [current]
+        : [];
+
+      const getFileName = (file) => {
+        if (!file) return "Archivo";
+        if (typeof file === "string") return file.split("/").pop() || file;
+        return file.name || file.path?.split("/").pop() || "Archivo";
+      };
+
+      const getFileSizeLabel = (file) => {
+        const size = Number(file?.size || 0);
+        if (!size) return "";
+        if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+        if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+        return `${size} B`;
+      };
+
+      const removeAttachedFile = (indexToRemove) => {
+        if (readOnly) return;
+
+        const nextFiles = currentFiles.filter((_, index) => index !== indexToRemove);
+
+        if (f.id === "evidencia_fotografica" || f.multiple) {
+          setVal(f.id, nextFiles);
+        } else {
+          setVal(f.id, nextFiles[0] || null);
+        }
+
+        if (formFieldErrorId === f.id) clearFormFieldError();
+      };
 
       return (
         <div style={{ display: "grid", gap: 10 }}>
@@ -665,13 +727,62 @@ export default function SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles({
                 formFieldRefs.current[f.id] = el;
               }}
               type="file"
-              multiple={!!f.multiple}
+              multiple={f.id === "evidencia_fotografica" ? true : !!f.multiple}
               accept={f.accept || ""}
-              onChange={(e) => {
+
+              onChange={async (e) => {
                 const files = Array.from(e.target.files || []);
-                setVal(f.id, f.multiple ? files : files[0] || null);
+              
+                const invalidFiles = files.filter(
+                  (file) => !file.type.startsWith("image/")
+                );
+              
+                if (invalidFiles.length > 0) {
+                  setMsg(
+                    "Solo se permiten imágenes en Evidencia Fotográfica. No se agregaron archivos no válidos."
+                  );
+              
+                  e.target.value = "";
+                  return;
+                }
+              
+                const toBase64 = (file) =>
+                  new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+              
+                    reader.onload = () => {
+                      resolve({
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        data: reader.result,
+                      });
+                    };
+              
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                  });
+              
+                const parsedFiles = await Promise.all(files.map(toBase64));
+              
+                const currentFiles = Array.isArray(answers[f.id])
+                  ? answers[f.id]
+                  : answers[f.id]
+                  ? [answers[f.id]]
+                  : [];
+              
+                const nextFiles =
+                  f.id === "evidencia_fotografica" || f.multiple
+                    ? [...currentFiles, ...parsedFiles]
+                    : parsedFiles[0] || null;
+              
+                setVal(f.id, nextFiles);
+              
+                e.target.value = "";
+              
                 if (formFieldErrorId === f.id) clearFormFieldError();
               }}
+
               disabled={readOnly}
               style={commonStyle}
             />
@@ -688,7 +799,97 @@ export default function SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles({
               lineHeight: 1.5,
             }}
           >
-            {label ? `Evidencia cargada: ${label}` : "Sin evidencia cargada."}
+            {currentFiles.length ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div
+                  style={{
+                    fontWeight: 800,
+                    color: "#0f172a",
+                    fontSize: 13,
+                  }}
+                >
+                  Archivos adjuntos
+                </div>
+
+                <div style={{ display: "grid", gap: 6 }}>
+                  {currentFiles.map((file, index) => {
+                    const fileName = getFileName(file);
+                    const fileSize = getFileSizeLabel(file);
+
+                    return (
+                      <div
+                        key={`${f.id}_attached_${index}_${fileName}`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          border: "1px solid #e5e7eb",
+                          background: "#fff",
+                          borderRadius: 10,
+                          padding: isMobile ? "9px 10px" : "8px 10px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            minWidth: 0,
+                            display: "grid",
+                            gap: 2,
+                            flex: 1,
+                          }}
+                        >
+                          <div
+                            title={fileName}
+                            style={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              color: "#0f172a",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {fileName}
+                          </div>
+
+                          {fileSize ? (
+                            <div
+                              style={{
+                                color: "#64748b",
+                                fontSize: 12,
+                              }}
+                            >
+                              {fileSize}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {!readOnly ? (
+                          <button
+                            type="button"
+                            onClick={() => removeAttachedFile(index)}
+                            style={{
+                              borderRadius: 9,
+                              border: "1px solid #fecaca",
+                              background: "#fef2f2",
+                              color: "#b91c1c",
+                              padding: isMobile ? "7px 10px" : "6px 10px",
+                              cursor: "pointer",
+                              fontWeight: 800,
+                              fontSize: 12,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Quitar
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              "Sin evidencia cargada."
+            )}
           </div>
         </div>
       );
@@ -741,6 +942,70 @@ export default function SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles({
       transition: "all 0.2s ease",
     };
   };
+
+  const renderDivider = (key = null) => (
+    <div key={key} style={{ borderBottom: "1px solid #d1d5db", margin: "4px 0 0 0" }} />
+  );
+
+  const nestedSectionStyle = {
+    border: "1px solid #dbe4ee",
+    borderRadius: 18,
+    background: "#f8fafc",
+    overflow: "hidden",
+    boxShadow: "0 6px 18px rgba(15,23,42,0.04)",
+  };
+
+  const nestedSectionHeaderStyle = {
+    padding: isMobile ? "13px 14px" : "15px 18px",
+    background: "#eef2f7",
+    borderBottom: "1px solid #dbe4ee",
+    fontWeight: 900,
+    color: "#0f172a",
+    fontSize: isMobile ? 15 : 16,
+    lineHeight: 1.35,
+    textTransform: "uppercase",
+    letterSpacing: 0.2,
+  };
+
+  const renderCollapsibleSection = (title, isOpen, setIsOpen, children) => (
+    <div style={nestedSectionStyle}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={{
+          ...nestedSectionHeaderStyle,
+          width: "100%",
+          border: "none",
+          borderBottom: isOpen ? "1px solid #dbe4ee" : "none",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          textAlign: "left",
+        }}
+      >
+        <span>{title}</span>
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 18,
+            lineHeight: 1,
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.2s ease",
+          }}
+        >
+          ▾
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div style={{ padding: isMobile ? 12 : 14, display: "grid", gap: isMobile ? 12 : 14 }}>
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
 
   const renderOuterField = (f, requiredVisual = true) => {
     if (!f) return null;
@@ -896,51 +1161,65 @@ export default function SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles({
   };
 
   const renderSection = (section) => {
+    const sectionKey = `section_${section.title}`;
+    const isOpen = !collapsedSections[sectionKey];
+
     return (
-      <div
-        key={section.title}
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 14,
-          overflow: "hidden",
-        }}
-      >
-        <div
+      <div key={section.title} style={nestedSectionStyle}>
+        <button
+          type="button"
+          onClick={() => toggleSection(sectionKey)}
           style={{
+            ...nestedSectionHeaderStyle,
             width: "100%",
-            padding: isMobile ? "14px 14px" : "14px 16px",
-            background: "#f8fafc",
-            borderBottom: "1px solid #e5e7eb",
+            border: "none",
+            borderBottom: isOpen ? "1px solid #dbe4ee" : "none",
+            cursor: "pointer",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
             textAlign: "left",
-            fontWeight: 800,
-            color: "#0f172a",
-            fontSize: isMobile ? 14 : 14,
           }}
         >
-          {section.title}
-        </div>
+          <span>{section.title}</span>
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: 18,
+              lineHeight: 1,
+              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s ease",
+            }}
+          >
+            ▾
+          </span>
+        </button>
 
-        <div
-          style={{
-            padding: isMobile ? 14 : 16,
-            display: "grid",
-            gap: isMobile ? 14 : 14,
-            background: "#fff",
-          }}
-        >
-          {section.title === "Documentación"
-            ? section.fieldIds.map((fieldId) => renderDocumentCard(fieldId))
-            : section.fieldIds.map((fieldId) => {
-                const field = getField(fieldId);
-                if (!field) return null;
+        {isOpen ? (
+          <div style={{ padding: isMobile ? 12 : 14, display: "grid", gap: isMobile ? 12 : 14 }}>
+            {section.title === "Documentación"
+              ? section.fieldIds.map((fieldId, index) => (
+                  <React.Fragment key={fieldId}>
+                    {renderDocumentCard(fieldId)}
+                    {index < section.fieldIds.length - 1 ? renderDivider(`${fieldId}_divider`) : null}
+                  </React.Fragment>
+                ))
+              : section.fieldIds.map((fieldId, index) => {
+                  const field = getField(fieldId);
+                  if (!field) return null;
 
-                if (field.type === "radio" || getField(`${fieldId}_observaciones`)) {
-                  return renderConditionCard(fieldId);
-                }
-
-                return renderOuterField(field, true);
-              })}
-        </div>
+                  return (
+                    <React.Fragment key={fieldId}>
+                      {field.type === "radio" || getField(`${fieldId}_observaciones`)
+                        ? renderConditionCard(fieldId)
+                        : renderOuterField(field, true)}
+                      {index < section.fieldIds.length - 1 ? renderDivider(`${fieldId}_divider`) : null}
+                    </React.Fragment>
+                  );
+                })}
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -1262,109 +1541,81 @@ export default function SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles({
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "grid",
-                gap: isMobile ? 10 : 6,
-                textAlign: "left",
-              }}
-            >
-              {headerLines.map((line) => (
-                <div
-                  key={line.id}
-                  style={{
-                    width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
-                    color: "#111827",
-                    textAlign: "left",
-                    lineHeight: isMobile ? 1.45 : 1.35,
-                  }}
-                >
-                  {line.text}
-                </div>
-              ))}
-            </div>
+            {headerLines.length ? (
+              <div style={{ display: "grid", gap: isMobile ? 10 : 6, textAlign: "left" }}>
+                {headerLines.map((line) => (
+                  <div
+                    key={line.id}
+                    style={{
+                      width: "100%",
+                      fontWeight: 700,
+                      fontSize: isMobile ? 12 : 14,
+                      color: "#111827",
+                      textAlign: "left",
+                      lineHeight: isMobile ? 1.45 : 1.35,
+                    }}
+                  >
+                    {line.text}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {(logo || headerLines.length) ? renderDivider("header_divider") : null}
 
             {renderOuterField(taller)}
+            {renderDivider("taller_divider")}
             {renderOuterField(nombreResponsable)}
+            {renderDivider("nombre_responsable_divider")}
             {renderOuterField(firmaResponsable)}
 
-            <div
-              style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: 14,
-                overflow: "hidden",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => toggleSection("indicaciones_toggle")}
-                style={{
-                  width: "100%",
-                  padding: isMobile ? "14px 14px" : "14px 16px",
-                  background: "#f8fafc",
-                  border: "none",
-                  borderBottom: isCollapsed ? "none" : "1px solid #e5e7eb",
-                  textAlign: "left",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  color: "#0f172a",
-                  fontSize: isMobile ? 14 : 14,
-                }}
-              >
-                <span>Indicaciones de Llenado</span>
-                <span>{isCollapsed ? "＋" : "－"}</span>
-              </button>
+            {renderCollapsibleSection(
+              "INDICACIONES DE LLENADO",
+              !isCollapsed,
+              () => toggleSection("indicaciones_toggle"),
+              <>
+                {criteriosTexto ? (
+                  <div
+                    style={{
+                      color: "#111827",
+                      fontSize: isMobile ? 14 : 14,
+                      lineHeight: 1.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {criteriosTexto.text || criteriosTexto.label}
+                  </div>
+                ) : null}
 
-              {!isCollapsed ? (
-                <div
-                  style={{
-                    padding: isMobile ? 14 : 16,
-                    display: "grid",
-                    gap: isMobile ? 14 : 14,
-                    background: "#fff",
-                  }}
-                >
-                  {criteriosTexto ? (
-                    <div
-                      style={{
-                        color: "#111827",
-                        fontSize: isMobile ? 14 : 14,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {criteriosTexto.text || criteriosTexto.label}
-                    </div>
-                  ) : null}
-
-                  {renderOuterField(placas)}
-                  {renderOuterField(kilometraje)}
-                </div>
-              ) : null}
-            </div>
+                {criteriosTexto ? renderDivider("criterios_unidades_divider") : null}
+                {renderOuterField(placas)}
+                {renderDivider("placas_divider")}
+                {renderOuterField(kilometraje)}
+              </>
+            )}
 
             {sectionGroups.map((section) => renderSection(section))}
 
-            {evidenciaFotografica ? renderOuterField(evidenciaFotografica, false) : null}
+            {evidenciaFotografica ? (
+              <>
+                {renderDivider("evidencia_divider")}
+                {renderOuterField(evidenciaFotografica, false)}
+              </>
+            ) : null}
 
-            {prohibidoConducir ? renderBasicInput(prohibidoConducir) : null}
+            {prohibidoConducir ? (
+              <>
+                {renderDivider("prohibido_divider")}
+                {renderBasicInput(prohibidoConducir)}
+              </>
+            ) : null}
 
-            {notas ? renderOuterField(notas, false) : null}
+            {notas ? (
+              <>
+                {renderDivider("notas_divider")}
+                {renderOuterField(notas, false)}
+              </>
+            ) : null}
           </div>
 
           {!readOnly ? (

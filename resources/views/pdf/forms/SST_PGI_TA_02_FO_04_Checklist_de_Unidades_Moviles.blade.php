@@ -27,6 +27,7 @@
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
@@ -52,14 +53,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 8px;
-        }
-
-        .row-1-center {
-            font-size: 10px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -77,7 +74,7 @@
             display: inline-block;
             width: 42%;
             vertical-align: middle;
-            font-size: 10px;
+            font-size: 8px;
             box-sizing: border-box;
         }
 
@@ -91,7 +88,7 @@
 
         .inspection-label {
             display: inline-block;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
             vertical-align: middle;
             margin-right: 8px;
@@ -111,7 +108,7 @@
             right: 0;
             bottom: 3px;
             text-align: center;
-            font-size: 10px;
+            font-size: 8px;
             white-space: nowrap;
             overflow: hidden;
         }
@@ -124,6 +121,60 @@
             border-bottom: 1px solid #000;
             height: 1px;
         }
+
+        .attachments-sheet {
+            width: 100%;
+            margin: 0;
+            page-break-before: always;
+        }
+
+        .attachments-title {
+            display:block;
+            width:99.7%;
+            margin:14px auto 0 auto;
+            border:1px solid #000;
+            background:#f3f4f6;
+            text-align:center;
+            font-weight:bold;
+            font-size:8px;
+            padding:6px 0;
+            box-sizing:border-box;
+        }
+
+        .attachments-table {
+            width: 100%;
+            margin-top: 10px;
+            border-collapse: separate;
+            border-spacing: 8px 8px;
+            table-layout: fixed;
+        }
+
+        .attachment-cell {
+            width: 50%;
+            height: 285px;
+            border: 1px solid #000;
+            padding: 6px;
+            text-align: center;
+            vertical-align: top;
+            box-sizing: border-box;
+        }
+
+        .attachment-name {
+            font-size: 7px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 6px;
+            line-height: 1.2;
+            height: 18px;
+            overflow: hidden;
+        }
+
+        .attachment-img {
+            max-width: 100%;
+            max-height: 245px;
+            object-fit: contain;
+        }
+
     </style>
 </head>
 
@@ -159,39 +210,51 @@
 
         <!-- HEADER -->
         <table class="header-table">
+            <tr style="height:0; line-height:0;">
+                <td style="width:25%; padding:0; border:none; height:0;"></td>
+                <td style="width:45%; padding:0; border:none; height:0;"></td>
+                <td style="width:30%; padding:0; border:none; height:0;"></td>
+            </tr>
+
             <tr>
-                <td rowspan="3" class="logo-cell">
+                <td rowspan="4" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}">
                     @endif
                 </td>
 
-                <td colspan="2" class="center-cell row-1-center">
+                <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
 
-                <td colspan="2" class="right-cell">
+                <td class="right-cell">
+                    PÁGINA: 01
+                </td>
+            </tr>
+
+            <tr>
+                <td rowspan="2" class="center-cell">
+                    SISTEMA DE GESTIÓN INTEGRAL
+                </td>
+
+                <td class="right-cell">
                     CODIFICACIÓN: SST-PGI-TA-02-FO-04
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
-                    SISTEMA DE GESTIÓN INTEGRAL
-                </td>
-
-                <td colspan="2" class="right-cell">
-                    FECHA DE EMISIÓN: 27/03/2025
+                <td class="right-cell">
+                    NÚMERO DE REVISIÓN: 06
                 </td>
             </tr>
 
             <tr>
-                <td colspan="2" class="center-cell">
+                <td class="center-cell">
                     CHECKLIST DE UNIDADES MÓVILES
                 </td>
 
-                <td colspan="2" class="right-cell">
-                    NÚMERO DE REVISIÓN: 06
+                <td class="right-cell">
+                    FECHA DE EMISIÓN: 27/03/2025
                 </td>
             </tr>
         </table>
@@ -243,7 +306,7 @@
                     width:25%;
                     text-align:center;
                     vertical-align:middle;
-                    font-size:10px;
+                    font-size:8px;
                 ">
                     <span class="inspection-label">
                         Placa:
@@ -264,7 +327,7 @@
                     width:30%;
                     text-align:center;
                     vertical-align:middle;
-                    font-size:10px;
+                    font-size:8px;
                 ">
                     <span class="inspection-label">
                         Kilometraje:
@@ -285,7 +348,7 @@
                     width:35%;
                     text-align:center;
                     vertical-align:middle;
-                    font-size:10px;
+                    font-size:8px;
                 ">
                     <span class="inspection-label">
                         Inspector:
@@ -414,7 +477,7 @@
                                 height:14px;
                                 text-align:center;
                                 vertical-align:middle;
-                                font-size:8px;
+                                font-size:7px;
                             ">
                                 {{ $row['value'] }}
                             </td>
@@ -446,7 +509,7 @@
                     width:100%;
                     border-collapse:collapse;
                     table-layout:fixed;
-                    font-size:8px;
+                    font-size:7px;
                 ">
             
                     <!-- FILA 1 -->
@@ -625,7 +688,7 @@
                                 height:14px;
                                 text-align:center;
                                 vertical-align:middle;
-                                font-size:8px;
+                                font-size:7px;
                             ">
                                 {{ $row['value'] }}
                             </td>
@@ -667,7 +730,7 @@
                     width:100%;
                     border-collapse:collapse;
                     table-layout:fixed;
-                    font-size:8px;
+                    font-size:7px;
                 ">
         
                     <!-- FILA 1 -->
@@ -839,7 +902,7 @@
                                 height:14px;
                                 text-align:center;
                                 vertical-align:middle;
-                                font-size:8px;
+                                font-size:7px;
                             ">
                                 {{ $row['value'] }}
                             </td>
@@ -943,7 +1006,7 @@
                     width:100%;
                     border-collapse:collapse;
                     table-layout:fixed;
-                    font-size:8px;
+                    font-size:7px;
                 ">
         
                     <!-- FILA 1 -->
@@ -1190,7 +1253,7 @@
                     width:100%;
                     border-collapse:collapse;
                     table-layout:fixed;
-                    font-size:8px;
+                    font-size:7px;
                 ">
             
                     <!-- FILA 1 -->
@@ -1307,7 +1370,7 @@
             margin-top:5px;
             border-collapse:collapse;
             table-layout:fixed;
-            font-size:8px;
+            font-size:7px;
         ">
             <tr>
                 <td style="
@@ -1329,7 +1392,7 @@
             margin-top:5px;
             border-collapse:collapse;
             table-layout:fixed;
-            font-size:8px;
+            font-size:7px;
         ">
             <tr>
         
@@ -1361,5 +1424,132 @@
         </table>
 
     </div> <!-- Principal -->
+
+    @php
+        $evidencias = data_get($answers, 'evidencia_fotografica', []);
+
+        if (!is_array($evidencias)) {
+            $evidencias = [];
+        }
+
+        $imagenesAdjuntas = [];
+
+        foreach ($evidencias as $evidencia) {
+            if (!is_array($evidencia)) {
+                continue;
+            }
+
+            $tipoEvidencia = $evidencia['type'] ?? '';
+
+            if (!is_string($tipoEvidencia) || !str_starts_with($tipoEvidencia, 'image/')) {
+                continue;
+            }
+
+            $rutaEvidencia = $evidencia['path'] ?? '';
+
+            if (!$rutaEvidencia) {
+                continue;
+            }
+
+            $rutaEvidencia = str_replace('/storage/', '', $rutaEvidencia);
+            $rutaEvidencia = ltrim($rutaEvidencia, '/');
+
+            $pathEvidencia = storage_path('app/public/' . $rutaEvidencia);
+
+            if (!file_exists($pathEvidencia)) {
+                continue;
+            }
+
+            $imagenesAdjuntas[] = [
+                'name' => $evidencia['name'] ?? 'Evidencia fotográfica',
+                'src' => 'data:' . $tipoEvidencia . ';base64,' . base64_encode(file_get_contents($pathEvidencia)),
+            ];
+        }
+    @endphp
+
+    @if(count($imagenesAdjuntas) > 0)
+        @php
+            $paginasEvidencias = array_chunk($imagenesAdjuntas, 4);
+        @endphp
+
+        @foreach($paginasEvidencias as $paginaIndex => $imagenesPagina)
+            <div class="attachments-sheet">
+
+                <!-- HEADER ADJUNTOS -->
+                <table class="header-table">
+                    <tr style="height:0; line-height:0;">
+                        <td style="width:25%; padding:0; border:none; height:0;"></td>
+                        <td style="width:45%; padding:0; border:none; height:0;"></td>
+                        <td style="width:30%; padding:0; border:none; height:0;"></td>
+                    </tr>
+
+                    <tr>
+                        <td rowspan="4" class="logo-cell">
+                            @if($logoSrc)
+                                <img src="{{ $logoSrc }}">
+                            @endif
+                        </td>
+
+                        <td class="center-cell">
+                            VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
+                        </td>
+
+                        <td class="right-cell">
+                            PÁGINA: {{ str_pad(2 + $paginaIndex, 2, '0', STR_PAD_LEFT) }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td rowspan="2" class="center-cell">
+                            SISTEMA DE GESTIÓN INTEGRAL
+                        </td>
+
+                        <td class="right-cell">
+                            CODIFICACIÓN: SST-PGI-TA-02-FO-04
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="right-cell">
+                            NÚMERO DE REVISIÓN: 06
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="center-cell">
+                            CHECKLIST DE UNIDADES MÓVILES
+                        </td>
+
+                        <td class="right-cell">
+                            FECHA DE EMISIÓN: 27/03/2025
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="attachments-title">
+                    EVIDENCIA FOTOGRÁFICA
+                </div>
+
+                <table class="attachments-table">
+                    @foreach(array_chunk($imagenesPagina, 2) as $filaImagenes)
+                        <tr>
+                            @foreach($filaImagenes as $imagenAdjunta)
+                                <td class="attachment-cell">
+                                    <div class="attachment-name">
+                                        {{ $imagenAdjunta['name'] }}
+                                    </div>
+                
+                                    <img
+                                        src="{{ $imagenAdjunta['src'] }}"
+                                        class="attachment-img"
+                                    >
+                                </td>
+                            @endforeach
+                        </tr>
+                    @endforeach
+                </table>
+            </div>
+        @endforeach
+    @endif
 </body>
 </html>

@@ -57,17 +57,17 @@ class SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles implements FormDefinitio
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales S.A. de C.V.',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'CHECKLIST DE UNIDADES MÓVILES',
+                    'text' => 'Checklist de Unidades Móviles',
                 ],
                 [
                     'id' => 'header_line_4',
@@ -280,7 +280,7 @@ class SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles implements FormDefinitio
                     'type' => 'file',
                     'required' => false,
                     'multiple' => true,
-                    'accept' => 'image/*,.pdf,.doc,.docx',
+                    'accept' => 'image/*',
                 ],
                 [
                     'id' => 'prohibido_conducir',

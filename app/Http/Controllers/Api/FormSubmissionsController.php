@@ -510,6 +510,60 @@ class FormSubmissionsController extends Controller
 
             // photo / file / signature
             if (in_array($type, ['photo', 'file', 'signature'], true)) {
+
+                if ($type === 'file' || $type === 'photo') {
+                    if (
+                        $formCodeKey === 'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles'
+                        && $id === 'evidencia_fotografica'
+                    ) {
+                        $files = is_array($val) && isset($val[0]) ? $val : [$val];
+                
+                        $storedFiles = [];
+                
+                        foreach ($files as $file) {
+                
+                            // ✅ conservar archivos ya guardados
+                            if (
+                                is_array($file) &&
+                                !empty($file['path']) &&
+                                empty($file['data'])
+                            ) {
+                                $storedFiles[] = $file;
+                                continue;
+                            }
+                
+                            // ✅ guardar archivos nuevos
+                            if (
+                                is_array($file) &&
+                                !empty($file['data']) &&
+                                str_starts_with($file['data'], 'data:')
+                            ) {
+                                $storedFile = $this->storeEvidenceForUnidadesMoviles(
+                                    $file,
+                                    $userId,
+                                    $id
+                                );
+                                
+                                if (!$storedFile) {
+                                    return response()->json([
+                                        'message' => 'Solo se permiten imágenes en Evidencia Fotográfica.'
+                                    ], 422);
+                                }
+                                
+                                $storedFiles[] = $storedFile;
+                                
+                                continue;
+                            }
+                        }
+                
+                        $cleanAnswers[$id] = array_values($storedFiles);
+                        continue;
+                    }
+                
+                    $cleanAnswers[$id] = $val;
+                    continue;
+                }
+
                 if ($type === 'signature') {
                     if (is_array($val)) {
                         $cleanAnswers[$id] = $val;
@@ -1404,6 +1458,69 @@ class FormSubmissionsController extends Controller
         \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
     
         return $relativePath;
+    }
+
+    private function storeEvidenceForUnidadesMoviles(array $file, ?int $userId, string $fieldId): ?array
+    {
+        $dataUrl = $file['data'] ?? '';
+    
+        if (!preg_match('/^data:(.*?);base64,/', $dataUrl, $matches)) {
+            return null;
+        }
+    
+        $mime = $matches[1] ?? 'application/octet-stream';
+    
+        $allowedMimes = [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'image/gif',
+            'image/bmp',
+            'image/heic',
+            'image/heif',
+        ];
+    
+        if (!in_array($mime, $allowedMimes, true)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:.*?;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $extensionMap = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+            'image/gif'  => 'gif',
+            'image/bmp'  => 'bmp',
+            'image/heic' => 'heic',
+            'image/heif' => 'heif',
+        ];
+    
+        $extension = $extensionMap[$mime] ?? 'jpg';
+    
+        $originalName = $file['name'] ?? 'evidencia';
+    
+        $directory = 'forms/files/SSTPGITA02FO04_ChecklistUnidadesMoviles/EvidenciaFotografica';
+    
+        $fileName = 'evidencia_' . $fieldId . '_u' . ($userId ?: 'guest') . '_' . now()->format('Ymd_His') . '_' . \Illuminate\Support\Str::random(8) . '.' . $extension;
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put($relativePath, $binary);
+    
+        return [
+            'name' => $originalName,
+            'type' => $mime,
+            'size' => $file['size'] ?? null,
+            'path' => $relativePath,
+        ];
     }
 
     private function storeSignatureForChecklistBotiquines(string $dataUrl, ?int $userId, string $fieldId): ?string
