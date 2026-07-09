@@ -204,6 +204,20 @@
         $kilometrajeValor = data_get($answers, 'kilometraje', '') ?: '';
     
         $inspectorValor = data_get($answers, 'nombre_responsable_inspeccion', '') ?: '';
+
+        $firmaInspector = data_get($answers, 'firma_responsable_inspeccion');
+
+        $firmaInspectorSrc = null;
+        
+        if ($firmaInspector) {
+            $pathFirma = storage_path('app/public/' . $firmaInspector);
+        
+            if (file_exists($pathFirma)) {
+                $firmaInspectorSrc =
+                    'data:image/png;base64,' .
+                    base64_encode(file_get_contents($pathFirma));
+            }
+        }
     @endphp
 
     <div class="sheet">
@@ -362,13 +376,36 @@
                         <span class="inspection-underline"></span>
                     </span>
                 </div>
+
+                <!-- FIRMA INSPECTOR -->
+                <div style="
+                    display:inline-block;
+                    width:5%;
+                    text-align:center;
+                    vertical-align:middle;
+                    font-size:8px;
+                ">
+                    @if($firmaInspectorSrc)
+                        <img
+                            src="{{ $firmaInspectorSrc }}"
+                            style="
+                                max-width:90px;
+                                max-height:38px;
+                                object-fit:contain;
+                                position:relative;
+                                top:-10px;
+                                left:20px;
+                            "
+                        >
+                    @endif
+                </div>
             </div>
         </div>
 
         <!-- TABLA -->
         <table style="
             width:100%;
-            margin-top:5px;
+            margin-top:2px;
             border-collapse:collapse;
             table-layout:fixed;
             font-size:8px;
