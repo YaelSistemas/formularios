@@ -19,6 +19,8 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
     indicaciones_toggle: false,
   });
 
+  const [modalCollapsedSections, setModalCollapsedSections] = useState({});
+
   const [tableModal, setTableModal] = useState({
     open: false,
     field: null,
@@ -68,6 +70,17 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
       if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableModal.open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [tableModal.open]);
 
   const normalizeAssetUrl = (url) => {
     if (!url) return "";
@@ -127,6 +140,21 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
   const showTableModalFieldError = (fieldId, message) => {
     setTableModalError(message);
     setTableModalErrorFieldId(fieldId);
+
+    const rowSchema = Array.isArray(tableModal.field?.row_schema)
+      ? tableModal.field.row_schema
+      : [];
+    const groups = buildModalGroups(rowSchema);
+    const targetGroup = groups.find((group) =>
+      Array.isArray(group.fields) && group.fields.some((col) => col.id === fieldId)
+    );
+
+    if (targetGroup?.id) {
+      setModalCollapsedSections((prev) => ({
+        ...prev,
+        [targetGroup.id]: false,
+      }));
+    }
 
     if (tableErrorTimerRef.current) clearTimeout(tableErrorTimerRef.current);
 
@@ -197,6 +225,13 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
     if (readOnly) return;
 
     clearTableModalError();
+    const groups = buildModalGroups(Array.isArray(field?.row_schema) ? field.row_schema : []);
+    setModalCollapsedSections(
+      groups.reduce((acc, group) => {
+        if (group.kind === "collapsible_section") acc[group.id] = false;
+        return acc;
+      }, {})
+    );
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -212,6 +247,13 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
     const currentRow = rows[rowIndex] || {};
 
     clearTableModalError();
+    const groups = buildModalGroups(Array.isArray(field?.row_schema) ? field.row_schema : []);
+    setModalCollapsedSections(
+      groups.reduce((acc, group) => {
+        if (group.kind === "collapsible_section") acc[group.id] = false;
+        return acc;
+      }, {})
+    );
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -229,6 +271,7 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
       field: null,
       editIndex: null,
     });
+    setModalCollapsedSections({});
     setTableRowDraft({});
   };
 
@@ -244,6 +287,19 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
     const label = String(col?.label || "").toLowerCase();
   
     return id.includes("observaciones") || label.includes("observaciones");
+  };
+
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+    return isObservationColumn(col) || isNotesColumn(col);
   };
 
   const isEmptyValue = (value, type) => {
@@ -275,7 +331,7 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
       if (col.type === "static_text" || col.type === "fixed_image") continue;
       const v = tableRowDraft[col.id];
 
-      if (isObservationColumn(col)) {
+      if (isOptionalColumn(col)) {
         continue;
       }
       
@@ -588,9 +644,10 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
 
       if (col.type === "static_text") {
         currentGroup = {
-          kind: "section",
+          kind: "collapsible_section",
           id: col.id,
           titleField: col,
+          title: getSectionTitle(col),
           fields: [],
         };
         groups.push(currentGroup);
@@ -1265,7 +1322,7 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
                   </th>
                 
                   {rowSchema
-                    .filter((col) => col.type !== "fixed_image")
+                    .filter((col) => col.type !== "fixed_image" && col.type !== "static_text")
                     .map((col) => (
                     <th
                       key={`${f.id}_col_${col.id}`}
@@ -1318,7 +1375,7 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
                       </td>
                     
                       {rowSchema
-                        .filter((col) => col.type !== "fixed_image")
+                        .filter((col) => col.type !== "fixed_image" && col.type !== "static_text")
                         .map((col) => (
                         <td
                           key={`${f.id}_${rowIndex}_${col.id}`}
@@ -1392,7 +1449,7 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
                   <tr>
                     <td
                       colSpan={
-                        rowSchema.filter((col) => col.type !== "fixed_image").length +
+                        rowSchema.filter((col) => col.type !== "fixed_image" && col.type !== "static_text").length +
                         (readOnly ? 0 : 1) +
                         1
                       }
@@ -1911,46 +1968,69 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "grid",
-                gap: isMobile ? 10 : 6,
-                textAlign: "left",
-              }}
-            >
-              {headerLines.map((line) => (
-                <div
-                  key={line.id}
-                  style={{
-                    width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
-                    color: "#111827",
-                    textAlign: "left",
-                    lineHeight: isMobile ? 1.45 : 1.35,
-                  }}
-                >
-                  {line.text}
-                </div>
-              ))}
-            </div>
+            {headerLines.length ? (
+              <div
+                style={{
+                  display: "grid",
+                  gap: isMobile ? 10 : 6,
+                  textAlign: "left",
+                }}
+              >
+                {headerLines.map((line) => (
+                  <div
+                    key={line.id}
+                    style={{
+                      width: "100%",
+                      fontWeight: 700,
+                      fontSize: isMobile ? 12 : 14,
+                      color: "#111827",
+                      textAlign: "left",
+                      lineHeight: isMobile ? 1.45 : 1.35,
+                    }}
+                  >
+                    {line.text}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {logo || headerLines.length ? (
+              <div
+                style={{
+                  borderBottom: "1px solid #d1d5db",
+                  margin: "4px 0 0 0",
+                }}
+              />
+            ) : null}
 
             {renderOuterRequiredField(taller)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(nombreInspector)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
             {renderOuterRequiredField(firmaInspector)}
 
-            {(indicacionCriterios || criteriosTitulo || tablaExtintor) ? (
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
+            {(indicacionesToggle || indicacionCriterios || criteriosTitulo || tablaExtintor) ? (
               <div
                 style={{
                   border: "1px solid #e5e7eb",
@@ -1958,60 +2038,73 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
                   overflow: "hidden",
                 }}
               >
-                <div
+                <button
+                  type="button"
+                  onClick={() => indicacionesToggle ? toggleSection(indicacionesToggle.id) : null}
                   style={{
                     width: "100%",
                     padding: isMobile ? "14px 14px" : "14px 16px",
                     background: "#f8fafc",
-                    borderBottom: "1px solid #e5e7eb",
+                    border: "none",
+                    borderBottom: isCollapsed ? "none" : "1px solid #e5e7eb",
                     textAlign: "left",
                     fontWeight: 800,
+                    cursor: indicacionesToggle ? "pointer" : "default",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                     color: "#0f172a",
                     fontSize: isMobile ? 14 : 14,
                   }}
                 >
-                  Checklist de Extintor
-                </div>
+                  <span>{indicacionesToggle?.text || indicacionesToggle?.label || "Checklist de Extintor"}</span>
+                  {indicacionesToggle ? <span>{isCollapsed ? "＋" : "－"}</span> : null}
+                </button>
 
-                <div
-                  style={{
-                    padding: isMobile ? 14 : 16,
-                    display: "grid",
-                    gap: isMobile ? 14 : 14,
-                    background: "#fff",
-                  }}
-                >
-                  {indicacionCriterios ? (
-                    <div
-                      style={{
-                        color: "#111827",
-                        fontSize: isMobile ? 14 : 14,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {indicacionCriterios.text}
-                    </div>
-                  ) : null}
+                {!isCollapsed ? (
+                  <div
+                    style={{
+                      padding: isMobile ? 14 : 16,
+                      display: "grid",
+                      gap: isMobile ? 14 : 14,
+                      background: "#fff",
+                    }}
+                  >
+                    {indicacionCriterios ? (
+                      <div
+                        style={{
+                          fontSize: isMobile ? 12 : 12,
+                          color: "#111827",
+                          lineHeight: 1.5,
+                          fontWeight: 600,
+                          whiteSpace: "pre-line",
+                        }}
+                      >
+                        {indicacionCriterios.text}
+                      </div>
+                    ) : null}
 
-                  {criteriosTitulo ? (
-                    <div
-                      style={{
-                        fontWeight: 800,
-                        color: "#0f172a",
-                        fontSize: isMobile ? 14 : 15,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {criteriosTitulo.text}
-                    </div>
-                  ) : null}
+                    {criteriosTitulo ? (
+                      <div
+                        style={{
+                          fontSize: isMobile ? 12 : 12,
+                          color: "#111827",
+                          lineHeight: 1.5,
+                          fontWeight: 600,
+                          whiteSpace: "pre-line",
+                        }}
+                      >
+                        {criteriosTitulo.text}
+                      </div>
+                    ) : null}
 
-                  {tablaExtintor ? (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {renderField(tablaExtintor)}
-                    </div>
-                  ) : null}
-                </div>
+                    {tablaExtintor ? (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {renderField(tablaExtintor)}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -2155,192 +2248,229 @@ export default function SST_PGI_TA_02_FO_02_Checklist_de_Extintor({
             <div style={{ padding: 16, display: "grid", gap: 14 }}>
               {modalGroups
                 .filter((group) => group.kind !== "image")
-                .map((group) => {
-                  if (group.kind === "section") {
+                .map((group, index, filteredGroups) => {
+                  if (group.kind === "collapsible_section") {
                     const theme = getSectionTheme(group.titleField?.id);
+                    const isModalSectionCollapsed = !!modalCollapsedSections[group.id];
+
                     return (
-                      <div
-                        key={group.id}
-                        style={{
-                          borderRadius: 16,
-                          overflow: "hidden",
-                          border: theme.border,
-                          background: theme.background,
-                        }}
-                      >
+                      <React.Fragment key={group.id}>
                         <div
                           style={{
-                            padding: "12px 14px",
-                            fontWeight: 800,
-                            color: "#0f172a",
-                            background: theme.titleBg,
-                            borderBottom: "1px solid rgba(15,23,42,0.08)",
-                            fontSize: isMobile ? 14 : 15,
-                            lineHeight: 1.4,
+                            borderRadius: 16,
+                            overflow: "hidden",
+                            border: theme.border,
+                            background: theme.background,
                           }}
                         >
-                          {getSectionTitle(group.titleField)}
-                        </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setModalCollapsedSections((prev) => ({
+                                ...prev,
+                                [group.id]: !prev[group.id],
+                              }))
+                            }
+                            style={{
+                              width: "100%",
+                              border: "none",
+                              background: theme.titleBg,
+                              padding: "12px 14px",
+                              cursor: "pointer",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              fontWeight: 900,
+                              color: "#0f172a",
+                              fontSize: isMobile ? 14 : 15,
+                              textAlign: "left",
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            <span>{getSectionTitle(group.titleField)}</span>
+                            <span>{isModalSectionCollapsed ? "＋" : "－"}</span>
+                          </button>
 
-                        <div
-                          style={{
-                            padding: 14,
-                            display: "grid",
-                            gap: 14,
-                          }}
-                        >
-                          {group.fields.map((col) => {
-                            const isRequiredVisual = !isObservationColumn(col);
-                            const hasError = tableModalErrorFieldId === col.id;
+                          {!isModalSectionCollapsed ? (
+                            <div
+                              style={{
+                                padding: 14,
+                                display: "grid",
+                                gap: 14,
+                              }}
+                            >
+                              {group.fields.map((col) => {
+                                const isRequiredVisual = !isOptionalColumn(col);
+                                const hasError = tableModalErrorFieldId === col.id;
 
-                            return (
-                              <div
-                                key={col.id}
-                                ref={(el) => {
-                                  tableFieldWrapRefs.current[col.id] = el;
-                                }}
-                                style={{
-                                  borderRadius: 14,
-                                  border: hasError
-                                    ? "1px solid #fdba74"
-                                    : "1px solid rgba(15,23,42,0.08)",
-                                  background: "#fff",
-                                  padding: 12,
-                                }}
-                              >
-                                <label
-                                  style={{
-                                    fontSize: isMobile ? 14 : 14,
-                                    lineHeight: 1.4,
-                                    color: "#0f172a",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  {col.label}{" "}
-                                  {isRequiredVisual ? (
-                                    <span style={{ color: "crimson" }}>*</span>
-                                  ) : null}
-                                </label>
-
-                                {(col.description || getExtintorDescription(col.id)) ? (
+                                return (
                                   <div
+                                    key={col.id}
+                                    ref={(el) => {
+                                      tableFieldWrapRefs.current[col.id] = el;
+                                    }}
                                     style={{
-                                      marginTop: 8,
-                                      marginBottom: 10,
-                                      color: "#111827",
-                                      fontSize: isMobile ? 13 : 14,
-                                      lineHeight: 1.6,
-                                      fontWeight: 500,
-                                      whiteSpace: "pre-line",
+                                      borderRadius: 14,
+                                      border: hasError
+                                        ? "1px solid #fdba74"
+                                        : "1px solid rgba(15,23,42,0.08)",
+                                      background: "#fff",
+                                      padding: 12,
                                     }}
                                   >
-                                    {col.description || getExtintorDescription(col.id)}
-                                  </div>
-                                ) : null}
+                                    <label
+                                      style={{
+                                        fontSize: isMobile ? 14 : 14,
+                                        lineHeight: 1.4,
+                                        color: "#0f172a",
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {col.label || col.text}{" "}
+                                      {isRequiredVisual ? (
+                                        <span style={{ color: "crimson" }}>*</span>
+                                      ) : null}
+                                    </label>
 
-                                {hasError && tableModalError ? (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      borderRadius: 10,
-                                      border: "1px solid #fdba74",
-                                      background: "#fff7ed",
-                                      color: "#9a3412",
-                                      padding: "8px 10px",
-                                      fontSize: 13,
-                                      lineHeight: 1.4,
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    {tableModalError}
-                                  </div>
-                                ) : null}
+                                    {(col.description || getExtintorDescription(col.id)) ? (
+                                      <div
+                                        style={{
+                                          marginTop: 8,
+                                          marginBottom: 10,
+                                          color: "#111827",
+                                          fontSize: isMobile ? 13 : 14,
+                                          lineHeight: 1.6,
+                                          fontWeight: 500,
+                                          whiteSpace: "pre-line",
+                                        }}
+                                      >
+                                        {col.description || getExtintorDescription(col.id)}
+                                      </div>
+                                    ) : null}
 
-                                <div style={{ marginTop: 10 }}>
-                                  {renderTableModalField(col)}
-                                </div>
-                              </div>
-                            );
-                          })}
+                                    {hasError && tableModalError ? (
+                                      <div
+                                        style={{
+                                          marginTop: 8,
+                                          borderRadius: 10,
+                                          border: "1px solid #fdba74",
+                                          background: "#fff7ed",
+                                          color: "#9a3412",
+                                          padding: "8px 10px",
+                                          fontSize: 13,
+                                          lineHeight: 1.4,
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {tableModalError}
+                                      </div>
+                                    ) : null}
+
+                                    <div style={{ marginTop: 10 }}>
+                                      {renderTableModalField(col)}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
                         </div>
-                      </div>
+
+                        {index < filteredGroups.length - 1 ? (
+                          <div
+                            style={{
+                              borderBottom: "1px solid #cbd5e1",
+                              margin: "4px 0 2px 0",
+                            }}
+                          ></div>
+                        ) : null}
+                      </React.Fragment>
                     );
                   }
 
                   const col = group.fields[0];
                   const hasError = tableModalErrorFieldId === col.id;
-                  const isRequiredVisual = !isObservationColumn(col);
+                  const isRequiredVisual = !isOptionalColumn(col);
 
                   return (
-                    <div
-                      key={group.id}
-                      ref={(el) => {
-                        tableFieldWrapRefs.current[col.id] = el;
-                      }}
-                      style={{
-                        borderRadius: 14,
-                        border: hasError
-                          ? "1px solid #fdba74"
-                          : "1px solid rgba(15,23,42,0.08)",
-                        background: "#fff",
-                        padding: 12,
-                      }}
-                    >
-                      <label
+                    <React.Fragment key={group.id}>
+                      <div
+                        ref={(el) => {
+                          tableFieldWrapRefs.current[col.id] = el;
+                        }}
                         style={{
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.4,
-                          color: "#0f172a",
-                          fontWeight: 700,
+                          borderRadius: 14,
+                          border: hasError
+                            ? "1px solid #fdba74"
+                            : "1px solid rgba(15,23,42,0.08)",
+                          background: "#fff",
+                          padding: 12,
                         }}
                       >
-                        {col.label}{" "}
-                        {isRequiredVisual ? (
-                          <span style={{ color: "crimson" }}>*</span>
-                        ) : null}
-                      </label>
-
-                      {(col.description || getExtintorDescription(col.id)) ? (
-                        <div
+                        <label
                           style={{
-                            marginTop: 8,
-                            marginBottom: 10,
-                            color: "#111827",
-                            fontSize: isMobile ? 13 : 14,
-                            lineHeight: 1.6,
-                            fontWeight: 500,
-                            whiteSpace: "pre-line",
-                          }}
-                        >
-                          {col.description || getExtintorDescription(col.id)}
-                        </div>
-                      ) : null}
-
-                      {hasError && tableModalError ? (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            borderRadius: 10,
-                            border: "1px solid #fdba74",
-                            background: "#fff7ed",
-                            color: "#9a3412",
-                            padding: "8px 10px",
-                            fontSize: 13,
+                            fontSize: isMobile ? 14 : 14,
                             lineHeight: 1.4,
+                            color: "#0f172a",
                             fontWeight: 700,
                           }}
                         >
-                          {tableModalError}
-                        </div>
-                      ) : null}
+                          {col.label || col.text}{" "}
+                          {isRequiredVisual ? (
+                            <span style={{ color: "crimson" }}>*</span>
+                          ) : null}
+                        </label>
 
-                      <div style={{ marginTop: 10 }}>
-                        {renderTableModalField(col)}
+                        {(col.description || getExtintorDescription(col.id)) ? (
+                          <div
+                            style={{
+                              marginTop: 8,
+                              marginBottom: 10,
+                              color: "#111827",
+                              fontSize: isMobile ? 13 : 14,
+                              lineHeight: 1.6,
+                              fontWeight: 500,
+                              whiteSpace: "pre-line",
+                            }}
+                          >
+                            {col.description || getExtintorDescription(col.id)}
+                          </div>
+                        ) : null}
+
+                        {hasError && tableModalError ? (
+                          <div
+                            style={{
+                              marginTop: 8,
+                              borderRadius: 10,
+                              border: "1px solid #fdba74",
+                              background: "#fff7ed",
+                              color: "#9a3412",
+                              padding: "8px 10px",
+                              fontSize: 13,
+                              lineHeight: 1.4,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {tableModalError}
+                          </div>
+                        ) : null}
+
+                        <div style={{ marginTop: 10 }}>
+                          {renderTableModalField(col)}
+                        </div>
                       </div>
-                    </div>
+
+                      {index < filteredGroups.length - 1 ? (
+                        <div
+                          style={{
+                            borderBottom: "1px solid #cbd5e1",
+                            margin: "4px 0 2px 0",
+                          }}
+                        ></div>
+                      ) : null}
+                    </React.Fragment>
                   );
-                })}
-            </div>
+                })}            </div>
 
             <div
               style={{

@@ -19,33 +19,33 @@
         }
 
         .sheet {
-            width: 108%;
-            transform: scale(0.92);
-            transform-origin: top left;
-            margin-left: 5px;
+            width: 100%;
+            margin: 0;
         }
 
         .header-table {
-            width: 99.6%;
+            width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
@@ -53,14 +53,10 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
+            text-align: left !important;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -79,17 +75,19 @@
             display: inline-block;
             width: 31%;
             vertical-align: middle;
-            font-size: 10px;
+            font-size: 8px;
             box-sizing: border-box;
             text-align: center;
         }
 
         .inspection-label {
             display: inline-block;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
             vertical-align: middle;
             margin-right: 6px;
+            position: relative;
+            top: 4px;
         }
 
         .inspection-line-wrap {
@@ -106,7 +104,7 @@
             right: 0;
             bottom: 3px;
             text-align: center;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: normal;
             white-space: nowrap;
             overflow: hidden;
@@ -166,45 +164,71 @@
                 base64_encode(file_get_contents($pathFirma));
         }
     }
+
+    $registrosPorPaginaExtintor = 15;
+    $registrosExtintor = collect(data_get($answers, 'tabla_checklist_extintor', []))->values();
+
+    $paginasExtintor = $registrosExtintor
+        ->chunk($registrosPorPaginaExtintor)
+        ->map(fn($pagina) => $pagina->values());
+
+    if ($paginasExtintor->isEmpty()) {
+        $paginasExtintor = collect([collect()]);
+    }
+
+    $totalPaginasExtintor = $paginasExtintor->count();
 @endphp
 
+@foreach($paginasExtintor as $paginaExtintorIndex => $registrosPaginaExtintor)
 <div class="sheet">
 
     <!-- HEADER -->
     <table class="header-table">
+        <tr style="height:0; line-height:0;">
+            <td style="width:25%; padding:0; border:none; height:0;"></td>
+            <td style="width:45%; padding:0; border:none; height:0;"></td>
+            <td style="width:30%; padding:0; border:none; height:0;"></td>
+        </tr>
+    
         <tr>
-            <td rowspan="3" class="logo-cell">
+            <td rowspan="4" class="logo-cell">
                 @if($logoSrc)
                     <img src="{{ $logoSrc }}">
                 @endif
             </td>
-
-            <td colspan="2" class="center-cell row-1-center">
+    
+            <td class="center-cell">
                 VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
             </td>
-
-            <td colspan="2" class="right-cell">
+    
+            <td class="right-cell">
                 CODIFICACIÓN: SST-PGI-TA-02-FO-02
             </td>
         </tr>
-
+    
         <tr>
-            <td colspan="2" class="center-cell">
+            <td rowspan="2" class="center-cell">
                 SISTEMA DE GESTIÓN INTEGRAL
             </td>
-
-            <td colspan="2" class="right-cell">
+    
+            <td class="right-cell">
                 FECHA DE EMISIÓN: 27/03/2025
             </td>
         </tr>
-
+    
         <tr>
-            <td colspan="2" class="center-cell">
+            <td class="right-cell">
+                REVISIÓN: 06
+            </td>
+        </tr>
+    
+        <tr>
+            <td class="center-cell">
                 CHECKLIST DE EXTINTOR
             </td>
-
-            <td colspan="2" class="right-cell">
-                NÚMERO DE REVISIÓN: 06
+    
+            <td class="right-cell">
+                PÁGINA: {{ $paginaExtintorIndex + 1 }} DE {{ $totalPaginasExtintor }}
             </td>
         </tr>
     </table>
@@ -227,7 +251,7 @@
             </div>
 
             <!-- TALLER -->
-            <div class="inspection-item" style="width:27%;">
+            <div class="inspection-item" style="width:20%; margin-left:15px;">
                 <span class="inspection-label">Taller:</span>
 
                 <span class="inspection-line-wrap">
@@ -240,7 +264,7 @@
             </div>
 
             <!-- NOMBRE -->
-            <div class="inspection-item" style="width:40%;">
+            <div class="inspection-item" style="width:45%;">
                 <span class="inspection-label" style="
                     line-height:1.1;
                     text-align:right;
@@ -289,8 +313,8 @@
     <div style="
         width:100%;
         text-align:center;
-        margin-top:8px;
-        font-size:9px;
+        margin-top:5px;
+        font-size:8px;
         font-weight:bold;
         line-height:1.5;
     ">
@@ -300,81 +324,135 @@
     
         <div style="margin-top:4px;">
             Tipo de Extintor,
-            ( ✓ ) Se Encuentra en Buenas Condiciones,
+            ( ✔︎ ) Se Encuentra en Buenas Condiciones,
             ( X ) No Esta En Condiciones,
             ( NA ) No Aplica
         </div>
     </div> <!-- INDICACIONES -->
 
-    <!-- TABLA EXTINTOR -->
+    @php
+        $extintorColWidths = [
+            '8%', // 1  No. de Extintor
+            '4%', // 2  No. Kilos
+    
+            '3%', // 3  PQS
+            '3%', // 4  CO2
+            '3%', // 5  Espuma Afff
+            '3%', // 6  Agente Limpio
+            '3%', // 7  Agua H2O
+    
+            '5%', // 8  Anillo de Verificación
+            '5%', // 9  Etiqueta de Inspección
+            '5%', // 10 Caducidad
+            '5%', // 11 Pasador de Seguridad
+            '5%', // 12 Cincho de Seguridad
+            '5%', // 13 Manómetro
+            '5%', // 14 Presión
+            '5%', // 15 Lleno
+            '5%', // 16 Manguera y Boquilla
+            '5%', // 17 Señalética
+            '5%', // 18 Soportes y Funda
+            '5%', // 19 Limpieza
+    
+            '13%', // 20 Observaciones
+        ];
+    @endphp
+
     <table style="
-        width: 99.1%;
-        margin-top: 8px;
-        border-collapse: separate; /* <--- CAMBIADO: De collapse a separate */
-        border-spacing: 0;         /* <--- AGREGADO: Evita espacios entre celdas */
-        table-layout: fixed;
-        font-size: 7px;
+        width:100%;
+        margin-top:10px;
+        border-collapse:collapse;
+        table-layout:fixed;
+        font-size:7px;
     ">
-        <tr style="height: 0; line-height: 0;">
-            <td style="width: 10%; padding: 0; border: none; height: 0;"></td> 
-            <td style="width: 4%; padding: 0; border: none; height: 0;"></td> 
-            <td style="width: 3%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 3%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 3%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 3%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 3%; padding: 0; border: none; height: 0;"></td>
-            
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5%; padding: 0; border: none; height: 0;"></td>
-            
-            <td style="width: 5.5%; padding: 0; border: none; height: 0;"></td>
-            <td style="width: 5.5%; padding: 0; border: none; height: 0;"></td>
+        <colgroup>
+            @foreach($extintorColWidths as $width)
+                <col style="width:{{ $width }};">
+            @endforeach
+        </colgroup>
+    
+        <tr style="height:0; line-height:0;">
+            @foreach($extintorColWidths as $width)
+                <td style="
+                    width:{{ $width }};
+                    padding:0;
+                    border:none;
+                    height:0;
+                    font-size:0;
+                    line-height:0;
+                "></td>
+            @endforeach
         </tr>
-    
-        <tr>
-            <td rowspan="3" style="border:1px solid #000; background:#b91c1c; color:#fff; text-align:center; font-weight:bold;">
-                No. de<br>Extintor
+
+        <!-- FILA 1 -->
+        <tr style="height:22px;">
+            <!-- COLUMNA 1 -->
+            <td rowspan="2" style="border:1px solid #000; background:#b91c1c; color:#fff; font-weight:bold; text-align:center; vertical-align:middle;">
+                No. de Extintor
             </td>
     
-            <td rowspan="3" style="border:1px solid #000; text-align:center; font-weight:bold;">
-                <div style="transform:rotate(270deg); white-space:nowrap;">No. kilos</div>
+            <!-- COLUMNA 2 -->
+            <td rowspan="2" style="
+                border:1px solid #000;
+                font-weight:bold;
+                text-align:center;
+                vertical-align:middle;
+                padding:0;
+            ">
+                <div style="
+                    transform:rotate(270deg);
+                    white-space:nowrap;
+                    line-height:1;
+                ">
+                    No. Kilos
+                </div>
             </td>
     
-            <td colspan="5" style="border:1px solid #000; background:#b91c1c; color:#fff; text-align:center; font-weight:bold;">
+            <!-- COLUMNAS 3 A 7 -->
+            <td colspan="5" style="border:1px solid #000; background:#b91c1c; color:#fff; font-weight:bold; text-align:center; vertical-align:middle;">
                 Tipo de Extintor
             </td>
     
-            <td colspan="12" style="border:1px solid #000; background:#b91c1c; color:#fff; text-align:center; font-weight:bold;">
-                Componente de Extintor
+            <!-- COLUMNAS 8 A 19 -->
+            <td colspan="12" style="border:1px solid #000; background:#b91c1c; color:#fff; font-weight:bold; text-align:center; vertical-align:middle;">
+                Componentes de Extintor
             </td>
     
-            <td rowspan="3" colspan="2" style="
-                border:1px solid #000;
-                background:#d1d5db;
-                text-align:center;
-                font-weight:bold;
-            ">
+            <!-- COLUMNA 20 -->
+            <td rowspan="2" style="border:1px solid #000; background:#d1d5db; font-weight:bold; text-align:center; vertical-align:middle;">
                 Observaciones
             </td>
         </tr>
     
+        <!-- FILA 2 -->
         <tr>
-            @foreach (['PQS', 'CO2', 'Espuma Afff', 'Agente Limpio', 'Agua H2O'] as $tipo)
-                <td rowspan="2" style="border:1px solid #000; background:#C7CCA7; text-align:center; font-weight:bold; height:70px;">
-                    <div style="transform:rotate(270deg); white-space:nowrap;">{{ $tipo }}</div>
+        
+            @foreach ([
+                'PQS',
+                'CO2',
+                'Espuma<br>Afff',
+                'Agente Limpio',
+                'Agua<br>H2O'
+            ] as $tipo)
+                <td style="
+                    border:1px solid #000;
+                    background:#DDD9C4;
+                    font-weight:bold;
+                    text-align:center;
+                    vertical-align:middle;
+                    padding:0;
+                    height:65px;
+                ">
+                    <div style="
+                        transform:rotate(270deg);
+                        white-space:nowrap;
+                        line-height:1;
+                    ">
+                        {!! $tipo !!}
+                    </div>
                 </td>
             @endforeach
-    
+        
             @foreach ([
                 'Anillo de<br>Verificación',
                 'Etiqueta de<br>Inspección',
@@ -389,97 +467,116 @@
                 'Soportes y<br>Funda',
                 'Limpieza'
             ] as $componente)
-                <td rowspan="2" style="border:1px solid #000; text-align:center; font-weight:bold; height:70px;">
+                <td style="
+                    border:1px solid #000;
+                    font-weight:bold;
+                    text-align:center;
+                    vertical-align:middle;
+                    padding:0;
+                ">
                     <div style="
                         transform:rotate(270deg);
-                        white-space:normal;
-                        line-height:1.1;
+                        white-space:nowrap;
+                        line-height:1;
                     ">
                         {!! $componente !!}
                     </div>
                 </td>
             @endforeach
         </tr>
-    
-        <tr></tr>
 
         @php
-            $filasExtintor = data_get($answers, 'tabla_checklist_extintor', []);
-            $filasExtintor = is_array($filasExtintor) ? $filasExtintor : [];
-        
-            $componentesExtintor = [
-                'anillo_verificacion',
-                'etiqueta_inspeccion',
-                'caducidad',
-                'pasador_seguridad',
-                'cincho_seguridad',
-                'manometro',
-                'presion',
-                'lleno',
-                'manguera_boquilla',
-                'senaletica',
-                'soportes_funda',
-                'limpieza',
-            ];
-        
-            $valorCorto = function ($valor) {
-                if (str_contains($valor, 'Buenas Condiciones')) {
-                    return '( ✓ ) Buenas Condiciones';
-                }
-        
-                if (str_contains($valor, 'Malas Condiciones')) {
-                    return '( X ) En Malas Condiciones';
-                }
-        
-                if (str_contains($valor, 'No Aplica')) {
-                    return '( NA ) No Aplica';
-                }
-        
-                return $valor ?: '';
-            };
+            $altoFilaDatos = '20px';
         @endphp
-        
-        @php
-            $totalFilas = max(10, count($filasExtintor));
-        @endphp
-        
-        @for ($i = 0; $i < $totalFilas; $i++)
+
+        @for($i = 0; $i < $registrosPorPaginaExtintor; $i++)
             @php
-                $fila = $filasExtintor[$i] ?? [];
+                $fila = $registrosPaginaExtintor->get($i, []);
             @endphp
-        
-            <tr>
-                <!-- No. Extintor -->
-                <td style="border:1px solid #000; height:18px; text-align:center; vertical-align:middle;">
+
+            <tr style="height:{{ $altoFilaDatos }};">
+
+                <!-- 1 -->
+                <td style="
+                    border:1px solid #000;
+                    height:{{ $altoFilaDatos }};
+                    text-align:center;
+                    vertical-align:middle;
+                    padding:2px;
+                ">
                     {{ data_get($fila, 'numero_extintor', '') }}
                 </td>
-        
-                <!-- No. Kilos -->
-                <td style="border:1px solid #000; height:18px; text-align:center; vertical-align:middle;">
+
+                <!-- 2 -->
+                <td style="
+                    border:1px solid #000;
+                    height:{{ $altoFilaDatos }};
+                    text-align:center;
+                    vertical-align:middle;
+                    padding:2px;
+                ">
                     {{ data_get($fila, 'numero_kilos', '') }}
                 </td>
-        
-                <!-- Tipo de Extintor -->
-                <td colspan="5" style="border:1px solid #000; height:18px; text-align:center; vertical-align:middle;">
+
+                <!-- 3-7 Tipo de Extintor -->
+                <td colspan="5" style="
+                    border:1px solid #000;
+                    height:{{ $altoFilaDatos }};
+                    text-align:center;
+                    vertical-align:middle;
+                    padding:2px;
+                ">
                     {{ data_get($fila, 'tipo_extintor', '') }}
                 </td>
-        
-                <!-- Componentes -->
-                @foreach ($componentesExtintor as $componente)
-                    <td style="border:1px solid #000; height:18px; text-align:center; vertical-align:middle;">
-                        {{ $valorCorto(data_get($fila, $componente, '')) }}
+
+                @foreach([
+                    'anillo_verificacion',
+                    'etiqueta_inspeccion',
+                    'caducidad',
+                    'pasador_seguridad',
+                    'cincho_seguridad',
+                    'manometro',
+                    'presion',
+                    'lleno',
+                    'manguera_boquilla',
+                    'senaletica',
+                    'soportes_funda',
+                    'limpieza'
+                ] as $campo)
+
+                    <td style="
+                        border:1px solid #000;
+                        height:{{ $altoFilaDatos }};
+                        text-align:center;
+                        vertical-align:middle;
+                        padding:2px;
+                    ">
+                        {{ data_get($fila, $campo, '') }}
                     </td>
+
                 @endforeach
-        
-                <!-- Observaciones -->
-                <td colspan="2" style="border:1px solid #000; height:18px; text-align:center; vertical-align:middle; padding:0 3px;">
+
+                <!-- 20 -->
+                <td style="
+                    border:1px solid #000;
+                    height:{{ $altoFilaDatos }};
+                    text-align:left;
+                    vertical-align:middle;
+                    padding:2px;
+                ">
                     {{ data_get($fila, 'observaciones', '') }}
                 </td>
+
             </tr>
         @endfor
     </table>
 
 </div>
+
+@if(!$loop->last)
+    <div style="page-break-after:always;"></div>
+@endif
+@endforeach
 
 </body>
 </html>
