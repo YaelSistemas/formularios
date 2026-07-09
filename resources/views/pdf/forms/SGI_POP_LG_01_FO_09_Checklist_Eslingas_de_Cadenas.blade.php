@@ -25,27 +25,33 @@
             margin-left: 5px;
         }
 
+        .page-break {
+            page-break-after: always;
+        }
+
         .header-table {
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: 8px;
         }
 
         .header-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 4px 6px;
             vertical-align: middle;
             text-align: center;
-            line-height: 1.05;
+            line-height: 1.1;
         }
 
         .logo-cell {
-            padding: 3px 4px;
+            width: 25%;
+            padding: 4px 5px;
         }
 
         .logo-cell img {
             max-width: 100%;
-            max-height: 60px;
+            max-height: 62px;
             object-fit: contain;
         }
 
@@ -53,14 +59,9 @@
             font-weight: bold;
         }
 
-        .right-cell {
+        .header-table td.right-cell {
             font-weight: bold;
-            text-align: center;
-            font-size: 9px;
-        }
-
-        .row-1-center {
-            font-size: 11px;
+            padding-left: 8px;
         }
 
         .inspection-area {
@@ -150,45 +151,144 @@
                 base64_encode(file_get_contents($pathFirma));
         }
     }
-    @endphp
 
-<div class="sheet">
+    $headers = [
+        'N° de Eslinga',
+        'Diámetro',
+        'Capacidad',
+        'Longitud',
+        'Elongación Causada por Estiramiento',
+        'Eslabones Distorsionados o Dañados',
+        'Presenta Muescas o Estrías',
+        'Presenta Corrosión General',
+        'Eslabones Torcidos',
+        'Trizaduras en Partes Soldadas',
+        'Ojos o Eslabones Desgastados',
+        'Se Realiza Revisión de Ganchos',
+        'Cuenta con Seguro de Gancho',
+        'Tiene Rotulación Carga Máxima',
+        'Almacenamiento Correcto',
+        'Libre de Aceite o Grasas (Libre de Químicos)',
+        'Etiqueta Visible',
+        'Cuenta con Certificado de Fabricante',
+        'La Eslinga está en Buenas Condiciones',
+    ];
+
+    $filasEslingas = data_get($answers, 'tabla_checklist_eslingas_cadenas', []);
+    $filasEslingas = is_array($filasEslingas) ? $filasEslingas : [];
+
+    $columnas = [
+        'numero_eslinga',
+        'diametro',
+        'capacidad',
+        'longitud',
+        'elongacion_causada_por_estiramiento',
+        'eslabones_distorsionados_o_danados',
+        'presenta_muescas_o_estrias',
+        'presenta_corrosion_general',
+        'eslabones_torcidos',
+        'trizaduras_en_partes_soldadas',
+        'ojos_o_eslabones_desgastados',
+        'se_realiza_revision_de_ganchos',
+        'cuenta_con_seguro_de_gancho',
+        'tiene_rotulacion_carga_maxima',
+        'almacenamiento_correcto',
+        'libre_de_aceite_o_grasas_libre_de_quimicos',
+        'etiqueta_visible',
+        'cuenta_con_certificado_de_fabricante',
+        'la_eslinga_esta_en_buenas_condiciones',
+    ];
+
+    $valorSiNo = function ($valor) {
+        if (
+            $valor === true ||
+            $valor === 'true' ||
+            $valor === 'si' ||
+            $valor === 'sí' ||
+            $valor === 'SI'
+        ) {
+            return 'SI';
+        }
+
+        if (
+            $valor === false ||
+            $valor === 'false' ||
+            $valor === 'no' ||
+            $valor === 'NO'
+        ) {
+            return 'NO';
+        }
+
+        return $valor ?: '';
+    };
+
+    $registrosPorHoja = 10;
+    $paginasEslingas = array_chunk($filasEslingas, $registrosPorHoja);
+
+    if (count($paginasEslingas) === 0) {
+        $paginasEslingas = [[]];
+    }
+
+    $imgEslingasTodas = public_path(
+        'images/forms/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas/Eslingas_Todas.png'
+    );
+
+    $imgEslingasTodasSrc = file_exists($imgEslingasTodas)
+        ? 'data:image/png;base64,' . base64_encode(file_get_contents($imgEslingasTodas))
+        : null;
+@endphp
+
+@foreach ($paginasEslingas as $paginaIndex => $filasPagina)
+
+<div class="sheet {{ !$loop->last ? 'page-break' : '' }}">
 
     <!-- HEADER -->
     <table class="header-table">
+        <tr style="height:0; line-height:0;">
+            <td style="width:25%; padding:0; border:none; height:0;"></td>
+            <td style="width:45%; padding:0; border:none; height:0;"></td>
+            <td style="width:30%; padding:0; border:none; height:0;"></td>
+        </tr>
+    
         <tr>
-            <td rowspan="3" class="logo-cell">
+            <td rowspan="4" class="logo-cell">
                 @if($logoSrc)
                     <img src="{{ $logoSrc }}">
                 @endif
             </td>
-
-            <td colspan="2" class="center-cell row-1-center">
+    
+            <td class="center-cell">
                 VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
             </td>
-
-            <td colspan="2" class="right-cell">
-                CODIFICACIÓN: SGI-POP-LG-01-FO-09
+    
+            <td class="right-cell">
+                CÓDIGO: SGI-POP-LG-01-FO-09
             </td>
         </tr>
-
+    
         <tr>
-            <td colspan="2" class="center-cell">
+            <td class="center-cell">
                 SISTEMA DE GESTIÓN INTEGRAL
             </td>
-
-            <td colspan="2" class="right-cell">
-                FECHA DE EMISIÓN:
+    
+            <td class="right-cell">
+                FECHA DE EMISIÓN: 27/03/25
             </td>
         </tr>
-
+    
         <tr>
-            <td colspan="2" class="center-cell">
+            <td rowspan="2" class="center-cell">
                 CHECKLIST ESLINGAS DE CADENAS
             </td>
-
-            <td colspan="2" class="right-cell">
-                NÚMERO DE REVISIÓN:
+    
+            <td class="right-cell">
+                REVISIÓN: 01
+            </td>
+        </tr>
+    
+        <tr>
+            <td class="right-cell">
+                PÁGINA: {{ str_pad($paginaIndex + 1, 2, '0', STR_PAD_LEFT) }}
             </td>
         </tr>
     </table>
@@ -198,7 +298,7 @@
         width:100%;
         border-collapse:collapse;
         table-layout:fixed;
-        margin-top:15px;
+        margin-top:1px;
     ">
         <tr>
             <td style="
@@ -346,36 +446,12 @@
         </tr>
     </table>
 
-    <div style="width:100%; text-align:left; margin-top:25px; margin-bottom:8px; font-size:9px; line-height:1.4;">
+    <div style="width:100%; text-align:left; margin-top:10px; margin-bottom:8px; font-size:9px; line-height:1.4;">
         Considerar los siguientes criterios de acuerdo al estado de la eslinga de cadena:
         <strong>SI</strong> /
         <strong>NO</strong>
     </div>
 
-    @php
-        $headers = [
-            'N° de Eslinga',
-            'Diámetro',
-            'Capacidad',
-            'Longitud',
-            'Elongación Causada por Estiramiento',
-            'Eslabones Distorsionados o Dañados',
-            'Presenta Muescas o Estrías',
-            'Presenta Corrosión General',
-            'Eslabones Torcidos',
-            'Trizaduras en Partes Soldadas',
-            'Ojos o Eslabones Desgastados',
-            'Se Realiza Revisión de Ganchos',
-            'Cuenta con Seguro de Gancho',
-            'Tiene Rotulación Carga Máxima',
-            'Almacenamiento Correcto',
-            'Libre de Aceite o Grasas (Libre de Químicos)',
-            'Etiqueta Visible',
-            'Cuenta con Certificado de Fabricante',
-            'La Eslinga está en Buenas Condiciones',
-        ];
-    @endphp
-    
     <!-- TABLA -->
     <table style="
         width:100%;
@@ -386,24 +462,24 @@
     ">
     
         <tr style="height:0; line-height:0;">
-            <td style="width:4%; padding:0; border:none; height:0;"></td>  {{-- N° de Eslinga --}}
-            <td style="width:4%; padding:0; border:none; height:0;"></td>  {{-- Diámetro --}}
-            <td style="width:4%; padding:0; border:none; height:0;"></td>  {{-- Capacidad --}}
-            <td style="width:4%; padding:0; border:none; height:0;"></td>  {{-- Longitud --}}
+            <td style="width:5%; padding:0; border:none; height:0;"></td>  {{-- N° de Eslinga --}}
+            <td style="width:6%; padding:0; border:none; height:0;"></td>  {{-- Diámetro --}}
+            <td style="width:6%; padding:0; border:none; height:0;"></td>  {{-- Capacidad --}}
+            <td style="width:4.5%; padding:0; border:none; height:0;"></td>  {{-- Longitud --}}
         
             <td style="width:5.2%; padding:0; border:none; height:0;"></td>
             <td style="width:5.2%; padding:0; border:none; height:0;"></td>
             <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
-            <td style="width:5.2%; padding:0; border:none; height:0;"></td>
+            <td style="width:4%; padding:0; border:none; height:0;"></td>
+            <td style="width:4%; padding:0; border:none; height:0;"></td>
+            <td style="width:4%; padding:0; border:none; height:0;"></td>
+            <td style="width:4%; padding:0; border:none; height:0;"></td>
+            <td style="width:5%; padding:0; border:none; height:0;"></td>
+            <td style="width:5%; padding:0; border:none; height:0;"></td>
+            <td style="width:4.5%; padding:0; border:none; height:0;"></td>
+            <td style="width:4%; padding:0; border:none; height:0;"></td>
+            <td style="width:5.6%; padding:0; border:none; height:0;"></td>
+            <td style="width:4%; padding:0; border:none; height:0;"></td>
             <td style="width:5.2%; padding:0; border:none; height:0;"></td>
             <td style="width:5.2%; padding:0; border:none; height:0;"></td>
         </tr>
@@ -437,7 +513,7 @@
                         line-height:1.1;
                         margin:auto;
                         width:100%;
-                        font-size:10px;
+                        font-size:9px;
                         font-weight:{{ in_array($loop->index, $boldHeaders) ? 'bold' : 'normal' }};
                     ">
                         {{ $header }}
@@ -445,70 +521,18 @@
                 </td>
             @endforeach
         </tr>
-    
-        @php
-            $filasEslingas = data_get($answers, 'tabla_checklist_eslingas_cadenas', []);
-            $filasEslingas = is_array($filasEslingas) ? $filasEslingas : [];
         
-            $columnas = [
-                'numero_eslinga',
-                'diametro',
-                'capacidad',
-                'longitud',
-                'elongacion_causada_por_estiramiento',
-                'eslabones_distorsionados_o_danados',
-                'presenta_muescas_o_estrias',
-                'presenta_corrosion_general',
-                'eslabones_torcidos',
-                'trizaduras_en_partes_soldadas',
-                'ojos_o_eslabones_desgastados',
-                'se_realiza_revision_de_ganchos',
-                'cuenta_con_seguro_de_gancho',
-                'tiene_rotulacion_carga_maxima',
-                'almacenamiento_correcto',
-                'libre_de_aceite_o_grasas_libre_de_quimicos',
-                'etiqueta_visible',
-                'cuenta_con_certificado_de_fabricante',
-                'la_eslinga_esta_en_buenas_condiciones',
-            ];
-        
-            $valorSiNo = function ($valor) {
-                if (
-                    $valor === true ||
-                    $valor === 'true' ||
-                    $valor === 'si' ||
-                    $valor === 'sí' ||
-                    $valor === 'SI'
-                ) {
-                    return 'SI';
-                }
-        
-                if (
-                    $valor === false ||
-                    $valor === 'false' ||
-                    $valor === 'no' ||
-                    $valor === 'NO'
-                ) {
-                    return 'NO';
-                }
-        
-                return $valor ?: '';
-            };
-        
-            $totalFilas = max(10, count($filasEslingas));
-        @endphp
-        
-        @for ($i = 0; $i < $totalFilas; $i++)
+        @for ($i = 0; $i < $registrosPorHoja; $i++)
         
             @php
-                $fila = $filasEslingas[$i] ?? [];
+                $fila = $filasPagina[$i] ?? [];
             @endphp
         
             <tr>
                 @foreach ($columnas as $columna)
                     <td style="
                         border:1px solid #000;
-                        height:15px;
+                        height:18px;
                         text-align:center;
                         vertical-align:middle;
                         font-size:8px;
@@ -552,21 +576,11 @@
             </td>
         </tr>
     </table>
-
-    @php
-        $imgEslingasTodas = public_path(
-            'images/forms/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas/Eslingas_Todas.png'
-        );
-    
-        $imgEslingasTodasSrc = file_exists($imgEslingasTodas)
-            ? 'data:image/png;base64,' . base64_encode(file_get_contents($imgEslingasTodas))
-            : null;
-    @endphp
     
     <!-- IMAGEN -->
     <table style="
         width:100%;
-        margin-top:15px;
+        margin-top:10px;
         border-collapse:collapse;
         table-layout:fixed;
     ">
@@ -584,7 +598,7 @@
                         src="{{ $imgEslingasTodasSrc }}"
                         style="
                             width:1000px;
-                            height:120px;
+                            height:70px;
                             object-fit:contain;
                         "
                     >
@@ -594,6 +608,8 @@
     </table>
 
 </div>
+
+@endforeach
 
 </body>
 </html>

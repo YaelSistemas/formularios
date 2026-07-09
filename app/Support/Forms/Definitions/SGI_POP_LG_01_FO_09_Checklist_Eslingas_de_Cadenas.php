@@ -38,17 +38,17 @@ class SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas implements FormDefinitio
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',
                     'type' => 'static_text',
-                    'text' => 'SISTEMA DE GESTIÓN INTEGRAL',
+                    'text' => 'Sistema de Gestión Integral',
                 ],
                 [
                     'id' => 'header_line_3',
                     'type' => 'static_text',
-                    'text' => 'CHECKLIST ESLINGAS DE CADENAS',
+                    'text' => 'Checklist Eslingas de Cadenas',
                 ],
                 [
                     'id' => 'header_line_4',
@@ -58,12 +58,12 @@ class SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas implements FormDefinitio
                 [
                     'id' => 'header_line_5',
                     'type' => 'static_text',
-                    'text' => 'Fecha de Emisión: ',
+                    'text' => 'Fecha de Emisión: 27/03/2025',
                 ],
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: ',
+                    'text' => 'Número de Revisión: 01',
                 ],
 
                 [

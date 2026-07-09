@@ -19,6 +19,8 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
     indicaciones_toggle: false,
   });
 
+  const [modalCollapsedSections, setModalCollapsedSections] = useState({});
+
   const [tableModal, setTableModal] = useState({
     open: false,
     field: null,
@@ -68,6 +70,17 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
       if (formErrorTimerRef.current) clearTimeout(formErrorTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableModal.open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [tableModal.open]);
 
   const normalizeAssetUrl = (url) => {
     if (!url) return "";
@@ -197,6 +210,7 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
     if (readOnly) return;
 
     clearTableModalError();
+    setModalCollapsedSections({});
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -212,6 +226,7 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
     const currentRow = rows[rowIndex] || {};
 
     clearTableModalError();
+    setModalCollapsedSections({});
     setTableRowDraft(buildRowDraft(field, currentRow));
     setTableModal({
       open: true,
@@ -246,6 +261,19 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
     return id.includes("observaciones") || label.includes("observaciones");
   };
 
+  const isNotesColumn = (col) => {
+    const id = String(col?.id || "").toLowerCase();
+    const label = String(col?.label || "").toLowerCase();
+
+    return id === "notas" || label === "notas" || label.includes("notas");
+  };
+
+  const isOptionalColumn = (col) => {
+    if (col?.required === false) return true;
+    if (col?.type === "static_text" || col?.type === "fixed_image") return true;
+    return isObservationColumn(col) || isNotesColumn(col);
+  };
+
   const isEmptyValue = (value, type) => {
     if (type === "checkbox") return value !== true;
     return value === null || value === undefined || String(value).trim() === "";
@@ -275,7 +303,7 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
       if (col.type === "static_text" || col.type === "fixed_image") continue;
       const v = tableRowDraft[col.id];
 
-      if (isObservationColumn(col)) {
+      if (isOptionalColumn(col)) {
         continue;
       }
       
@@ -1596,6 +1624,7 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
 
     if (!validateSimpleRequiredField(taller, "Debes seleccionar el Taller.")) return false;
     if (!validateSimpleRequiredField(nombreColaboradorInspecciono, "Debes capturar el Nombre del Colaborador que Inspecciono.")) return false;
+    if (!validateSimpleRequiredField(firmaColaboradorInspecciono, "Debes capturar la Firma del Colaborador que Inspecciono.")) return false;
 
     if (!tablaEslingas) {
       setMsg("No se encontró la tabla de Checklist Eslingas de Cadenas.");
@@ -1625,7 +1654,7 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
         if (col.type === "static_text" || col.type === "fixed_image") continue;
         const value = row[col.id];
 
-        if (isObservationColumn(col)) {
+        if (isOptionalColumn(col)) {
           continue;
         }
         
@@ -1695,6 +1724,170 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
     if (saving) return isEditing ? "Actualizando..." : "Guardando...";
     if (isEditing) return "Actualizar registro";
     return isOnline ? "Enviar formulario" : "Guardar offline";
+  };
+
+
+  const getCleanFieldLabel = (col) => {
+    return String(col?.text || col?.label || "");
+  };
+
+  const getGroupTitle = (group) => {
+    return String(group?.title || group?.titleField?.text || group?.titleField?.label || "");
+  };
+
+  const getModalFieldDisplayLabel = (col) => {
+    return getCleanFieldLabel(col);
+  };
+
+  const renderModalFieldCard = (col) => {
+    const hasError = tableModalErrorFieldId === col.id;
+    const isRequiredVisual = !isOptionalColumn(col);
+
+    return (
+      <div
+        key={col.id}
+        ref={(el) => {
+          tableFieldWrapRefs.current[col.id] = el;
+        }}
+        style={{
+          borderRadius: 14,
+          border: hasError
+            ? "1px solid #fdba74"
+            : "1px solid rgba(15,23,42,0.08)",
+          background: "#fff",
+          padding: 12,
+        }}
+      >
+        <label
+          style={{
+            fontSize: isMobile ? 14 : 14,
+            lineHeight: 1.4,
+            color: "#0f172a",
+            fontWeight: 700,
+          }}
+        >
+          {getModalFieldDisplayLabel(col)}{" "}
+          {isRequiredVisual ? <span style={{ color: "crimson" }}>*</span> : null}
+        </label>
+
+        {col.description ? (
+          <div
+            style={{
+              marginTop: 8,
+              marginBottom: 10,
+              color: "#111827",
+              fontSize: isMobile ? 13 : 14,
+              lineHeight: 1.6,
+              fontWeight: 500,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {col.description}
+          </div>
+        ) : null}
+
+        {hasError && tableModalError ? (
+          <div
+            style={{
+              marginTop: 8,
+              borderRadius: 10,
+              border: "1px solid #fdba74",
+              background: "#fff7ed",
+              color: "#9a3412",
+              padding: "8px 10px",
+              fontSize: 13,
+              lineHeight: 1.4,
+              fontWeight: 700,
+            }}
+          >
+            {tableModalError}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 10 }}>{renderTableModalField(col)}</div>
+      </div>
+    );
+  };
+
+  const renderModalGroupContent = (group, index, filteredGroups) => {
+    if (group.kind === "image") {
+      return (
+        <React.Fragment key={group.id}>
+          {group.fields.map((col) => (
+            <div key={col.id}>{renderTableModalField(col)}</div>
+          ))}
+          {index < filteredGroups.length - 1 ? (
+            <div style={{ borderBottom: "1px solid #cbd5e1", margin: "4px 0 2px 0" }} />
+          ) : null}
+        </React.Fragment>
+      );
+    }
+
+    if (group.kind === "section") {
+      const isModalSectionCollapsed = !!modalCollapsedSections[group.id];
+      const theme = getSectionTheme(group.titleField?.id);
+
+      return (
+        <React.Fragment key={group.id}>
+          <div
+            style={{
+              borderRadius: 16,
+              overflow: "hidden",
+              border: theme.border,
+              background: theme.background,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setModalCollapsedSections((prev) => ({
+                  ...prev,
+                  [group.id]: !prev[group.id],
+                }))
+              }
+              style={{
+                width: "100%",
+                border: "none",
+                background: theme.titleBg,
+                padding: "12px 14px",
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontWeight: 900,
+                color: "#0f172a",
+                fontSize: isMobile ? 14 : 15,
+                textAlign: "left",
+              }}
+            >
+              <span>{getGroupTitle(group)}</span>
+              <span>{isModalSectionCollapsed ? "＋" : "－"}</span>
+            </button>
+
+            {!isModalSectionCollapsed ? (
+              <div style={{ padding: 14, display: "grid", gap: 14 }}>
+                {group.fields.map((col) => renderModalFieldCard(col))}
+              </div>
+            ) : null}
+          </div>
+
+          {index < filteredGroups.length - 1 ? (
+            <div style={{ borderBottom: "1px solid #cbd5e1", margin: "4px 0 2px 0" }} />
+          ) : null}
+        </React.Fragment>
+      );
+    }
+
+    const col = group.fields[0];
+
+    return (
+      <React.Fragment key={group.id}>
+        {renderModalFieldCard(col)}
+        {index < filteredGroups.length - 1 ? (
+          <div style={{ borderBottom: "1px solid #cbd5e1", margin: "4px 0 2px 0" }} />
+        ) : null}
+      </React.Fragment>
+    );
   };
 
   const desktopContentWidth = 900;
@@ -1902,44 +2095,69 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "grid",
-                gap: isMobile ? 10 : 6,
-                textAlign: "left",
-              }}
-            >
-              {headerLines.map((line) => (
-                <div
-                  key={line.id}
-                  style={{
-                    width: "100%",
-                    fontWeight: line.id === "header_line_3" ? 800 : 700,
-                    fontSize:
-                      line.id === "header_line_1"
-                        ? isMobile
-                          ? 14
-                          : 18
-                        : line.id === "header_line_2"
-                        ? isMobile
-                          ? 13
-                          : 15
-                        : isMobile
-                        ? 12
-                        : 14,
-                    color: "#111827",
-                    textAlign: "left",
-                    lineHeight: isMobile ? 1.45 : 1.35,
-                  }}
-                >
-                  {line.text}
-                </div>
-              ))}
-            </div>
+            {headerLines.length ? (
+              <div
+                style={{
+                  display: "grid",
+                  gap: isMobile ? 10 : 6,
+                  textAlign: "left",
+                }}
+              >
+                {headerLines.map((line) => (
+                  <div
+                    key={line.id}
+                    style={{
+                      width: "100%",
+                      fontWeight: 700,
+                      fontSize: isMobile ? 12 : 14,
+                      color: "#111827",
+                      textAlign: "left",
+                      lineHeight: isMobile ? 1.45 : 1.35,
+                    }}
+                  >
+                    {line.text}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {logo || headerLines.length ? (
+              <div
+                style={{
+                  borderBottom: "1px solid #d1d5db",
+                  margin: "4px 0 0 0",
+                }}
+              />
+            ) : null}
 
             {renderOuterRequiredField(taller)}
 
-            {(indicacionCriterios || criteriosTitulo || tablaEslingas) ? (
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
+            {renderOuterRequiredField(nombreColaboradorInspecciono)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
+            {renderOuterRequiredField(firmaColaboradorInspecciono)}
+
+            <div
+              style={{
+                borderBottom: "1px solid #d1d5db",
+                margin: "4px 0 0 0",
+              }}
+            />
+
+            {(indicacionesToggle || indicacionCriterios || criteriosTitulo || tablaEslingas) ? (
               <div
                 style={{
                   border: "1px solid #e5e7eb",
@@ -1947,41 +2165,88 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
                   overflow: "hidden",
                 }}
               >
-                <div
+                <button
+                  type="button"
+                  onClick={() => toggleSection(indicacionesToggle?.id || "criterios_eslingas")}
                   style={{
                     width: "100%",
                     padding: isMobile ? "14px 14px" : "14px 16px",
                     background: "#f8fafc",
-                    borderBottom: "1px solid #e5e7eb",
+                    border: "none",
+                    borderBottom: isCollapsed ? "none" : "1px solid #e5e7eb",
                     textAlign: "left",
                     fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                     color: "#0f172a",
                     fontSize: isMobile ? 14 : 14,
                   }}
                 >
-                  Criterios de revisión
-                </div>
+                  <span>
+                    {indicacionesToggle?.text || indicacionesToggle?.label || "Criterios de revisión"}
+                  </span>
+                  <span>{isCollapsed ? "＋" : "－"}</span>
+                </button>
 
-                <div
-                  style={{
-                    padding: isMobile ? 14 : 16,
-                    display: "grid",
-                    gap: isMobile ? 14 : 14,
-                    background: "#fff",
-                  }}
-                >
-                  {tablaEslingas ? (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {renderField(tablaEslingas)}
-                    </div>
-                  ) : null}
-                </div>
+                {!isCollapsed ? (
+                  <div
+                    style={{
+                      padding: isMobile ? 14 : 16,
+                      display: "grid",
+                      gap: isMobile ? 14 : 14,
+                      background: "#fff",
+                    }}
+                  >
+                    {indicacionCriterios ? (
+                      <div
+                        style={{
+                          fontSize: isMobile ? 12 : 12,
+                          color: "#111827",
+                          lineHeight: 1.5,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {indicacionCriterios.text || indicacionCriterios.label}
+                      </div>
+                    ) : null}
+
+                    {criteriosTitulo ? (
+                      <div
+                        style={{
+                          fontSize: isMobile ? 12 : 12,
+                          color: "#111827",
+                          lineHeight: 1.5,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {criteriosTitulo.text || criteriosTitulo.label}
+                      </div>
+                    ) : null}
+
+                    {tablaEslingas ? (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {renderField(tablaEslingas)}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
-            {renderOuterRequiredField(notas)}
-            {renderOuterRequiredField(nombreColaboradorInspecciono)}
-            {renderOuterRequiredField(firmaColaboradorInspecciono)}
+            {notas ? (
+              <>
+                <div
+                  style={{
+                    borderBottom: "1px solid #d1d5db",
+                    margin: "4px 0 0 0",
+                  }}
+                />
+
+                {renderOuterRequiredField(notas)}
+              </>
+            ) : null}
           </div>
 
           {!readOnly ? (
@@ -2131,7 +2396,7 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
                     textAlign: "center",
                   }}
                 >
-                  {indicacionCriterios.text}
+                  {indicacionCriterios.text || indicacionCriterios.label}
                 </div>
               ) : null}
 
@@ -2162,191 +2427,9 @@ export default function SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas({
 
               {modalGroups
                 .filter((group) => group.kind !== "image")
-                .map((group) => {
-                  if (group.kind === "section") {
-                    const theme = getSectionTheme(group.titleField?.id);
-                    return (
-                      <div
-                        key={group.id}
-                        style={{
-                          borderRadius: 16,
-                          overflow: "hidden",
-                          border: theme.border,
-                          background: theme.background,
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "12px 14px",
-                            fontWeight: 800,
-                            color: "#0f172a",
-                            background: theme.titleBg,
-                            borderBottom: "1px solid rgba(15,23,42,0.08)",
-                            fontSize: isMobile ? 14 : 15,
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {group.titleField?.text || group.titleField?.label}
-                        </div>
-
-                        <div
-                          style={{
-                            padding: 14,
-                            display: "grid",
-                            gap: 14,
-                          }}
-                        >
-                          {group.fields.map((col) => {
-                            const isRequiredVisual = !isObservationColumn(col);
-                            const hasError = tableModalErrorFieldId === col.id;
-
-                            return (
-                              <div
-                                key={col.id}
-                                ref={(el) => {
-                                  tableFieldWrapRefs.current[col.id] = el;
-                                }}
-                                style={{
-                                  borderRadius: 14,
-                                  border: hasError
-                                    ? "1px solid #fdba74"
-                                    : "1px solid rgba(15,23,42,0.08)",
-                                  background: "#fff",
-                                  padding: 12,
-                                }}
-                              >
-                                <label
-                                  style={{
-                                    fontSize: isMobile ? 14 : 14,
-                                    lineHeight: 1.4,
-                                    color: "#0f172a",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  {col.label}{" "}
-                                  {isRequiredVisual ? (
-                                    <span style={{ color: "crimson" }}>*</span>
-                                  ) : null}
-                                </label>
-
-                                {(col.description || getEslingasDescription(col.id)) ? (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      marginBottom: 10,
-                                      color: "#111827",
-                                      fontSize: isMobile ? 13 : 14,
-                                      lineHeight: 1.6,
-                                      fontWeight: 500,
-                                      whiteSpace: "pre-line",
-                                    }}
-                                  >
-                                    {col.description || getEslingasDescription(col.id)}
-                                  </div>
-                                ) : null}
-
-                                {hasError && tableModalError ? (
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      borderRadius: 10,
-                                      border: "1px solid #fdba74",
-                                      background: "#fff7ed",
-                                      color: "#9a3412",
-                                      padding: "8px 10px",
-                                      fontSize: 13,
-                                      lineHeight: 1.4,
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    {tableModalError}
-                                  </div>
-                                ) : null}
-
-                                <div style={{ marginTop: 10 }}>
-                                  {renderTableModalField(col)}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const col = group.fields[0];
-                  const hasError = tableModalErrorFieldId === col.id;
-                  const isRequiredVisual = !isObservationColumn(col);
-
-                  return (
-                    <div
-                      key={group.id}
-                      ref={(el) => {
-                        tableFieldWrapRefs.current[col.id] = el;
-                      }}
-                      style={{
-                        borderRadius: 14,
-                        border: hasError
-                          ? "1px solid #fdba74"
-                          : "1px solid rgba(15,23,42,0.08)",
-                        background: "#fff",
-                        padding: 12,
-                      }}
-                    >
-                      <label
-                        style={{
-                          fontSize: isMobile ? 14 : 14,
-                          lineHeight: 1.4,
-                          color: "#0f172a",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {col.label}{" "}
-                        {isRequiredVisual ? (
-                          <span style={{ color: "crimson" }}>*</span>
-                        ) : null}
-                      </label>
-
-                      {(col.description || getEslingasDescription(col.id)) ? (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            marginBottom: 10,
-                            color: "#111827",
-                            fontSize: isMobile ? 13 : 14,
-                            lineHeight: 1.6,
-                            fontWeight: 500,
-                            whiteSpace: "pre-line",
-                          }}
-                        >
-                          {col.description || getEslingasDescription(col.id)}
-                        </div>
-                      ) : null}
-
-                      {hasError && tableModalError ? (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            borderRadius: 10,
-                            border: "1px solid #fdba74",
-                            background: "#fff7ed",
-                            color: "#9a3412",
-                            padding: "8px 10px",
-                            fontSize: 13,
-                            lineHeight: 1.4,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {tableModalError}
-                        </div>
-                      ) : null}
-
-                      <div style={{ marginTop: 10 }}>
-                        {renderTableModalField(col)}
-                      </div>
-                    </div>
-                  );
-                })}
+                .map((group, index, filteredGroups) =>
+                  renderModalGroupContent(group, index, filteredGroups)
+                )}
             </div>
 
             <div
