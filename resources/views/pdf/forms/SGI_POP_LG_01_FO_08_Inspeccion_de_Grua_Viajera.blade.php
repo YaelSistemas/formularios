@@ -73,7 +73,7 @@
             display: inline-block;
             width: 42%;
             vertical-align: middle;
-            font-size: 10px;
+            font-size: 8px;
             box-sizing: border-box;
         }
 
@@ -87,7 +87,7 @@
 
         .inspection-label {
             display: inline-block;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
             vertical-align: middle;
             margin-right: 8px;
@@ -107,7 +107,7 @@
             right: 0;
             bottom: 3px;
             text-align: center;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: normal;
             white-space: nowrap;
             overflow: hidden;
@@ -120,6 +120,69 @@
             bottom: 3px;
             border-bottom: 1px solid #000;
             height: 1px;
+        }
+
+        .responsable-table {
+            width: 92%;
+            margin: 15px auto 0 auto;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 8px;
+        }
+        
+        .responsable-table td {
+            border: none;
+            padding: 0;
+            vertical-align: middle;
+        }
+        
+        .responsable-label {
+            width: 18%;
+            text-align: right;
+            padding-right: 8px !important;
+            font-weight: bold;
+            line-height: 1.2;
+            vertical-align: middle;
+        }
+        
+        .responsable-label-text {
+            display: block;
+            position: relative;
+            top: 5px;
+        }
+        
+        .responsable-line-cell {
+            width: 32%;
+            padding-right: 18px !important;
+        }
+        
+        .responsable-line {
+            width: 100%;
+            height: 30px;
+            position: relative;
+            border-bottom: 1px solid #000;
+        }
+        
+        .responsable-value {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 2px;
+            text-align: center;
+            font-size: 8px;
+            font-weight: normal;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        
+        .responsable-signature {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 2px;
+            margin: auto;
+            max-width: 120px;
+            max-height: 28px;
         }
     </style>
 </head>
@@ -295,40 +358,40 @@
                 </td>
         
                 <td class="center-cell row-1-center">
-                    Vulcanización y Servicios Industriales, SA de CV
+                    VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
         
                 <td class="right-cell">
-                    Código: SGI-POP-LG-01-FO-08
+                    CÓDIGO: SGI-POP-LG-01-FO-08
                 </td>
             </tr>
         
             <!-- FILA 2 -->
             <tr>
                 <td class="center-cell">
-                    Sistema de Gestión Integral
+                    SISTEMA DE GESTIÓN INTEGRAL
                 </td>
         
                 <td class="right-cell">
-                    Fecha de Emisión: 27/03/2025
+                    FECHA DE EMISIÓN: 27/03/2025
                 </td>
             </tr>
         
             <!-- FILA 3 -->
             <tr>
                 <td rowspan="2" class="center-cell">
-                    Inspección de Grúa Viajera
+                    INSPECCIÓN DE GRÚA VIAJERA
                 </td>
             
                 <td class="right-cell">
-                    Revisión: 02
+                    REVISIÓN: 02
                 </td>
             </tr>
             
             <!-- FILA 4 -->
             <tr>
                 <td class="right-cell">
-                    Página: {{ str_pad($pageIndex + 1, 2, '0', STR_PAD_LEFT) }}
+                    PÁGINA: {{ str_pad($pageIndex + 1, 2, '0', STR_PAD_LEFT) }}
                 </td>
             </tr>
         
@@ -349,50 +412,46 @@
             </div>
         </div>
 
-        <!-- Responsable de Inspeccion -->
-        <div class="inspection-area" style="margin-top: 18px;">
-            <div class="inspection-row">
+        <!-- RESPONSABLE DE INSPECCIÓN -->
+        <table class="responsable-table">
+            <tr>
+                <!-- ETIQUETA NOMBRE -->
+                <td class="responsable-label">
+                    <div class="responsable-label-text">
+                        Nombre del colaborador<br>
+                        que inspeccionó:
+                    </div>
+                </td>
         
-                <!-- NOMBRE -->
-                <div class="inspection-item left">
-                    <span
-                        class="inspection-label"
-                        style="line-height: 1.2; text-align: center; margin-right: 8px; position: relative; top: -4px;">
-                        Nombre del<br>
-                        Responsable:
-                    </span>
-        
-                    <span class="inspection-line-wrap" style="width: 180px;">
-                        <span class="inspection-value">
+                <!-- LÍNEA NOMBRE -->
+                <td class="responsable-line-cell">
+                    <div class="responsable-line">
+                        <span class="responsable-value">
                             {{ $nombreResponsableInspeccion }}
                         </span>
-                        <span class="inspection-underline"></span>
-                    </span>
-                </div>
+                    </div>
+                </td>
         
-                <!-- FIRMA -->
-                <div class="inspection-item right">
-                    <span
-                        class="inspection-label"
-                        style="line-height: 1.2; text-align: center; margin-right: 8px; position: relative; top: -4px;">
-                        Firma del<br>
-                        Responsable:
-                    </span>
+                <!-- ETIQUETA FIRMA -->
+                <td class="responsable-label">
+                    <div class="responsable-label-text">
+                        Firma del colaborador<br>
+                        que inspeccionó:
+                    </div>
+                </td>
         
-                    <span
-                        class="inspection-line-wrap"
-                        style="width: 120px; height: 30px; position: relative; top: -4px;">
+                <!-- LÍNEA FIRMA -->
+                <td class="responsable-line-cell">
+                    <div class="responsable-line">
                         @if(!empty($firmaResponsableInspeccion))
                             <img
                                 src="{{ public_path('storage/' . $firmaResponsableInspeccion) }}"
-                                style="position: absolute; left: 0; right: 0; bottom: 7px; margin: auto; max-width: 120px; max-height: 38px; object-fit: contain;">
+                                class="responsable-signature">
                         @endif
-        
-                        <span class="inspection-underline"></span>
-                    </span>
-                </div>
-            </div>
-        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
 
         <!-- TEXTO -->
         <div class="inspection-area">

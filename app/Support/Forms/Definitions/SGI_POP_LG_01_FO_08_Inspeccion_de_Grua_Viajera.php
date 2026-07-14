@@ -39,7 +39,7 @@ class SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera implements FormDefinition
                 [
                     'id' => 'header_line_1',
                     'type' => 'static_text',
-                    'text' => 'Vulcanización y Servicios Industriales, SA de CV',
+                    'text' => 'Vulcanización y Servicios Industriales SA de CV',
                 ],
                 [
                     'id' => 'header_line_2',

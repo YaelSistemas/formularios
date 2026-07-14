@@ -1535,6 +1535,9 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
 
     if (!validateSimpleRequiredField(taller, "Debes seleccionar el Taller.")) return false;
 
+    if (!validateSimpleRequiredField(nombreResponsableInspeccion, "Debes capturar el Nombre del Responsable de Inspección.")) return false;
+    if (!validateSimpleRequiredField(firmaResponsableInspeccion, "Debes capturar la Firma del Responsable de Inspección.")) return false;
+    
     if (!tablaGruaViajera) {
       setMsg("No se encontró la tabla de Grúa Viajera.");
       scrollToTopSafe();
@@ -1583,9 +1586,6 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
         }
       }
     }
-
-    if (!validateSimpleRequiredField(nombreResponsableInspeccion, "Debes capturar el Nombre del Responsable de Inspección.")) return false;
-    if (!validateSimpleRequiredField(firmaResponsableInspeccion, "Debes capturar la Firma del Responsable de Inspección.")) return false;
 
     setMsg("");
     return true;
@@ -2131,6 +2131,11 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
                 .map((group, index, filteredGroups) => {
                   if (group.kind === "section") {
                     const theme = getSectionTheme(group.titleField?.id);
+                    const sectionTitle = getModalSectionTitle(group);
+                    const showSectionTitle =
+                      /^grua_\d+_grupo$/.test(String(group.id || "")) &&
+                      sectionTitle;
+
                     return (
                       <React.Fragment key={group.id}>
                         <div
@@ -2141,6 +2146,22 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
                             background: theme.background,
                           }}
                         >
+                          {showSectionTitle ? (
+                            <div
+                              style={{
+                                padding: isMobile ? "12px 14px" : "13px 14px",
+                                background: theme.titleBg,
+                                borderBottom: "1px solid #dbe4ee",
+                                color: "#0f172a",
+                                fontSize: isMobile ? 14 : 15,
+                                fontWeight: 800,
+                                lineHeight: 1.45,
+                              }}
+                            >
+                              {sectionTitle}
+                            </div>
+                          ) : null}
+
                           <div
                             style={{
                               padding: 14,
