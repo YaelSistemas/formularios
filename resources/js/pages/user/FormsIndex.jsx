@@ -1597,14 +1597,25 @@ export default function FormsIndex() {
                     overflow: "hidden",
                   }}
                 >
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() =>
                       setMobileSubmissionActions({
                         open: true,
                         submission: s,
                       })
                     }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                  
+                        setMobileSubmissionActions({
+                          open: true,
+                          submission: s,
+                        });
+                      }
+                    }}
                     style={{
                       width: "100%",
                       border: "none",
@@ -1612,6 +1623,7 @@ export default function FormsIndex() {
                       textAlign: "left",
                       padding: "16px",
                       cursor: "pointer",
+                      boxSizing: "border-box",
                     }}
                   >
                     <div style={{ display: "grid", gap: 8 }}>
@@ -1687,7 +1699,7 @@ export default function FormsIndex() {
                         </div>
                       ) : null}
                     </div>
-                  </button>
+                  </div>
                 </Card>
               ))
             ) : (

@@ -513,16 +513,21 @@ class FormSubmissionsController extends Controller
 
                 if ($type === 'file' || $type === 'photo') {
                     if (
-                        $formCodeKey === 'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles'
+                        in_array($formCodeKey, [
+                            'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles',
+                            'sst_pgi_ta_01_fo_01_boleta_de_observaciones',
+                        ], true)
                         && $id === 'evidencia_fotografica'
                     ) {
-                        $files = is_array($val) && isset($val[0]) ? $val : [$val];
-                
+                        $files = is_array($val) && isset($val[0])
+                            ? $val
+                            : [$val];
+                    
                         $storedFiles = [];
-                
+                    
                         foreach ($files as $file) {
-                
-                            // ✅ conservar archivos ya guardados
+                    
+                            // Conservar imágenes ya guardadas
                             if (
                                 is_array($file) &&
                                 !empty($file['path']) &&
@@ -531,31 +536,43 @@ class FormSubmissionsController extends Controller
                                 $storedFiles[] = $file;
                                 continue;
                             }
-                
-                            // ✅ guardar archivos nuevos
+                    
+                            // Guardar imágenes nuevas
                             if (
                                 is_array($file) &&
                                 !empty($file['data']) &&
                                 str_starts_with($file['data'], 'data:')
                             ) {
-                                $storedFile = $this->storeEvidenceForUnidadesMoviles(
-                                    $file,
-                                    $userId,
-                                    $id
-                                );
-                                
+                                if (
+                                    $formCodeKey ===
+                                    'sst_pgi_ta_01_fo_01_boleta_de_observaciones'
+                                ) {
+                                    $storedFile =
+                                        $this->storeEvidenceForBoletaObservaciones(
+                                            $file,
+                                            $userId,
+                                            $id
+                                        );
+                                } else {
+                                    $storedFile =
+                                        $this->storeEvidenceForUnidadesMoviles(
+                                            $file,
+                                            $userId,
+                                            $id
+                                        );
+                                }
+                    
                                 if (!$storedFile) {
                                     return response()->json([
-                                        'message' => 'Solo se permiten imágenes en Evidencia Fotográfica.'
+                                        'message' =>
+                                            'Solo se permiten imágenes en Evidencia Fotográfica.'
                                     ], 422);
                                 }
-                                
+                    
                                 $storedFiles[] = $storedFile;
-                                
-                                continue;
                             }
                         }
-                
+                    
                         $cleanAnswers[$id] = array_values($storedFiles);
                         continue;
                     }
@@ -565,6 +582,97 @@ class FormSubmissionsController extends Controller
                 }
 
                 if ($type === 'signature') {
+
+                    /*
+                     * Boleta de Observaciones:
+                     * firma_observado puede contener varias firmas,
+                     * una por cada persona observada.
+                     */
+                    if (
+                        $formCodeKey === 'sst_pgi_ta_01_fo_01_boleta_de_observaciones'
+                        && $id === 'firma_observado'
+                        && is_array($val)
+                    ) {
+                        $storedSignatures = [];
+                
+                        foreach ($val as $index => $item) {
+                            if (!is_array($item)) {
+                                continue;
+                            }
+                
+                            $nombre = trim((string) ($item['nombre'] ?? ''));
+                            $firma = $item['firma'] ?? '';
+                
+                            if (!is_string($firma)) {
+                                $firma = '';
+                            }
+                
+                            $firma = trim($firma);
+                
+                            /*
+                             * Si ya es una ruta guardada, conservarla.
+                             */
+                            if (
+                                $firma !== ''
+                                && !str_starts_with($firma, 'data:image/')
+                            ) {
+                                $storedSignatures[] = [
+                                    'nombre' => $nombre,
+                                    'firma' => $firma,
+                                ];
+                
+                                continue;
+                            }
+                
+                            /*
+                             * Si es una nueva firma en base64,
+                             * guardarla físicamente.
+                             */
+                            if (
+                                $firma !== ''
+                                && str_starts_with($firma, 'data:image/')
+                            ) {
+                                $storedPath =
+                                    $this->storeSignatureForBoletaObservaciones(
+                                        $firma,
+                                        $userId,
+                                        'firma_observado_' . ($index + 1)
+                                    );
+                
+                                if (!$storedPath) {
+                                    return response()->json([
+                                        'message' =>
+                                            $nombre !== ''
+                                                ? "No se pudo guardar la firma de {$nombre}."
+                                                : 'No se pudo guardar una de las firmas del observado.'
+                                    ], 422);
+                                }
+                
+                                $storedSignatures[] = [
+                                    'nombre' => $nombre,
+                                    'firma' => $storedPath,
+                                ];
+                
+                                continue;
+                            }
+                
+                            /*
+                             * Conservar el nombre aunque no tenga firma.
+                             */
+                            $storedSignatures[] = [
+                                'nombre' => $nombre,
+                                'firma' => '',
+                            ];
+                        }
+                
+                        $cleanAnswers[$id] = array_values($storedSignatures);
+                        continue;
+                    }
+                
+                    /*
+                     * Para cualquier otro campo signature que llegue como arreglo,
+                     * conservar el comportamiento actual.
+                     */
                     if (is_array($val)) {
                         $cleanAnswers[$id] = $val;
                         continue;
@@ -1602,14 +1710,15 @@ class FormSubmissionsController extends Controller
     
         $baseDirectory = 'forms/signatures/SSTPGITA01FO01_BoletaObservaciones';
     
-        $directory = match ($fieldId) {
-            'firma_reporta_observacion'
+        $directory = match (true) {
+            $fieldId === 'firma_reporta_observacion'
                 => $baseDirectory . '/Reporta_Observacion',
-    
-            'firma_observado'
+        
+            str_starts_with($fieldId, 'firma_observado')
                 => $baseDirectory . '/Observado',
-    
-            default => $baseDirectory,
+        
+            default
+                => $baseDirectory,
         };
     
         $fileName =
@@ -1631,6 +1740,91 @@ class FormSubmissionsController extends Controller
         );
     
         return $relativePath;
+    }
+
+    private function storeEvidenceForBoletaObservaciones( array $file, ?int $userId, string $fieldId): ?array 
+    { $dataUrl = $file['data'] ?? '';
+
+        if (!preg_match('/^data:(.*?);base64,/', $dataUrl, $matches)) {
+            return null;
+        }
+    
+        $mime = $matches[1] ?? 'application/octet-stream';
+    
+        $allowedMimes = [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'image/gif',
+            'image/bmp',
+            'image/heic',
+            'image/heif',
+        ];
+    
+        if (!in_array($mime, $allowedMimes, true)) {
+            return null;
+        }
+    
+        $base64 = preg_replace(
+            '/^data:.*?;base64,/',
+            '',
+            $dataUrl
+        );
+    
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $extensionMap = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+            'image/gif'  => 'gif',
+            'image/bmp'  => 'bmp',
+            'image/heic' => 'heic',
+            'image/heif' => 'heif',
+        ];
+    
+        $extension = $extensionMap[$mime] ?? 'jpg';
+    
+        $originalName =
+            $file['name'] ?? 'evidencia';
+    
+        $directory =
+            'forms/files/' .
+            'SSTPGITA01FO01_BoletaObservaciones/' .
+            'EvidenciaFotografica';
+    
+        $fileName =
+            'evidencia_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            Str::random(8) .
+            '.' .
+            $extension;
+    
+        $relativePath =
+            $directory . '/' . $fileName;
+    
+        Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return [
+            'name' => $originalName,
+            'type' => $mime,
+            'size' => $file['size'] ?? null,
+            'path' => $relativePath,
+        ];
     }
 
     private function storeSignatureForChecklistEslingasCadenas(string $dataUrl, ?int $userId, string $fieldId): ?string
