@@ -207,7 +207,17 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
   const openTableModal = (field) => {
     if (readOnly) return;
 
+    const currentRows = Array.isArray(answers[field.id])
+      ? answers[field.id]
+      : [];
+
+    if (currentRows.length >= 1) {
+      setMsg("Solo se permite una fila en la tabla de Inspección de Grúa Viajera.");
+      return;
+    }
+
     clearTableModalError();
+    setMsg("");
     setTableRowDraft(buildRowDraft(field, null));
     setTableModal({
       open: true,
@@ -307,10 +317,19 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
       }
     }
 
-    const currentRows = Array.isArray(answers[field.id]) ? answers[field.id] : [];
+    const currentRows = Array.isArray(answers[field.id])
+      ? answers[field.id]
+      : [];
 
     if (tableModal.editIndex === null || tableModal.editIndex === undefined) {
-      setVal(field.id, [...currentRows, { ...tableRowDraft }]);
+      if (currentRows.length >= 1) {
+        setTableModalError(
+          "Solo se permite una fila en la tabla de Inspección de Grúa Viajera."
+        );
+        return;
+      }
+
+      setVal(field.id, [{ ...tableRowDraft }]);
     } else {
       const nextRows = currentRows.map((row, idx) =>
         idx === tableModal.editIndex ? { ...tableRowDraft } : row
@@ -1354,7 +1373,7 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
             </table>
           </div>
 
-          {!readOnly ? (
+          {!readOnly && rows.length === 0 ? (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 type="button"
@@ -1550,6 +1569,12 @@ export default function SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera({
 
     if (!rows.length) {
       setMsg("Debes agregar al menos una fila en la tabla de criterios a inspeccionar.");
+      scrollToTopSafe();
+      return false;
+    }
+
+    if (rows.length > 1) {
+      setMsg("Solo se permite una fila en la tabla de Inspección de Grúa Viajera.");
       scrollToTopSafe();
       return false;
     }

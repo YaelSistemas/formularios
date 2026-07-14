@@ -131,6 +131,12 @@ class SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera implements FormDefinition
                     ],
                     'row_schema' => [
                         [
+                            'id' => 'fecha_uso',
+                            'label' => 'Fecha de uso',
+                            'type' => 'date',
+                            'required' => true,
+                        ],
+                        [
                             'id' => 'numero_revision',
                             'label' => 'Número de Revisión',
                             'type' => 'text',

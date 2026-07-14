@@ -214,13 +214,23 @@
         $tablaGrua = collect(data_get($answers, 'tabla_grua_viajera', []))
             ->filter(fn($item) => !empty(array_filter($item, fn($value) => $value !== null && $value !== '')))
             ->values();
-
-        $fechaInspeccion =
-        optional($submission->created_at)->format('d/m/Y') ?: '';
     @endphp
 
     @foreach($tablaGrua as $pageIndex => $rowGrua)
         @php
+
+            $fechaUsoRaw = data_get($rowGrua, 'fecha_uso', '');
+    
+            $fechaUso = '';
+            
+            if (!empty($fechaUsoRaw)) {
+                try {
+                    $fechaUso = \Carbon\Carbon::parse($fechaUsoRaw)->format('d/m/Y');
+                } catch (\Throwable $e) {
+                    $fechaUso = $fechaUsoRaw;
+                }
+            }
+
             $rows = [
                 [
                     'descripcion' => 'Número de Revisión',
@@ -499,7 +509,7 @@
             <!-- FILA 2 -->
             <tr>
                 <td style="border:1px solid #000; height:20px; text-align:center; vertical-align:middle; font-size:8px;">
-                    {{ $fechaInspeccion }}
+                    {{ $fechaUso }}
                 </td>
             </tr>
         
