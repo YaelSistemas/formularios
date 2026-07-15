@@ -64,7 +64,7 @@ class SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico implements Form
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 00',
+                    'text' => 'Número de Revisión: 02',
                 ],
 
                 [

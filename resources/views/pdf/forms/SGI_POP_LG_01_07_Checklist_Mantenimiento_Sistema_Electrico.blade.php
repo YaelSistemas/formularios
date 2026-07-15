@@ -145,12 +145,12 @@
 
                 <!-- NOMBRE FORMULARIO -->
                 <td class="center-cell">
-                    Checklist de Mantenimiento Sistema Eléctrico
+                    CHECKLIST DE MANTENIMIENTO SISTEMA ELÉCTRICO
                 </td>
 
                 <!-- REVISION -->
                 <td class="right-cell">
-                    REVISIÓN: 00
+                    REVISIÓN: 02
                 </td>
             </tr>
         </table>
@@ -183,7 +183,7 @@
                     text-align:center;
                     font-weight:bold;
                 ">
-                    TALLER:
+                    UNIDAD DE SERVICIO:
                     {{ $answers['taller'] ?? '' }}
                 </td>
             </tr>
