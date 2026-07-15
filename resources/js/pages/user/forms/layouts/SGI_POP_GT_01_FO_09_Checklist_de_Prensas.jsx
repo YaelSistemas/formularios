@@ -25,6 +25,20 @@ export default function SGI_POP_GT_01_FO_09_Checklist_de_Prensas({
 
   const [signatureModal, setSignatureModal] = useState({ open: false, field: null });
 
+  const [equipmentModal, setEquipmentModal] = useState({
+    open: false,
+    editIndex: null,
+  });
+
+  const [equipmentDraft, setEquipmentDraft] = useState({
+    cantidad: "",
+    nombre_equipo: "",
+    numero_serie: "",
+    observaciones: "",
+  });
+
+  const [equipmentError, setEquipmentError] = useState("");
+
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.innerWidth < 768;
@@ -72,6 +86,120 @@ export default function SGI_POP_GT_01_FO_09_Checklist_de_Prensas({
 
   const getField = (id) => fields.find((f) => f.id === id);
 
+  const getEquipmentRows = () => {
+    const rows = answers?.tabla_equipos_medicion;
+
+    if (Array.isArray(rows)) {
+      return rows;
+    }
+
+    // Compatibilidad con registros anteriores que usaban campos individuales.
+    const legacyRow = {
+      cantidad: answers?.cantidad_equipo_medicion ?? "",
+      nombre_equipo: answers?.nombre_equipo ?? "",
+      numero_serie: answers?.numero_serie_equipo ?? "",
+      observaciones: answers?.observaciones ?? "",
+    };
+
+    const hasLegacyData = Object.values(legacyRow).some(
+      (value) => value !== null && value !== undefined && String(value).trim() !== ""
+    );
+
+    return hasLegacyData ? [legacyRow] : [];
+  };
+
+  const openEquipmentModal = (editIndex = null) => {
+    if (readOnly) return;
+
+    const rows = getEquipmentRows();
+    const row =
+      editIndex === null || editIndex === undefined
+        ? null
+        : rows[editIndex] || null;
+
+    setEquipmentDraft({
+      cantidad: row?.cantidad ?? "",
+      nombre_equipo: row?.nombre_equipo ?? "",
+      numero_serie: row?.numero_serie ?? "",
+      observaciones: row?.observaciones ?? "",
+    });
+
+    setEquipmentError("");
+    setEquipmentModal({
+      open: true,
+      editIndex,
+    });
+  };
+
+  const closeEquipmentModal = () => {
+    setEquipmentModal({
+      open: false,
+      editIndex: null,
+    });
+
+    setEquipmentDraft({
+      cantidad: "",
+      nombre_equipo: "",
+      numero_serie: "",
+      observaciones: "",
+    });
+
+    setEquipmentError("");
+  };
+
+  const updateEquipmentDraft = (fieldId, value) => {
+    setEquipmentDraft((prev) => ({
+      ...prev,
+      [fieldId]: value,
+    }));
+
+    if (equipmentError) {
+      setEquipmentError("");
+    }
+  };
+
+  const saveEquipmentRow = () => {
+    const hasAnyValue = Object.values(equipmentDraft).some(
+      (value) => value !== null && value !== undefined && String(value).trim() !== ""
+    );
+
+    if (!hasAnyValue) {
+      setEquipmentError("Captura al menos un dato del equipo antes de guardarlo.");
+      return;
+    }
+
+    if (equipmentDraft.cantidad !== "" && Number(equipmentDraft.cantidad) < 0) {
+      setEquipmentError("La cantidad no puede ser negativa.");
+      return;
+    }
+
+    const rows = [...getEquipmentRows()];
+    const normalizedRow = {
+      cantidad: equipmentDraft.cantidad === "" ? "" : Number(equipmentDraft.cantidad),
+      nombre_equipo: String(equipmentDraft.nombre_equipo ?? "").trim(),
+      numero_serie: String(equipmentDraft.numero_serie ?? "").trim(),
+      observaciones: String(equipmentDraft.observaciones ?? "").trim(),
+    };
+
+    if (equipmentModal.editIndex === null || equipmentModal.editIndex === undefined) {
+      rows.push(normalizedRow);
+    } else {
+      rows[equipmentModal.editIndex] = normalizedRow;
+    }
+
+    setVal("tabla_equipos_medicion", rows);
+    setMsg("");
+    closeEquipmentModal();
+  };
+
+  const removeEquipmentRow = (index) => {
+    if (readOnly) return;
+
+    const rows = getEquipmentRows().filter((_, rowIndex) => rowIndex !== index);
+    setVal("tabla_equipos_medicion", rows);
+    setMsg("");
+  };
+
   const openSectionForField = (fieldId) => {
     const id = String(fieldId || "");
 
@@ -101,6 +229,7 @@ export default function SGI_POP_GT_01_FO_09_Checklist_de_Prensas({
     }
 
     if (
+      id === "tabla_equipos_medicion" ||
       id === "cantidad_equipo_medicion" ||
       id === "nombre_equipo" ||
       id === "numero_serie_equipo" ||
@@ -519,10 +648,7 @@ export default function SGI_POP_GT_01_FO_09_Checklist_de_Prensas({
   const accionRealizar = getField("accion_realizar");
   const textoEstado = getField("texto_estado");
   const notas = getField("notas");
-  const cantidadEquipoMedicion = getField("cantidad_equipo_medicion");
-  const nombreEquipo = getField("nombre_equipo");
-  const numeroSerieEquipo = getField("numero_serie_equipo");
-  const observaciones = getField("observaciones");
+  const tablaEquiposMedicion = getField("tabla_equipos_medicion");
   const nombreEntregaPrensa = getField("nombre_entrega_prensa");
   const firmaEntregaPrensa = getField("firma_entrega_prensa");
   const nombreRecibePrensa = getField("nombre_recibe_prensa");
@@ -746,6 +872,215 @@ export default function SGI_POP_GT_01_FO_09_Checklist_de_Prensas({
         {cantidad ? renderOuterField({ ...cantidad, label: "Cantidad (pza)" }) : null}
         {cantidad && comentarios ? renderDivider(`${baseId}_cantidad_divider`) : null}
         {comentarios ? renderOuterField({ ...comentarios, label: "Comentarios" }) : null}
+      </div>
+    );
+  };
+
+  const renderEquipmentTable = () => {
+    const rows = getEquipmentRows();
+
+    return (
+      <div
+        ref={(el) => {
+          formFieldWrapRefs.current.tabla_equipos_medicion = el;
+        }}
+        style={{ display: "grid", gap: 12 }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>
+              {tablaEquiposMedicion?.label || "Equipos de medición"}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+              Puedes agregar, editar o eliminar varios equipos.
+            </div>
+          </div>
+
+          {!readOnly ? (
+            <button
+              type="button"
+              onClick={() => openEquipmentModal(null)}
+              style={{
+                borderRadius: 12,
+                border: "1px solid #c7d2fe",
+                background: "#eef2ff",
+                color: "#1e40af",
+                padding: "10px 14px",
+                cursor: "pointer",
+                fontWeight: 800,
+                fontSize: 14,
+              }}
+            >
+              + Agregar equipo
+            </button>
+          ) : null}
+        </div>
+
+        {rows.length === 0 ? (
+          <div
+            style={{
+              border: "1px dashed #cbd5e1",
+              borderRadius: 12,
+              background: "#f8fafc",
+              padding: 16,
+              textAlign: "center",
+              color: "#64748b",
+              fontSize: 14,
+            }}
+          >
+            Sin equipos de medición registrados.
+          </div>
+        ) : isMobile ? (
+          <div style={{ display: "grid", gap: 12 }}>
+            {rows.map((row, index) => (
+              <div
+                key={`equipo_${index}`}
+                style={{
+                  border: "1px solid #dbe4ee",
+                  borderRadius: 14,
+                  background: "#fff",
+                  padding: 14,
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>
+                  Equipo #{index + 1}
+                </div>
+                <div style={{ fontSize: 13 }}><b>Cantidad:</b> {row?.cantidad ?? "—"}</div>
+                <div style={{ fontSize: 13 }}><b>Nombre:</b> {row?.nombre_equipo || "—"}</div>
+                <div style={{ fontSize: 13 }}><b>Número de serie:</b> {row?.numero_serie || "—"}</div>
+                <div style={{ fontSize: 13, whiteSpace: "pre-line" }}>
+                  <b>Observaciones:</b> {row?.observaciones || "—"}
+                </div>
+
+                {!readOnly ? (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => openEquipmentModal(index)}
+                      style={{
+                        borderRadius: 10,
+                        border: "1px solid #bfdbfe",
+                        background: "#eff6ff",
+                        color: "#1d4ed8",
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => removeEquipmentRow(index)}
+                      style={{
+                        borderRadius: 10,
+                        border: "1px solid #fecaca",
+                        background: "#fef2f2",
+                        color: "#b91c1c",
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ width: "100%", overflowX: "auto", border: "1px solid #dbe4ee", borderRadius: 12 }}>
+            <table
+              style={{
+                width: "100%",
+                minWidth: 700,
+                borderCollapse: "collapse",
+                tableLayout: "fixed",
+                fontSize: 13,
+              }}
+            >
+              <thead>
+                <tr style={{ background: "#eef2f7" }}>
+                  <th style={{ borderBottom: "1px solid #dbe4ee", padding: 10 }}>Cantidad</th>
+                  <th style={{ borderBottom: "1px solid #dbe4ee", padding: 10 }}>Nombre del equipo</th>
+                  <th style={{ borderBottom: "1px solid #dbe4ee", padding: 10 }}>Número de serie</th>
+                  <th style={{ borderBottom: "1px solid #dbe4ee", padding: 10 }}>Observaciones</th>
+                  {!readOnly ? (
+                    <th style={{ width: 150, borderBottom: "1px solid #dbe4ee", padding: 10 }}>Acciones</th>
+                  ) : null}
+                </tr>
+              </thead>
+
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={`equipo_${index}`}>
+                    <td style={{ borderBottom: "1px solid #e5e7eb", padding: 10, textAlign: "center", verticalAlign: "top" }}>
+                      {row?.cantidad ?? ""}
+                    </td>
+                    <td style={{ borderBottom: "1px solid #e5e7eb", padding: 10, verticalAlign: "top" }}>
+                      {row?.nombre_equipo || ""}
+                    </td>
+                    <td style={{ borderBottom: "1px solid #e5e7eb", padding: 10, verticalAlign: "top" }}>
+                      {row?.numero_serie || ""}
+                    </td>
+                    <td style={{ borderBottom: "1px solid #e5e7eb", padding: 10, whiteSpace: "pre-line", verticalAlign: "top" }}>
+                      {row?.observaciones || ""}
+                    </td>
+
+                    {!readOnly ? (
+                      <td style={{ borderBottom: "1px solid #e5e7eb", padding: 10, verticalAlign: "top" }}>
+                        <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={() => openEquipmentModal(index)}
+                            style={{
+                              borderRadius: 9,
+                              border: "1px solid #bfdbfe",
+                              background: "#eff6ff",
+                              color: "#1d4ed8",
+                              padding: "7px 10px",
+                              cursor: "pointer",
+                              fontWeight: 800,
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeEquipmentRow(index)}
+                            style={{
+                              borderRadius: 9,
+                              border: "1px solid #fecaca",
+                              background: "#fef2f2",
+                              color: "#b91c1c",
+                              padding: "7px 10px",
+                              cursor: "pointer",
+                              fontWeight: 800,
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     );
   };
@@ -1056,13 +1391,7 @@ export default function SGI_POP_GT_01_FO_09_Checklist_de_Prensas({
                   prestamoDevolucionOpen,
                   setPrestamoDevolucionOpen,
                   <>
-                    {cantidadEquipoMedicion ? renderOuterField(cantidadEquipoMedicion) : null}
-                    {cantidadEquipoMedicion ? renderDivider("cantidad_equipo_medicion_divider") : null}
-                    {nombreEquipo ? renderOuterField(nombreEquipo) : null}
-                    {nombreEquipo ? renderDivider("nombre_equipo_divider") : null}
-                    {numeroSerieEquipo ? renderOuterField(numeroSerieEquipo) : null}
-                    {numeroSerieEquipo ? renderDivider("numero_serie_equipo_divider") : null}
-                    {observaciones ? renderOuterField({ ...observaciones, label: "Observaciones" }) : null}
+                    {tablaEquiposMedicion ? renderEquipmentTable() : null}
                   </>
                 )}
 
@@ -1132,6 +1461,174 @@ export default function SGI_POP_GT_01_FO_09_Checklist_de_Prensas({
           ) : null}
         </form>
       </div>
+
+      {!readOnly && equipmentModal.open ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 1080,
+          }}
+          onClick={closeEquipmentModal}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 720,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              background: "#fff",
+              borderRadius: 14,
+              border: "1px solid #d1d5db",
+            }}
+          >
+            <div
+              style={{
+                padding: "14px 16px",
+                borderBottom: "1px solid #e5e7eb",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <h3 style={{ margin: 0 }}>
+                {equipmentModal.editIndex === null || equipmentModal.editIndex === undefined
+                  ? "Agregar equipo de medición"
+                  : "Editar equipo de medición"}
+              </h3>
+              <button
+                type="button"
+                onClick={closeEquipmentModal}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                  borderRadius: 8,
+                  width: 34,
+                  height: 34,
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 16, display: "grid", gap: 14 }}>
+              {equipmentError ? (
+                <div
+                  style={{
+                    borderRadius: 10,
+                    border: "1px solid #fdba74",
+                    background: "#fff7ed",
+                    color: "#9a3412",
+                    padding: "10px 12px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                  }}
+                >
+                  {equipmentError}
+                </div>
+              ) : null}
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <b style={{ fontSize: 14 }}>Cantidad</b>
+                <input
+                  type="number"
+                  min="0"
+                  value={equipmentDraft.cantidad}
+                  onChange={(e) => updateEquipmentDraft("cantidad", e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid #d1d5db",
+                    fontSize: isMobile ? 16 : 14,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <b style={{ fontSize: 14 }}>Nombre del equipo</b>
+                <input
+                  type="text"
+                  value={equipmentDraft.nombre_equipo}
+                  onChange={(e) => updateEquipmentDraft("nombre_equipo", e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid #d1d5db",
+                    fontSize: isMobile ? 16 : 14,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <b style={{ fontSize: 14 }}>Número de serie</b>
+                <input
+                  type="text"
+                  value={equipmentDraft.numero_serie}
+                  onChange={(e) => updateEquipmentDraft("numero_serie", e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid #d1d5db",
+                    fontSize: isMobile ? 16 : 14,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <b style={{ fontSize: 14 }}>Observaciones</b>
+                <textarea
+                  rows={4}
+                  value={equipmentDraft.observaciones}
+                  onChange={(e) => updateEquipmentDraft("observaciones", e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid #d1d5db",
+                    fontSize: isMobile ? 16 : 14,
+                    boxSizing: "border-box",
+                    resize: "vertical",
+                  }}
+                />
+              </label>
+            </div>
+
+            <div
+              style={{
+                padding: 16,
+                borderTop: "1px solid #e5e7eb",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <button type="button" onClick={closeEquipmentModal} style={topButtonStyle}>
+                Cancelar
+              </button>
+              <button type="button" onClick={saveEquipmentRow} style={primaryButtonStyle}>
+                {equipmentModal.editIndex === null || equipmentModal.editIndex === undefined
+                  ? "Agregar equipo"
+                  : "Guardar cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {!readOnly && signatureModal.open && signatureModal.field ? (
         <div

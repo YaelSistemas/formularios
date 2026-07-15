@@ -152,45 +152,58 @@
 
         <!-- HEADER -->
         <table class="header-table">
+            <!-- DEFINICIÓN DE ANCHOS -->
             <tr style="height:0; line-height:0;">
                 <td style="width:25%; padding:0; border:none; height:0;"></td>
                 <td style="width:45%; padding:0; border:none; height:0;"></td>
                 <td style="width:30%; padding:0; border:none; height:0;"></td>
             </tr>
-
+        
+            <!-- FILA 1: PÁGINA -->
             <tr>
-                <td rowspan="3" class="logo-cell">
+                <!-- LOGO UTILIZA LAS 4 FILAS -->
+                <td rowspan="4" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}">
                     @endif
                 </td>
-
-                <td class="center-cell">
+        
+                <!-- EMPRESA UTILIZA LAS FILAS DE PÁGINA Y CODIFICACIÓN -->
+                <td rowspan="2" class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
-
+        
                 <td class="right-cell">
-                    CODIFICACIÓN: SGI-POP-GT-01-FO-09
+                    PÁGINA: 1 DE 1
                 </td>
             </tr>
-
+        
+            <!-- FILA 2: CODIFICACIÓN -->
             <tr>
-                <td class="center-cell">
-                    SISTEMA DE GESTIÓN INTEGRAL
-                </td>
-
                 <td class="right-cell">
                     FECHA EMISIÓN: 27/03/2025
                 </td>
             </tr>
-
+        
+            <!-- FILA 3: FECHA EMISIÓN -->
             <tr>
                 <td class="center-cell">
-                    Checklist de Prensas
+                    SISTEMA DE GESTIÓN INTEGRAL
                 </td>
-
+        
                 <td class="right-cell">
-                    REVISIÓN: 00
+                    CÓDIGO: SGI-POP-GT-01-FO-09
+                </td>
+            </tr>
+        
+            <!-- FILA 4: REVISIÓN -->
+            <tr>
+                <td class="center-cell">
+                    CHECKLIST DE PRENSAS
+                </td>
+        
+                <td class="right-cell">
+                    REVISIÓN: 05
                 </td>
             </tr>
         </table>
@@ -864,6 +877,87 @@
             </tr>
         </table>
 
+        @php
+            $equiposMedicion = collect(
+                $answers['tabla_equipos_medicion'] ?? []
+            )
+                ->filter(function ($equipo) {
+                    if (!is_array($equipo)) {
+                        return false;
+                    }
+        
+                    return collect($equipo)->contains(function ($value) {
+                        return $value !== null &&
+                               $value !== '' &&
+                               trim((string) $value) !== '';
+                    });
+                })
+                ->values()
+                ->all();
+        
+            /*
+             * Guarda si originalmente no existía ningún registro.
+             * Debe hacerse antes de completar las tres filas vacías.
+             */
+            $sinEquiposMedicion = count($equiposMedicion) === 0;
+
+            /*
+             * Diagonal gruesa para las celdas de equipos de medición.
+             */
+            $diagonalTablaSvg = '
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="1000"
+                     height="100"
+                     viewBox="0 0 1000 100"
+                     preserveAspectRatio="none">
+                    <line
+                        x1="0"
+                        y1="0"
+                        x2="1000"
+                        y2="100"
+                        stroke="#ff0000"
+                        stroke-width="6"
+                    />
+                </svg>
+            ';
+            
+            $diagonalTablaSrc =
+                'data:image/svg+xml;base64,' .
+                base64_encode($diagonalTablaSvg);
+            
+            
+            /*
+             * Diagonal delgada para las firmas opcionales.
+             */
+            $diagonalFirmaSvg = '
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="1000"
+                     height="100"
+                     viewBox="0 0 1000 100"
+                     preserveAspectRatio="none">
+                    <line
+                        x1="0"
+                        y1="0"
+                        x2="1000"
+                        y2="100"
+                        stroke="#ff0000"
+                        stroke-width="6"
+                    />
+                </svg>
+            ';
+            
+            $diagonalFirmaSrc =
+                'data:image/svg+xml;base64,' .
+                base64_encode($diagonalFirmaSvg);
+                    
+            /*
+             * Siempre muestra como mínimo tres filas.
+             */
+            while (count($equiposMedicion) < 3) {
+                $equiposMedicion[] = [];
+            }
+        @endphp
+
         <!-- TABLA EQUIPO DE MEDICIÓN -->
         <table style="
             width:100%;
@@ -944,42 +1038,158 @@
                 </td>
             </tr>
         
-            <!-- FILA 3 -->
-            <tr style="height:22px;">
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px">
-                    {{ $answers['cantidad_equipo_medicion'] ?? '' }}
-                </td>
-        
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px">
-                    {{ $answers['nombre_equipo'] ?? '' }}
-                </td>
-        
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px">
-                    {{ $answers['numero_serie_equipo'] ?? '' }}
-                </td>
-        
-                <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px">
-                    {{ $answers['observaciones'] ?? '' }}
-                </td>
-            </tr>
-        
-            <!-- FILA 4 -->
-            <tr style="height:22px;">
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-            </tr>
+            <!-- FILAS DE EQUIPOS: MÍNIMO 3 -->
+            @if($sinEquiposMedicion)
             
-            <!-- FILA 5 -->
-            <tr style="height:22px;">
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-                <td style="border:1px solid #000; padding:2px;">&nbsp;</td>
-            </tr>
+                <!-- SIN REGISTROS: CADA CELDA TIENE SU PROPIA DIAGONAL -->
+                @for($filaEquipo = 0; $filaEquipo < 3; $filaEquipo++)
+                    <tr style="height:10px;">
+            
+                        <!-- CANTIDAD -->
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:0;
+                        ">
+                            <img
+                                src="{{ $diagonalTablaSrc }}"
+                                style="
+                                    display:block;
+                                    width:100%;
+                                    height:10px;
+                                    margin:0;
+                                    padding:0;
+                                "
+                            >
+                        </td>
+            
+                        <!-- NOMBRE DEL EQUIPO -->
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:0;
+                        ">
+                            <img
+                                src="{{ $diagonalTablaSrc }}"
+                                style="
+                                    display:block;
+                                    width:100%;
+                                    height:10px;
+                                    margin:0;
+                                    padding:0;
+                                "
+                            >
+                        </td>
+            
+                        <!-- NÚMERO DE SERIE -->
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:0;
+                        ">
+                            <img
+                                src="{{ $diagonalTablaSrc }}"
+                                style="
+                                    display:block;
+                                    width:100%;
+                                    height:10px;
+                                    margin:0;
+                                    padding:0;
+                                "
+                            >
+                        </td>
+            
+                        <!-- OBSERVACIONES -->
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:0;
+                        ">
+                            <img
+                                src="{{ $diagonalTablaSrc }}"
+                                style="
+                                    display:block;
+                                    width:100%;
+                                    height:10px;
+                                    margin:0;
+                                    padding:0;
+                                "
+                            >
+                        </td>
+            
+                    </tr>
+                @endfor
+            
+            @else
+            
+                <!-- CON REGISTROS -->
+                @foreach($equiposMedicion as $equipoIndex => $equipo)
+                    <tr style="height:10px;">
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0 1px;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:8px;
+                            font-size:6px;
+                        ">
+                            {{ $equipo['cantidad'] ?? '' }}&nbsp;
+                        </td>
+            
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0 1px;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:8px;
+                            font-size:6px;
+                        ">
+                            {{ $equipo['nombre_equipo'] ?? '' }}&nbsp;
+                        </td>
+            
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0 1px;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:8px;
+                            font-size:6px;
+                        ">
+                            {{ $equipo['numero_serie'] ?? '' }}&nbsp;
+                        </td>
+            
+                        <td style="
+                            border:1px solid #000;
+                            height:10px;
+                            padding:0 1px;
+                            text-align:center;
+                            vertical-align:middle;
+                            line-height:8px;
+                            font-size:6px;
+                        ">
+                            {{ $equipo['observaciones'] ?? '' }}&nbsp;
+                        </td>
+                    </tr>
+                @endforeach
+            
+            @endif
         
-            <!-- FILA 6 -->
+            <!-- FILA VACÍA DESPUÉS DE LOS REGISTROS -->
             <tr style="height:30px;">
                 <td colspan="4" style="
                     border:1px solid #000;
@@ -988,6 +1198,7 @@
                     text-align:center;
                     vertical-align:middle;
                 ">
+                </td>
             </tr>
         </table>
 
@@ -1043,42 +1254,86 @@
             </tr>
         
             <tr style="height:70px;">
+                <!-- FIRMA Y NOMBRE DE QUIEN ENTREGA -->
                 <td style="
                     border:1px solid #000;
                     text-align:center;
                     vertical-align:middle;
                     padding:4px;
+                    height:70px;
                 ">
                     @if($firmaEntregaSrc)
-                        <img src="{{ $firmaEntregaSrc }}" style="
-                            width:130px;
-                            height:45px;
-                            object-fit:contain;
-                            display:block;
-                            margin:0 auto 2px auto;
-                        ">
+                        <img
+                            src="{{ $firmaEntregaSrc }}"
+                            style="
+                                width:130px;
+                                height:45px;
+                                object-fit:contain;
+                                display:block;
+                                margin:0 auto 2px auto;
+                            "
+                        >
+                    @else
+                        <img
+                            src="{{ $diagonalFirmaSrc }}"
+                            style="
+                                width:100%;
+                                height:45px;
+                                display:block;
+                                margin:0 0 2px 0;
+                                padding:0;
+                            "
+                        >
                     @endif
-        
-                    <div>{{ $nombreEntregaPrensa }}</div>
+                
+                    <div style="
+                        height:12px;
+                        line-height:12px;
+                        text-align:center;
+                    ">
+                        {{ $nombreEntregaPrensa }}
+                    </div>
                 </td>
         
+                <!-- FIRMA Y NOMBRE DE QUIEN RECIBE -->
                 <td style="
                     border:1px solid #000;
                     text-align:center;
                     vertical-align:middle;
                     padding:4px;
+                    height:70px;
                 ">
                     @if($firmaRecibeSrc)
-                        <img src="{{ $firmaRecibeSrc }}" style="
-                            width:130px;
-                            height:45px;
-                            object-fit:contain;
-                            display:block;
-                            margin:0 auto 2px auto;
-                        ">
+                        <img
+                            src="{{ $firmaRecibeSrc }}"
+                            style="
+                                width:130px;
+                                height:45px;
+                                object-fit:contain;
+                                display:block;
+                                margin:0 auto 2px auto;
+                            "
+                        >
+                    @else
+                        <img
+                            src="{{ $diagonalFirmaSrc }}"
+                            style="
+                                width:100%;
+                                height:45px;
+                                display:block;
+                                margin:0 0 2px 0;
+                                padding:0;
+                            "
+                        >
                     @endif
-        
-                    <div>{{ $nombreRecibePrensa }}</div>
+                
+                    <div style="
+                        height:12px;
+                        line-height:12px;
+                        text-align:center;
+                    ">
+                        {{ $nombreRecibePrensa }}
+                    </div>
                 </td>
         
                 <td style="

@@ -66,7 +66,7 @@ class SGI_POP_GT_01_FO_09_Checklist_de_Prensas implements FormDefinition
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 00',
+                    'text' => 'Número de Revisión: 05',
                 ],
 
                 [
@@ -229,29 +229,39 @@ class SGI_POP_GT_01_FO_09_Checklist_de_Prensas implements FormDefinition
                     'type' => 'static_text',
                     'text' => 'EN CASO DE PRESTAMO O DEVOLUCIÓN: INTEGRAR LOS DATOS DEL EQUIPO DE MEDICIÓN COMO COMPLEMENTO DE LA PRENSA',
                 ],
+
                 [
-                    'id' => 'cantidad_equipo_medicion',
-                    'label' => 'Cantidad',
-                    'type' => 'number',
-                    'required' => true,
-                ],
-                [
-                    'id' => 'nombre_equipo',
-                    'label' => 'Nombre del equipo',
-                    'type' => 'text',
-                    'required' => true,
-                ],
-                [
-                    'id' => 'numero_serie_equipo',
-                    'label' => 'Número de serie',
-                    'type' => 'text',
-                    'required' => true,
-                ],
-                [
-                    'id' => 'observaciones',
-                    'label' => 'Observaciones',
-                    'type' => 'textarea',
+                    'id' => 'tabla_equipos_medicion',
+                    'label' => 'Equipos de medición',
+                    'type' => 'table',
                     'required' => false,
+                
+                    'row_schema' => [
+                        [
+                            'id' => 'cantidad',
+                            'label' => 'Cantidad',
+                            'type' => 'number',
+                            'required' => false,
+                        ],
+                        [
+                            'id' => 'nombre_equipo',
+                            'label' => 'Nombre del equipo',
+                            'type' => 'text',
+                            'required' => false,
+                        ],
+                        [
+                            'id' => 'numero_serie',
+                            'label' => 'Número de serie',
+                            'type' => 'text',
+                            'required' => false,
+                        ],
+                        [
+                            'id' => 'observaciones',
+                            'label' => 'Observaciones',
+                            'type' => 'textarea',
+                            'required' => false,
+                        ],
+                    ],
                 ],
 
                 [
@@ -263,26 +273,26 @@ class SGI_POP_GT_01_FO_09_Checklist_de_Prensas implements FormDefinition
                     'id' => 'nombre_entrega_prensa',
                     'label' => 'Nombre de quien entrega prensa',
                     'type' => 'text',
-                    'required' => true,
+                    'required' => false,
                 ],
                 [
                     'id' => 'firma_entrega_prensa',
                     'label' => 'Firma de quien entrega prensa',
                     'type' => 'signature',
-                    'required' => true,
+                    'required' => false,
                     'save_path' => 'forms/signatures/SGIPOPGT01FO09_ChecklistPrensas/Entrega_Prensa',
                 ],
                 [
                     'id' => 'nombre_recibe_prensa',
                     'label' => 'Nombre de quien recibe prensa',
                     'type' => 'text',
-                    'required' => true,
+                    'required' => false,
                 ],
                 [
                     'id' => 'firma_recibe_prensa',
                     'label' => 'Firma de quien recibe prensa',
                     'type' => 'signature',
-                    'required' => true,
+                    'required' => false,
                     'save_path' => 'forms/signatures/SGIPOPGT01FO09_ChecklistPrensas/Recibe_Prensa',
                 ],
                 [
