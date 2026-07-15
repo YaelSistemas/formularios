@@ -64,7 +64,7 @@ class SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos implements FormDef
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 01',
+                    'text' => 'Número de Revisión: 03',
                 ],
 
                 [
