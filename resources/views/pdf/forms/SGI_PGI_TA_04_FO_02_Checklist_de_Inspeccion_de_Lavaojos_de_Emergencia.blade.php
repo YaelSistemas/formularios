@@ -23,6 +23,10 @@
             margin: 0;
         }
 
+        .page-break {
+            page-break-after: always;
+        }
+
         .header-table {
             width: 100%;
             border-collapse: collapse;
@@ -82,6 +86,22 @@
 
     $tablaLavaojos = $answers['tabla_lavaojos_emergencia'] ?? [];
 
+    if (!is_array($tablaLavaojos)) {
+        $tablaLavaojos = [];
+    }
+
+    $tablaLavaojos = array_values($tablaLavaojos);
+
+    $registrosPorPagina = 10;
+    $paginasLavaojos = array_chunk($tablaLavaojos, $registrosPorPagina);
+
+    // Si no existen registros, se conserva una hoja con 10 filas vacías.
+    if (count($paginasLavaojos) === 0) {
+        $paginasLavaojos = [[]];
+    }
+
+    $totalPaginas = count($paginasLavaojos);
+
     $observacionesGenerales = $answers['observaciones_generales'] ?? '';
     $nombreInspector = $answers['nombre_inspector'] ?? '';
     $firmaInspector = $answers['firma_inspector'] ?? '';
@@ -99,49 +119,64 @@
     }
 @endphp
 
+@foreach($paginasLavaojos as $paginaIndex => $registrosPagina)
 <div class="sheet">
 
     <!-- HEADER -->
     <table class="header-table">
+        <!-- CONTROL DE ANCHOS -->
         <tr style="height:0; line-height:0;">
             <td style="width:25%; padding:0; border:none; height:0;"></td>
             <td style="width:45%; padding:0; border:none; height:0;"></td>
             <td style="width:30%; padding:0; border:none; height:0;"></td>
         </tr>
-
+    
+        <!-- FILA 1: CÓDIGO -->
         <tr>
-            <td rowspan="3" class="logo-cell">
+            <!-- LOGO ABARCA LAS 4 FILAS -->
+            <td rowspan="4" class="logo-cell">
                 @if($logoSrc)
                     <img src="{{ $logoSrc }}">
                 @endif
             </td>
-
+    
             <td class="center-cell">
                 VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
             </td>
-
+    
             <td class="right-cell">
-                CODIFICACIÓN: SGI-PGI-TA-04-FO-02
+                CÓDIGO: SGI-PGI-TA-04-FO-02
             </td>
         </tr>
-
+    
+        <!-- FILA 2: FECHA DE EMISIÓN -->
         <tr>
             <td class="center-cell">
                 SISTEMA DE GESTIÓN INTEGRAL
             </td>
-
+    
             <td class="right-cell">
-                FECHA EMISIÓN:
+                FECHA EMISIÓN: 27/03/2025
             </td>
         </tr>
-
+    
+        <!-- FILA 3: REVISIÓN -->
         <tr>
-            <td class="center-cell">
-                CHECKLIST DE INSPECCIÓN DE LAVAOJOS DE EMERGENCIA
+            <!-- EL TÍTULO ABARCA REVISIÓN Y PÁGINA -->
+            <td rowspan="2" class="center-cell">
+                INSPECCIÓN DE LAVAOJOS DE EMERGENCIA
             </td>
-
+    
             <td class="right-cell">
-                REVISIÓN:
+                REVISIÓN: 03
+            </td>
+        </tr>
+    
+        <!-- FILA 4: PÁGINA -->
+        <tr>
+            <td class="right-cell">
+                PÁGINA: {{ str_pad($paginaIndex + 1, 2, '0', STR_PAD_LEFT) }}
+                DE {{ str_pad($totalPaginas, 2, '0', STR_PAD_LEFT) }}
             </td>
         </tr>
     </table>
@@ -172,7 +207,7 @@
                 padding:6px 8px;
                 text-align:center;
             ">
-                <strong>TALLER:</strong>
+                <strong>TALLER/UNIDA DE SERVICIO:</strong>
                 {{ $answers['taller'] ?? '' }}
             </td>
     
@@ -287,7 +322,7 @@
         
         @for($i = 0; $i < 10; $i++)
             @php
-                $row = $tablaLavaojos[$i] ?? [];
+                $row = $registrosPagina[$i] ?? [];
         
                 $numero = $row['numero_lavaojos_emergencia'] ?? '';
         
@@ -449,6 +484,7 @@
         <tr style="height:40px;">
             <td rowspan="2" style="
                 border:1px solid #000;
+                border-top:none;
                 text-align:left;
                 vertical-align:top;
                 padding:6px;
@@ -518,6 +554,11 @@
     </table>
 
 </div>
+
+@if(!$loop->last)
+    <div class="page-break"></div>
+@endif
+@endforeach
 
 </body>
 </html>
