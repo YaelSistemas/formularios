@@ -23,6 +23,10 @@
             margin: 0;
         }
 
+        .page-break {
+            page-break-after: always;
+        }
+
         .header-table {
             width: 100%;
             border-collapse: collapse;
@@ -80,13 +84,20 @@
         }
 
         $tablaPrensasPasamanos = $answers['tabla_prensas_pasamanos'] ?? [];
-        $primerRegistro = $tablaPrensasPasamanos[0] ?? [];
-        
-        $codigoIdentificacionPrensa = $primerRegistro['codigo_identificacion_prensa'] ?? '';
 
-        $tipoPrensa = $primerRegistro['tipo_prensa'] ?? '';
-        $tipoVoltaje = $primerRegistro['tipo_voltaje'] ?? '';
-        
+        if (!is_array($tablaPrensasPasamanos)) {
+            $tablaPrensasPasamanos = [];
+        }
+
+        $tablaPrensasPasamanos = array_values($tablaPrensasPasamanos);
+
+        // Por seguridad, si no existen filas se genera una hoja vacía.
+        if (count($tablaPrensasPasamanos) === 0) {
+            $tablaPrensasPasamanos = [[]];
+        }
+
+        $totalPaginas = count($tablaPrensasPasamanos);
+
         $prensaPasamanosSrc = null;
         $prensaPasamanosPath = public_path('images/forms/SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos/prensa_pasamanos.jpg');
         
@@ -110,8 +121,6 @@
             11 => 'RIEL INTERNO (MOLDE)',
             12 => 'TORNILLERÍA GENERAL',
         ];
-        
-        $notas = $primerRegistro['notas'] ?? '';
         
         $nombreInspeccionaMantenimiento = $answers['nombre_inspecciona_mantenimiento'] ?? '';
         $firmaInspeccionaMantenimiento = $answers['firma_inspecciona_mantenimiento'] ?? '';
@@ -137,49 +146,80 @@
         $firmaResponsableSrc = $getFirmaSrc($firmaResponsableAreaPasamanos);
     @endphp
 
-    <div class="sheet">
+    @foreach($tablaPrensasPasamanos as $paginaIndex => $registroPrensa)
+        @php
+            $codigoIdentificacionPrensa =
+                $registroPrensa['codigo_identificacion_prensa'] ?? '';
+
+            $tipoPrensa =
+                $registroPrensa['tipo_prensa'] ?? '';
+
+            $tipoVoltaje =
+                $registroPrensa['tipo_voltaje'] ?? '';
+
+            $accionRealizar =
+                $registroPrensa['accion_realizar'] ?? '';
+
+            $notas =
+                $registroPrensa['notas'] ?? '';
+        @endphp
+
+        <div class="sheet">
 
         <!-- HEADER -->
         <table class="header-table">
+            <!-- CONTROL DE ANCHOS -->
             <tr style="height:0; line-height:0;">
                 <td style="width:25%; padding:0; border:none; height:0;"></td>
                 <td style="width:45%; padding:0; border:none; height:0;"></td>
                 <td style="width:30%; padding:0; border:none; height:0;"></td>
             </tr>
-
+        
+            <!-- FILA 1: PÁGINA -->
             <tr>
-                <td rowspan="3" class="logo-cell">
+                <!-- LOGO ABARCA LAS 4 FILAS -->
+                <td rowspan="4" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}">
                     @endif
                 </td>
-
-                <td class="center-cell">
+        
+                <!-- EMPRESA ABARCA PÁGINA Y FECHA -->
+                <td rowspan="2" class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
-
+        
                 <td class="right-cell">
-                    CODIFICACIÓN: SGI-POP-FO-01
+                    PÁGINA: {{ $paginaIndex + 1 }} DE {{ $totalPaginas }}
                 </td>
             </tr>
-
+        
+            <!-- FILA 2: FECHA DE EMISIÓN -->
+            <tr>
+                <td class="right-cell">
+                    FECHA EMISIÓN: 27/03/2025
+                </td>
+            </tr>
+        
+            <!-- FILA 3: CÓDIGO -->
             <tr>
                 <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
-
+        
                 <td class="right-cell">
-                    FECHA EMISIÓN:
+                    CÓDIGO: SGI-POP-FO-01
                 </td>
             </tr>
-
+        
+            <!-- FILA 4: REVISIÓN -->
             <tr>
                 <td class="center-cell">
                     CHECKLIST DE PRENSAS PARA PASAMANOS
                 </td>
-
+        
                 <td class="right-cell">
-                    REVISIÓN:
+                    REVISIÓN: 01
                 </td>
             </tr>
         </table>
@@ -238,7 +278,7 @@
                                     font-size:8px;
                                     font-weight:bold;
                                 ">
-                                    TALLER:
+                                    UNIDAD DE SERVICIO:
                                 </span>
         
                                 <span style="
@@ -295,7 +335,27 @@
             $col7 = '3%';
             $col8 = '40%';
         
-            $accionRealizar = $primerRegistro['accion_realizar'] ?? '';
+            $estiloOpcionSeleccionada = function ($valorSeleccionado, $opcion) {
+                if ($valorSeleccionado === $opcion) {
+                    return '
+                        display:inline-block;
+                        border:1px solid #ff0000;
+                        color:#ff0000;
+                        font-weight:bold;
+                        padding:1px 6px;
+                        line-height:1.2;
+                    ';
+                }
+            
+                return '
+                    display:inline-block;
+                    border:1px solid transparent;
+                    color:#000;
+                    font-weight:normal;
+                    padding:1px 6px;
+                    line-height:1.2;
+                ';
+            };
         @endphp
         
         <table style="
@@ -345,7 +405,7 @@
             <tr style="height:{{ $filaAlto }};">
                 <td colspan="7" style="border:1px solid #000; border-bottom:none; padding:4px;">&nbsp;</td>
             
-                <td rowspan="13" style="
+                <td rowspan="14" style="
                     border:1px solid #000;
                     border-top:none;
                     text-align:center;
@@ -366,7 +426,7 @@
         
             <!-- FILA 3 -->
             <tr style="height:{{ $filaAlto }};">
-                <td rowspan="8" style="border:1px solid #000; border-right:none; border-top:none;">&nbsp;</td>
+                <td rowspan="9" style="border:1px solid #000; border-right:none; border-top:none;">&nbsp;</td>
         
                 <td style="
                     border:1px solid #000;
@@ -380,7 +440,7 @@
                     TIPO DE PRENSA:
                 </td>
         
-                <td colspan="2" rowspan="8" style="border:none;">
+                <td colspan="2" rowspan="9" style="border:none;">
                     &nbsp;
                 </td>
         
@@ -396,50 +456,100 @@
                     TIPO DE VOLTAJE:
                 </td>
         
-                <td colspan="2" rowspan="8" style="border:none;">
+                <td colspan="2" rowspan="9" style="border:none;">
                     &nbsp;
                 </td>
             </tr>
         
             <!-- FILA 4 -->
             <tr style="height:{{ $filaAlto }};">
-                <td style="border:none; text-align:center;">T79</td>
-                <td style="border:none; text-align:center;">220 VOLTS</td>
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, 'H49') }}">
+                        H49
+                    </span>
+                </td>
+            
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoVoltaje, '220 VOLTS') }}">
+                        220 VOLTS
+                    </span>
+                </td>
             </tr>
-        
+            
             <!-- FILA 5 -->
             <tr style="height:{{ $filaAlto }};">
-                <td style="border:none; text-align:center;">E99</td>
-                <td style="border:none; text-align:center;">110 VOLTS</td>
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, 'T79') }}">
+                        T79
+                    </span>
+                </td>
+            
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoVoltaje, '110 VOLTS') }}">
+                        110 VOLTS
+                    </span>
+                </td>
             </tr>
-        
+            
             <!-- FILA 6 -->
             <tr style="height:{{ $filaAlto }};">
-                <td style="border:none; text-align:center;">1179</td>
-                <td rowspan="5" style="border:none;">&nbsp;</td>
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, 'E99') }}">
+                        E99
+                    </span>
+                </td>
+            
+                <td rowspan="6" style="border:none;">
+                    &nbsp;
+                </td>
             </tr>
-        
+            
             <!-- FILA 7 -->
             <tr style="height:{{ $filaAlto }};">
-                <td style="border:none; text-align:center;">1379</td>
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, '1179') }}">
+                        1179
+                    </span>
+                </td>
             </tr>
-        
+            
             <!-- FILA 8 -->
             <tr style="height:{{ $filaAlto }};">
-                <td style="border:none; text-align:center;">1477</td>
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, '1379') }}">
+                        1379
+                    </span>
+                </td>
             </tr>
-        
+            
             <!-- FILA 9 -->
             <tr style="height:{{ $filaAlto }};">
-                <td style="border:none; text-align:center;">1699</td>
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, '1477') }}">
+                        1477
+                    </span>
+                </td>
             </tr>
-        
+            
             <!-- FILA 10 -->
             <tr style="height:{{ $filaAlto }};">
-                <td style="border:none; text-align:center;">1879</td>
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, '1699') }}">
+                        1699
+                    </span>
+                </td>
+            </tr>
+            
+            <!-- FILA 11 -->
+            <tr style="height:{{ $filaAlto }};">
+                <td style="border:none; text-align:center;">
+                    <span style="{{ $estiloOpcionSeleccionada($tipoPrensa, '1879') }}">
+                        1879
+                    </span>
+                </td>
             </tr>
         
-            <!-- FILA 11 -->
+            <!-- FILA 12 -->
             <tr style="height:{{ $filaAlto }};">
                 <td colspan="7" style="
                     border:1px solid #000;
@@ -450,7 +560,7 @@
                 </td>
             </tr>
         
-            <!-- FILA 12 -->
+            <!-- FILA 13 -->
             <tr style="height:{{ $filaAlto }};">
                 <td rowspan="3" style="border:1px solid #000; border-right:none;">&nbsp;</td>
         
@@ -461,14 +571,14 @@
                 <td rowspan="3" style="border:1px solid #000; border-left:none;">&nbsp;</td>
             </tr>
         
-            <!-- FILA 13 -->
+            <!-- FILA 14 -->
             <tr style="height:{{ $filaAlto }};">
                 <td style="border:none; text-align:center; font-weight:bold;">
                     INSPECCIÓN
                 </td>
         
                 <td style="border:1px solid #000; text-align:center; font-weight:bold;">
-                    {{ $accionRealizar === 'INSPECCIÓN' ? 'X' : '' }}
+                    {{ $accionRealizar === 'Inspección' ? 'X' : '' }}
                 </td>
         
                 <td style="border:none;">&nbsp;</td>
@@ -478,16 +588,16 @@
                 </td>
         
                 <td style="border:1px solid #000; text-align:center; font-weight:bold;">
-                    {{ $accionRealizar === 'MANTENIMIENTO' ? 'X' : '' }}
+                    {{ $accionRealizar === 'Mantenimiento' ? 'X' : '' }}
                 </td>
             </tr>
         
-            <!-- FILA 14 -->
+            <!-- FILA 15 -->
             <tr style="height:{{ $filaAlto }};">
                 <td colspan="5" style="border:none;">&nbsp;</td>
             </tr>
         
-            <!-- FILA 15 -->
+            <!-- FILA 16 -->
             <tr style="height:{{ $filaAlto }};">
                 <td colspan="8" style="
                     border:1px solid #000;
@@ -554,11 +664,11 @@
                     </td>
         
                     <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding:2px;">
-                        {{ $primerRegistro['estado_item_' . $num] ?? '' }}
+                        {{ $registroPrensa['estado_item_' . $num] ?? '' }}
                     </td>
         
                     <td style="border:1px solid #000; text-align:center; vertical-align:middle; padding-left:4px; padding:2px;">
-                        {{ $primerRegistro['observaciones_item_' . $num] ?? '' }}
+                        {{ $registroPrensa['observaciones_item_' . $num] ?? '' }}
                     </td>
                 </tr>
             @endforeach
@@ -654,6 +764,11 @@
             </tr>
         </table>
 
-    </div>
+        </div>
+
+        @if(!$loop->last)
+            <div class="page-break"></div>
+        @endif
+    @endforeach
 </body>
 </html>

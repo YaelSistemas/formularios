@@ -19,11 +19,12 @@ class SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos implements FormDefinitio
     public static function payload(): array
     {
         $accionOptions = [
-            'INSPECCIÓN',
-            'MANTENIMIENTO',
+            'Inspección',
+            'Mantenimiento',
         ];
 
         $tipoPrensaOptions = [
+            'H49',
             'T79',
             'E99',
             '1179',
@@ -165,12 +166,12 @@ class SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos implements FormDefinitio
                 [
                     'id' => 'header_line_5',
                     'type' => 'static_text',
-                    'text' => 'Fecha de Emisión:',
+                    'text' => 'Fecha de Emisión: 27/03/2025',
                 ],
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión:',
+                    'text' => 'Número de Revisión: 01',
                 ],
                 [
                     'id' => 'taller',
