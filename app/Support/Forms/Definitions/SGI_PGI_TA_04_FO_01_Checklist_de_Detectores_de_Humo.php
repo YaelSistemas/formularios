@@ -121,12 +121,12 @@ class SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo implements FormDefinit
                 [
                     'id' => 'header_line_5',
                     'type' => 'static_text',
-                    'text' => 'Fecha de Emisión:',
+                    'text' => 'Fecha de Emisión: 27/03/2025',
                 ],
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión:',
+                    'text' => 'Número de Revisión: 03',
                 ],
                 [
                     'id' => 'taller',

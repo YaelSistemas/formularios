@@ -23,6 +23,10 @@
             margin: 0;
         }
 
+        .page-break {
+            page-break-after: always;
+        }
+
         .header-table {
             width: 100%;
             border-collapse: collapse;
@@ -55,7 +59,7 @@
 
         .header-table td.right-cell {
             font-weight: bold;
-            text-align: left !important;
+            text-align: center !important;
             padding-left: 8px;
         }
     </style>
@@ -79,51 +83,96 @@
                 base64_encode(file_get_contents($path));
         }
     }
+
+    $tablaDetectores = $answers['tabla_detectores_humo'] ?? [];
+
+    if (!is_array($tablaDetectores)) {
+        $tablaDetectores = [];
+    }
+
+    $tablaDetectores = array_values($tablaDetectores);
+
+    $registrosPorPagina = 10;
+    $paginasDetectores = array_chunk(
+        $tablaDetectores,
+        $registrosPorPagina
+    );
+
+    // Si no hay registros, se conserva una hoja con 10 filas vacías.
+    if (count($paginasDetectores) === 0) {
+        $paginasDetectores = [[]];
+    }
+
+    $totalPaginas = count($paginasDetectores);
 @endphp
 
+@foreach($paginasDetectores as $paginaIndex => $registrosPagina)
 <div class="sheet">
 
     <!-- HEADER -->
     <table class="header-table">
+        <!-- CONTROL DE ANCHOS: 4 COLUMNAS -->
         <tr style="height:0; line-height:0;">
             <td style="width:25%; padding:0; border:none; height:0;"></td>
             <td style="width:45%; padding:0; border:none; height:0;"></td>
-            <td style="width:30%; padding:0; border:none; height:0;"></td>
+            <td style="width:15%; padding:0; border:none; height:0;"></td>
+            <td style="width:15%; padding:0; border:none; height:0;"></td>
         </tr>
-
+    
+        <!-- FILA 1 -->
         <tr>
-            <td rowspan="3" class="logo-cell">
+            <!-- LOGO UTILIZA LAS 4 FILAS -->
+            <td rowspan="4" class="logo-cell">
                 @if($logoSrc)
                     <img src="{{ $logoSrc }}">
                 @endif
             </td>
-
+    
             <td class="center-cell">
                 VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
             </td>
-
-            <td class="right-cell">
-                CODIFICACIÓN: SGI-PGI-TA-04-FO-01
+    
+            <!-- PÁGINA USA COLUMNAS 3 Y 4 -->
+            <td colspan="2" class="right-cell">
+                PÁGINA:
             </td>
         </tr>
-
+    
+        <!-- FILA 2 -->
         <tr>
             <td class="center-cell">
                 SISTEMA DE GESTIÓN INTEGRAL
             </td>
-
-            <td class="right-cell">
-                FECHA EMISIÓN:
+    
+            <!-- PÁGINA {{ $paginaIndex + 1 }} DE {{ $totalPaginas }} USA COLUMNAS 3 Y 4 -->
+            <td colspan="2" class="right-cell">
+                PÁGINA {{ $paginaIndex + 1 }} DE {{ $totalPaginas }}
             </td>
         </tr>
-
+    
+        <!-- FILA 3: CODIFICACIÓN -->
         <tr>
-            <td class="center-cell">
+            <!-- EL TÍTULO USA LAS FILAS 3 Y 4 -->
+            <td rowspan="2" class="center-cell">
                 CHECKLIST DE DETECTORES DE HUMO
             </td>
-
+    
+            <!-- CODIFICACIÓN USA COLUMNAS 3 Y 4 -->
+            <td colspan="2" class="right-cell">
+                CODIFICACIÓN: SGI-PGI-TA-04-FO-01
+            </td>
+        </tr>
+    
+        <!-- FILA 4: REVISIÓN Y FECHA DE EMISIÓN -->
+        <tr>
+            <!-- COLUMNA 3 -->
             <td class="right-cell">
-                REVISIÓN:
+                NÚMERO DE REVISIÓN: 03
+            </td>
+    
+            <!-- COLUMNA 4 -->
+            <td class="right-cell">
+                FECHA DE EMISIÓN:<br>27/03/2025
             </td>
         </tr>
     </table>
@@ -139,19 +188,19 @@
         <tr>
             <!-- ESPACIO IZQUIERDO -->
             <td style="
-                width:10%;
+                width:15%;
                 border:none;
             ">
             </td>
     
             <!-- TALLER -->
             <td style="
-                width:35%;
+                width:30%;
                 border:none;
                 text-align:center;
                 vertical-align:bottom;
             ">
-                <strong>TALLER:</strong>
+                <strong>US / EMPRESA:</strong>
     
                 <span style="
                     display:inline-block;
@@ -166,19 +215,19 @@
     
             <!-- ESPACIO CENTRAL -->
             <td style="
-                width:10%;
+                width:7%;
                 border:none;
             ">
             </td>
     
             <!-- FECHA -->
             <td style="
-                width:35%;
+                width:34%;
                 border:none;
                 text-align:center;
                 vertical-align:bottom;
             ">
-                <strong>FECHA:</strong>
+                <strong>FECHA DE INSPECCIÓN:</strong>
     
                 <span style="
                     display:inline-block;
@@ -193,7 +242,7 @@
     
             <!-- ESPACIO DERECHO -->
             <td style="
-                width:10%;
+                width:14%;
                 border:none;
             ">
             </td>
@@ -250,7 +299,13 @@
                 text-align:center;
                 vertical-align:bottom;
             ">
-                <strong>FIRMA:</strong>
+                <strong style="
+                    display:inline-block;
+                    position:relative;
+                    top:10px;
+                ">
+                    FIRMA:
+                </strong>
             
                 @php
                     $firmaInspector = $answers['firma_inspector'] ?? '';
@@ -275,8 +330,8 @@
                 ">
                     @if($firmaInspectorSrc)
                         <img src="{{ $firmaInspectorSrc }}" style="
-                            width:100px;
-                            height:20px;
+                            width:150px;
+                            height:35px;
                             object-fit:contain;
                             display:block;
                             margin:0 auto;
@@ -318,8 +373,6 @@
     </div>
 
     @php
-        $tablaDetectores = $answers['tabla_detectores_humo'] ?? [];
-    
         // Alturas
         $altoEncabezado = 20;
         $altoFila = 14;
@@ -342,7 +395,7 @@
         border-collapse:collapse;
         table-layout:fixed;
         font-size:7px;
-        margin-top:12px;
+        margin-top:5px;
     ">
         <!-- ENCABEZADOS -->
         <tr style="height:{{ $altoEncabezado }}px;">
@@ -460,7 +513,7 @@
         @for($i = 0; $i < 10; $i++)
     
             @php
-                $row = $tablaDetectores[$i] ?? [];
+                $row = $registrosPagina[$i] ?? [];
             @endphp
     
             <tr style="height:{{ $altoFila }}px;">
@@ -650,6 +703,11 @@
 
 
 </div>
+
+@if(!$loop->last)
+    <div class="page-break"></div>
+@endif
+@endforeach
 
 </body>
 </html>
