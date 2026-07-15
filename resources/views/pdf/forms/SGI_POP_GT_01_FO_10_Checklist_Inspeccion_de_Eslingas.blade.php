@@ -78,65 +78,111 @@
                     base64_encode(file_get_contents($path));
             }
         }
+        /*
+         * Divide la tabla de eslingas en páginas de 10 registros.
+         * Cada página se completa con filas vacías hasta llegar a 10.
+         */
+        $tablaEslingasOriginal = collect($answers['tabla_eslingas'] ?? [])
+            ->filter(function ($row) {
+                if (!is_array($row)) {
+                    return false;
+                }
+
+                return collect($row)->contains(function ($value) {
+                    return $value !== null && $value !== '';
+                });
+            })
+            ->values()
+            ->all();
+
+        // Aunque no existan registros, genera una página con 10 filas vacías.
+        if (empty($tablaEslingasOriginal)) {
+            $tablaEslingasOriginal = [[]];
+        }
+
+        $paginasEslingas = array_chunk($tablaEslingasOriginal, 10);
+
+        $paginasEslingas = array_map(function ($pagina) {
+            while (count($pagina) < 10) {
+                $pagina[] = [];
+            }
+
+            return $pagina;
+        }, $paginasEslingas);
+
+        $totalPaginas = count($paginasEslingas);
     @endphp
 
-    <div class="sheet">
+    @foreach($paginasEslingas as $pageIndex => $tablaEslingas)
+        <div
+            class="sheet"
+            style="{{ $pageIndex > 0 ? 'page-break-before: always;' : '' }}"
+        >
 
         <!-- HEADER -->
         <table class="header-table">
-
+        
             <!-- ANCHOS -->
             <tr style="height:0; line-height:0;">
                 <td style="width:25%; padding:0; border:none; height:0;"></td>
                 <td style="width:45%; padding:0; border:none; height:0;"></td>
                 <td style="width:30%; padding:0; border:none; height:0;"></td>
             </tr>
-
+        
             <!-- FILA 1 -->
             <tr>
-                <!-- LOGO -->
-                <td rowspan="3" class="logo-cell">
+                <!-- LOGO: USA LAS 4 FILAS -->
+                <td rowspan="4" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}">
                     @endif
                 </td>
-
+        
                 <!-- EMPRESA -->
                 <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
-
-                <!-- CODIFICACIÓN -->
+        
+                <!-- CÓDIGO -->
                 <td class="right-cell">
-                    CODIFICACIÓN: SGI-POP-GT-01-FO-10
+                    CÓDIGO: SGI-POP-GT-01-FO-10
                 </td>
             </tr>
-
+        
             <!-- FILA 2 -->
             <tr>
                 <!-- SISTEMA -->
                 <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
-
+        
                 <!-- FECHA -->
                 <td class="right-cell">
                     FECHA EMISIÓN: 27/03/2025
                 </td>
             </tr>
-
+        
             <!-- FILA 3 -->
             <tr>
-                <!-- NOMBRE FORMULARIO -->
-                <td class="center-cell">
-                    CHECKLIST INSPECCIÓN DE ESLINGAS
+                <!-- TÍTULO: USA LAS FILAS DE REVISIÓN Y PÁGINA -->
+                <td rowspan="2" class="center-cell">
+                    CHECKLIST DE INSPECCIÓN DE ESLINGAS
                 </td>
-
+        
                 <!-- REVISIÓN -->
                 <td class="right-cell">
-                    REVISIÓN: 01
+                    REVISIÓN: 03
                 </td>
             </tr>
+        
+            <!-- FILA 4 -->
+            <tr>
+                <!-- PÁGINA -->
+                <td class="right-cell">
+                    PÁGINA: {{ $pageIndex + 1 }} DE {{ $totalPaginas }}
+                </td>
+            </tr>
+        
         </table>
 
         <!-- FECHA Y TALLER -->
@@ -291,13 +337,14 @@
         <!-- INDICACIÓN -->
         <div style="
             width:100%;
-            margin-top:12px;
+            margin-top:0px;
             text-align:center;
             font-size:6px;
             line-height:1.3;
             font-weight:bold;
         ">
             CONTESTA SEGÚN APLIQUE AL ESTADO FÍSICO DEL EQUIPO:
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
             <span style="font-weight:bold;">( ✔︎ )</span>
             BUENAS CONDICIONES
             &nbsp;&nbsp;&nbsp;&nbsp;
@@ -305,13 +352,7 @@
             EN MALAS CONDICIONES
         </div>
 
-        @php
-            $tablaEslingas = $answers['tabla_eslingas'] ?? [];
-        
-            while (count($tablaEslingas) < 13) {
-                $tablaEslingas[] = [];
-            }
-        @endphp
+
         
         <!-- TABLA ESLINGAS -->
         <table style="
@@ -473,7 +514,7 @@
                     font-weight:bold;
                     height:10px;
                 ">
-                    SUPERVISOR
+                    REVISÓ
                 </td>
             </tr>
         
@@ -484,7 +525,7 @@
                     padding:4px;
                     height:15px;
                 ">
-                    <strong>Nombre:</strong>
+                    <strong>NOMBRE:</strong>
                     {{ $answers['nombre_colaborador_inspecciona'] ?? '' }}
                 </td>
         
@@ -496,7 +537,7 @@
                     padding:4px;
                     height:15px;
                 ">
-                    <strong>Nombre:</strong>
+                    <strong>SUPERVISOR:</strong>
                     {{ $answers['nombre_supervisor'] ?? '' }}
                 </td>
             </tr>
@@ -542,6 +583,7 @@
             </tr>
         </table>
 
-    </div>
+        </div>
+    @endforeach
 </body>
 </html>

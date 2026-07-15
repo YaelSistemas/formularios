@@ -63,7 +63,7 @@ class SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas implements FormDefini
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 01',
+                    'text' => 'Número de Revisión: 03',
                 ],
 
                 [
