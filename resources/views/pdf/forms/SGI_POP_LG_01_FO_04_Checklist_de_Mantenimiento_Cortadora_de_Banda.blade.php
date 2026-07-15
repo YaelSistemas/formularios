@@ -117,7 +117,7 @@
 
             <tr>
                 <td class="center-cell">
-                    Checklist Mantenimiento de Cortadora de Banda
+                    CHECKLIST MANTENIMIENTO DE CORTADORA DE BANDA
                 </td>
 
                 <td class="right-cell">
@@ -136,7 +136,7 @@
                 <td style="width:20%; border:none !important; background:#fff;"></td>
 
                 <td style="width:45%; text-align:center; font-weight:bold;">
-                    UBICACIÓN: {{ $taller }}
+                    TALLER / US: {{ $taller }}
                 </td>
             </tr>
         </table>
