@@ -122,7 +122,7 @@
             <!-- FILA 3 -->
             <tr>
                 <td class="center-cell">
-                    Checklist Mantenimiento Grúa Viajera
+                    CHECKLIST MANTENIMIENTO GRÚA VIAJERA
                 </td>
 
                 <td class="right-cell">
