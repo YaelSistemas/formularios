@@ -144,7 +144,7 @@ class SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas implements FormDefinitio
                 [
                     'id' => 'fecha_ultimo_mantenimiento',
                     'label' => 'Fecha de ultimo Mantenimiento',
-                    'type' => 'text',
+                    'type' => 'date',
                     'required' => true,
                 ],
 

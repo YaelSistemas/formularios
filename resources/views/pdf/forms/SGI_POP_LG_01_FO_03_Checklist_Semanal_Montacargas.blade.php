@@ -55,7 +55,7 @@
 
         .header-table td.right-cell {
             font-weight: bold;
-            text-align: left !important;
+            text-align: center !important;
             padding-left: 8px;
         }
 
@@ -88,7 +88,19 @@
 
         $equipo = $answers['equipo'] ?? '';
         $horometro = $answers['horometro'] ?? '';
-        $fechaUltimoMantenimiento = $answers['fecha_ultimo_mantenimiento'] ?? '';
+        $fechaUltimoMantenimientoRaw =
+            $answers['fecha_ultimo_mantenimiento'] ?? '';
+        
+        $fechaUltimoMantenimiento = '';
+        
+        if (!empty($fechaUltimoMantenimientoRaw)) {
+            try {
+                $fechaUltimoMantenimiento =
+                    \Carbon\Carbon::parse($fechaUltimoMantenimientoRaw)->format('d-m-Y');
+            } catch (\Throwable $e) {
+                $fechaUltimoMantenimiento = $fechaUltimoMantenimientoRaw;
+            }
+        }
 
         $montacargasSrc = null;
         $montacargasPath = public_path('images/forms/SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas/Montacargas.jpg');
@@ -104,45 +116,56 @@
 
         <!-- HEADER -->
         <table class="header-table">
+            <!-- CONTROL DE ANCHOS -->
             <tr style="height:0; line-height:0;">
                 <td style="width:25%; padding:0; border:none; height:0;"></td>
                 <td style="width:45%; padding:0; border:none; height:0;"></td>
                 <td style="width:30%; padding:0; border:none; height:0;"></td>
             </tr>
-
+        
+            <!-- FILA 1 -->
             <tr>
-                <td rowspan="3" class="logo-cell">
+                <td rowspan="4" class="logo-cell">
                     @if($logoSrc)
                         <img src="{{ $logoSrc }}">
                     @endif
                 </td>
-
+        
                 <td class="center-cell">
                     VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
                 </td>
-
+        
                 <td class="right-cell">
-                    CODIFICACIÓN: SGI-POP-LG-01-FO-03
+                    CÓDIGO: SGI-POP-LG-01-FO-03
                 </td>
             </tr>
-
+        
+            <!-- FILA 2 -->
             <tr>
                 <td class="center-cell">
                     SISTEMA DE GESTIÓN INTEGRAL
                 </td>
-
+        
                 <td class="right-cell">
-                    FECHA EMISIÓN: 27/03/2025
+                    FECHA EMISIÓN: 27 MARZO DE 2025
                 </td>
             </tr>
-
+        
+            <!-- FILA 3 -->
             <tr>
-                <td class="center-cell">
-                    Checklist Semanal Montacargas
+                <td rowspan="2" class="center-cell">
+                    CHECKLIST SEMANAL MONTACARGAS
                 </td>
-
+        
                 <td class="right-cell">
-                    REVISIÓN: 01
+                    REVISIÓN: 02
+                </td>
+            </tr>
+        
+            <!-- FILA 4 -->
+            <tr>
+                <td class="right-cell">
+                    PÁGINA: 01
                 </td>
             </tr>
         </table>
@@ -160,7 +183,7 @@
                     <!-- FECHA -->
                     <table class="header-table" style="width: 100%;">
                         <tr>
-                            <td style="text-align: center; font-weight: bold; padding: 2px 4px;">
+                            <td style="text-align: left; font-weight: bold; padding: 2px 4px;">
                                 Fecha:
                                 {{ \Carbon\Carbon::parse($submission->created_at)->format('d/m/Y') }}
                             </td>
@@ -170,7 +193,7 @@
                     <!-- TALLER -->
                     <table class="header-table" style="width: 100%; margin-top: 8px;">
                         <tr>
-                            <td style="text-align: center; font-weight: bold; padding: 2px 4px;">
+                            <td style="text-align: left; font-weight: bold; padding: 2px 4px;">
                                 Taller:
                                 {{ $taller }}
                             </td>
@@ -180,7 +203,7 @@
                     <!-- EQUIPO -->
                     <table class="header-table" style="width: 100%; margin-top: 8px;">
                         <tr>
-                            <td style="text-align: center; font-weight: bold; padding: 2px 4px;">
+                            <td style="text-align: left; font-weight: bold; padding: 2px 4px;">
                                 Equipo:
                                 {{ $equipo }}
                             </td>
@@ -190,7 +213,7 @@
                     <!-- HORÓMETRO -->
                     <table class="header-table" style="width: 100%; margin-top: 8px;">
                         <tr>
-                            <td style="text-align: center; font-weight: bold; padding: 2px 4px;">
+                            <td style="text-align: left; font-weight: bold; padding: 2px 4px;">
                                 Horómetro:
                                 {{ $horometro }}
                             </td>
@@ -200,7 +223,7 @@
                     <!-- FECHA ÚLTIMO MANTENIMIENTO -->
                     <table class="header-table" style="width: 100%; margin-top: 8px;">
                         <tr>
-                            <td style="text-align: center; font-weight: bold; padding: 2px 4px;">
+                            <td style="text-align: left; font-weight: bold; padding: 2px 4px;">
                                 Fecha del último mantenimiento:
                                 {{ $fechaUltimoMantenimiento }}
                             </td>
