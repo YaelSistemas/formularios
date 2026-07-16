@@ -52,7 +52,17 @@ export async function enqueue(type, payload) {
     payload?.uuid ||
     `local_${Date.now()}`;
 
-  const now = nowIso();
+  /*
+   * Conservamos la fecha exacta en la que el usuario
+   * guardó el registro offline.
+   *
+   * Si todavía no viene en el payload, usamos la fecha actual.
+   */
+  const createdAt =
+    payload?.offline_created_at ||
+    payload?.meta?.created_at ||
+    nowIso();
+
   const userId = getCurrentUserId();
 
   if (!userId) {
@@ -66,7 +76,13 @@ export async function enqueue(type, payload) {
     user_id: userId,
     type,
     ...payload,
-    created_at: now,
+
+    /*
+     * Se coloca después de ...payload para garantizar
+     * que se use la fecha original de la captura offline.
+     */
+    created_at: createdAt,
+
     synced: false,
   });
 
@@ -74,7 +90,12 @@ export async function enqueue(type, payload) {
     uuid,
     user_id: userId,
     type,
-    created_at: now,
+
+    /*
+     * La cola también conserva la fecha original.
+     */
+    created_at: createdAt,
+
     status: "pending",
     last_error: null,
     retry_count: 0,
@@ -123,6 +144,9 @@ async function markLocalSubmissionAsSynced(
       created_at:
         serverSubmission?.created_at ||
         localRow.created_at ||
+        rec?.offline_created_at ||
+        rec?.meta?.created_at ||
+        rec?.created_at ||
         nowIso(),
 
       submission: {
@@ -155,6 +179,9 @@ async function markLocalSubmissionAsSynced(
         created_at:
           serverSubmission?.created_at ||
           localRow.created_at ||
+          rec?.offline_created_at ||
+          rec?.meta?.created_at ||
+          rec?.created_at ||
           nowIso(),
 
         offline_pending: false,
@@ -194,10 +221,29 @@ async function processOutboxItem(item) {
 
   try {
     if (rec.type === "form_submission") {
+      /*
+       * Recuperamos la fecha original de la captura.
+       *
+       * Se mantienen varias opciones como respaldo para que
+       * también funcionen registros offline guardados con la
+       * estructura anterior.
+       */
+      const offlineCreatedAt =
+        rec.offline_created_at ||
+        rec.meta?.created_at ||
+        rec.created_at ||
+        null;
+
+      /*
+       * Enviamos al servidor las respuestas junto con la fecha
+       * en la que realmente se creó el registro offline.
+       */
       const response = await apiPost(
         `/forms/${rec.form_id}/submit`,
         {
           answers: rec.answers,
+          offline_created_at:
+            offlineCreatedAt,
         }
       );
 

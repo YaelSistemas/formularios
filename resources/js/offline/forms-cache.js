@@ -170,14 +170,25 @@ export async function saveOfflineSubmission(
   userId,
   form,
   answers,
-  localUuid = null
+  localUuid = null,
+  createdAt = null
 ) {
   const uid = normalizeUserId(userId);
   const formId = Number(form?.id);
 
   if (!uid || !formId) return;
 
-  const uuid = localUuid || `local_${Date.now()}`;
+  const uuid =
+    localUuid ||
+    `local_${Date.now()}`;
+
+  /*
+   * Conservamos la misma fecha generada en FormFill.jsx.
+   * Esto evita crear fechas distintas para records,
+   * outbox y form_submissions.
+   */
+  const offlineCreatedAt =
+    createdAt || nowIso();
 
   await db.form_submissions.add({
     user_id: uid,
@@ -186,15 +197,30 @@ export async function saveOfflineSubmission(
     local_uuid: uuid,
     consecutive: "Pendiente",
     answers: { ...(answers || {}) },
+
+    offline_created_at:
+      offlineCreatedAt,
+
     submission: {
       id: uuid,
+      form_id: formId,
       consecutive: "Pendiente",
       answers: { ...(answers || {}) },
-      created_at: nowIso(),
+
+      created_at:
+        offlineCreatedAt,
+
+      offline_created_at:
+        offlineCreatedAt,
+
       offline_pending: true,
+      pending_sync: true,
       synced: false,
     },
-    created_at: nowIso(),
+
+    created_at:
+      offlineCreatedAt,
+
     synced: false,
     pending_sync: true,
   });

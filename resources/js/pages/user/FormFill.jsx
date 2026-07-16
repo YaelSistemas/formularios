@@ -364,13 +364,17 @@ export default function FormFill({
 
     setSaving(true);
 
+    const offlineCreatedAt =
+      new Date().toISOString();
+
     const offlinePayload = {
       form_id: form.id,
       answers: { ...answers },
+      offline_created_at: offlineCreatedAt,
       meta: {
         offline_capable: true,
         user_agent: navigator.userAgent,
-        created_at: new Date().toISOString(),
+        created_at: offlineCreatedAt,
       },
     };
 
@@ -407,7 +411,13 @@ export default function FormFill({
         try {
           const localUuid = await enqueue("form_submission", offlinePayload);
 
-          await saveOfflineSubmission(currentUserId, form, answers, localUuid);
+          await saveOfflineSubmission(
+            currentUserId,
+            form,
+            answers,
+            localUuid,
+            offlineCreatedAt
+          );
 
           window.dispatchEvent(
             new CustomEvent("offline-record-saved", {

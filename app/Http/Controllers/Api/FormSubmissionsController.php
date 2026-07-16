@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class FormSubmissionsController extends Controller
 {
@@ -19,22 +20,41 @@ class FormSubmissionsController extends Controller
         $user = $request->user();
     
         if (!$user) {
-            return response()->json(['message' => 'No autorizado.'], 401);
+            return response()->json([
+                'message' => 'No autorizado.',
+            ], 401);
         }
     
-        // usuario normal solo puede responder PUBLICADOS
+        // Usuario normal solo puede responder formularios PUBLICADOS.
         if (!$user->hasRole('Administrador')) {
             if ($form->status !== 'PUBLICADO') {
-                return response()->json(['message' => 'No encontrado.'], 404);
+                return response()->json([
+                    'message' => 'No encontrado.',
+                ], 404);
             }
     
             if (!$this->userCanAccessForm($user->id, $form)) {
-                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+                return response()->json([
+                    'message' => 'No autorizado para este formulario.',
+                ], 403);
             }
         }
     
         $data = $request->validate([
-            'answers' => ['required', 'array'],
+            'answers' => [
+                'required',
+                'array',
+            ],
+    
+            /*
+             * Solo se envía cuando el registro fue creado offline.
+             * Los registros creados online continuarán usando la fecha
+             * normal generada por Laravel.
+             */
+            'offline_created_at' => [
+                'nullable',
+                'date',
+            ],
         ]);
     
         $cleanAnswers = $this->validateAndCleanAnswers(
@@ -46,18 +66,84 @@ class FormSubmissionsController extends Controller
         if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
             return $cleanAnswers;
         }
-
-        $submission = DB::transaction(function () use ($form, $user, $cleanAnswers) {
-            $consecutive = $this->getNextAvailableConsecutive((int) $form->id);
-
-            $submission = FormSubmission::create([
+    
+        /*
+         * Convertimos la fecha ISO enviada por JavaScript a la zona
+         * horaria configurada en Laravel.
+         *
+         * Ejemplo:
+         * 2026-01-01T20:00:00.000Z
+         * se convierte a:
+         * 2026-01-01 14:00:00
+         * para America/Mexico_City.
+         */
+        $offlineCreatedAt = null;
+    
+        if (!empty($data['offline_created_at'])) {
+            try {
+                $offlineCreatedAt = Carbon::parse(
+                    $data['offline_created_at']
+                )->setTimezone(
+                    config('app.timezone', 'America/Mexico_City')
+                );
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'La fecha de creación offline no es válida.',
+                ], 422);
+            }
+    
+            /*
+             * Evita aceptar fechas demasiado adelantadas.
+             * Se permiten cinco minutos por diferencias pequeñas
+             * entre el reloj del dispositivo y el servidor.
+             */
+            if ($offlineCreatedAt->greaterThan(now()->addMinutes(5))) {
+                return response()->json([
+                    'message' => 'La fecha de creación offline no puede estar en el futuro.',
+                ], 422);
+            }
+        }
+    
+        $submission = DB::transaction(function () use (
+            $form,
+            $user,
+            $cleanAnswers,
+            $offlineCreatedAt
+        ) {
+            $consecutive = $this->getNextAvailableConsecutive(
+                (int) $form->id
+            );
+    
+            /*
+             * Usamos una instancia del modelo para poder establecer
+             * created_at sin depender de que esté incluido en $fillable.
+             */
+            $submission = new FormSubmission([
                 'form_id' => $form->id,
                 'consecutive' => $consecutive,
                 'user_id' => $user?->id,
                 'answers' => $cleanAnswers,
             ]);
-
-            FormSubmissionHistory::create([
+    
+            /*
+             * Solo sustituimos created_at cuando el registro
+             * realmente proviene de la cola offline.
+             *
+             * updated_at conservará la fecha de sincronización.
+             */
+            if ($offlineCreatedAt) {
+                $submission->setCreatedAt(
+                    $offlineCreatedAt
+                );
+            }
+    
+            $submission->save();
+    
+            /*
+             * El historial de creación también conserva la fecha
+             * real en la que se hizo la captura offline.
+             */
+            $history = new FormSubmissionHistory([
                 'form_submission_id' => $submission->id,
                 'form_id' => $form->id,
                 'user_id' => $user?->id,
@@ -65,7 +151,15 @@ class FormSubmissionsController extends Controller
                 'snapshot' => $cleanAnswers,
                 'changes' => null,
             ]);
-
+    
+            if ($offlineCreatedAt) {
+                $history->setCreatedAt(
+                    $offlineCreatedAt
+                );
+            }
+    
+            $history->save();
+    
             return $submission;
         });
     
