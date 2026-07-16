@@ -52,10 +52,10 @@ const OFFLINE_BOOTSTRAP_REASON_KEY =
   "offline_bootstrap_reason";
 
 /*
- * Cada 45 segundos se consulta únicamente bootstrap-meta.
+ * Cada 20 segundos se consulta únicamente bootstrap-meta.
  * Solo si existen cambios se descarga el bootstrap completo.
  */
-const REMOTE_CHECK_INTERVAL_MS = 45000;
+const REMOTE_CHECK_INTERVAL_MS = 20000;
 
 /*
  * Cada 15 segundos se intenta subir la cola local pendiente.
