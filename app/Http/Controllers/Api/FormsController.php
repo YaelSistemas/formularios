@@ -387,15 +387,67 @@ class FormsController extends Controller
                 ];
 
                 if (in_array($type, ['select', 'radio'], true)) {
+                    /*
+                     * Opciones normales.
+                     */
                     $opts = $f['options'] ?? [];
+                
                     if (!is_array($opts)) {
                         $opts = [];
                     }
-
-                    $field['options'] = array_values(array_filter(array_map(function ($o) {
-                        $s = trim((string) $o);
-                        return $s !== '' ? $s : null;
-                    }, $opts)));
+                
+                    $field['options'] = array_values(array_filter(
+                        array_map(function ($option) {
+                            $option = trim((string) $option);
+                
+                            return $option !== '' ? $option : null;
+                        }, $opts),
+                        fn ($option) => $option !== null
+                    ));
+                
+                    /*
+                     * Campo del cual depende este select/radio.
+                     */
+                    if (
+                        isset($f['depends_on']) &&
+                        is_string($f['depends_on']) &&
+                        trim($f['depends_on']) !== ''
+                    ) {
+                        $field['depends_on'] = trim($f['depends_on']);
+                    }
+                
+                    /*
+                     * Opciones dinámicas según el valor del campo dependiente.
+                     */
+                    $optionsByValue = $f['options_by_value'] ?? [];
+                
+                    if (is_array($optionsByValue) && count($optionsByValue) > 0) {
+                        $normalizedOptionsByValue = [];
+                
+                        foreach ($optionsByValue as $dependencyValue => $conditionalOptions) {
+                            if (!is_array($conditionalOptions)) {
+                                continue;
+                            }
+                
+                            $normalizedConditionalOptions = array_values(array_filter(
+                                array_map(function ($option) {
+                                    $option = trim((string) $option);
+                
+                                    return $option !== '' ? $option : null;
+                                }, $conditionalOptions),
+                                fn ($option) => $option !== null
+                            ));
+                
+                            if (count($normalizedConditionalOptions) > 0) {
+                                $normalizedOptionsByValue[(string) $dependencyValue] =
+                                    $normalizedConditionalOptions;
+                            }
+                        }
+                
+                        if (count($normalizedOptionsByValue) > 0) {
+                            $field['options_by_value'] = $normalizedOptionsByValue;
+                        }
+                    }
                 }
 
                 if ($type === 'static_text') {
@@ -468,27 +520,72 @@ class FormsController extends Controller
     }
 
     /**
-     * select/radio: mínimo 2 opciones
+     * select/radio: mínimo 2 opciones.
+     * También admite opciones dinámicas mediante options_by_value.
      */
     private function validateChoiceFields(array $payload): ?string
     {
         $fields = $payload['fields'] ?? [];
+    
         if (!is_array($fields)) {
             return null;
         }
-
+    
         foreach ($fields as $f) {
             $type = $f['type'] ?? null;
-
-            if (in_array($type, ['select', 'radio'], true)) {
-                $options = $f['options'] ?? [];
-                if (!is_array($options) || count($options) < 2) {
-                    $label = $f['label'] ?? '(sin etiqueta)';
-                    return "El campo \"{$label}\" ({$type}) debe tener al menos 2 opciones.";
+    
+            if (!in_array($type, ['select', 'radio'], true)) {
+                continue;
+            }
+    
+            $label = $f['label'] ?? '(sin etiqueta)';
+    
+            /*
+             * Opciones normales:
+             * 'options' => ['Opción 1', 'Opción 2']
+             */
+            $options = $f['options'] ?? [];
+    
+            $hasNormalOptions =
+                is_array($options) &&
+                count($options) >= 2;
+    
+            /*
+             * Opciones dependientes:
+             * 'options_by_value' => [
+             *     'Valor 1' => [...],
+             *     'Valor 2' => [...],
+             * ]
+             */
+            $optionsByValue = $f['options_by_value'] ?? [];
+    
+            $hasConditionalOptions = false;
+    
+            if (
+                isset($f['depends_on']) &&
+                is_string($f['depends_on']) &&
+                $f['depends_on'] !== '' &&
+                is_array($optionsByValue) &&
+                count($optionsByValue) > 0
+            ) {
+                $hasConditionalOptions = true;
+    
+                foreach ($optionsByValue as $dependencyValue => $conditionalOptions) {
+                    if (
+                        !is_array($conditionalOptions) ||
+                        count($conditionalOptions) < 2
+                    ) {
+                        $hasConditionalOptions = false;
+                        break;
+                    }
                 }
             }
+    
+            if (!$hasNormalOptions && !$hasConditionalOptions) {
+                return "El campo \"{$label}\" ({$type}) debe tener al menos 2 opciones.";
+            }
         }
-
+    
         return null;
     }
 

@@ -236,6 +236,13 @@ class SGI_POP_GT_01_FO_09_Checklist_de_Prensas implements FormDefinition
                     'type' => 'table',
                     'required' => false,
                 
+                    'columns' => [
+                        'Cantidad',
+                        'Nombre del equipo',
+                        'Número de serie',
+                        'Observaciones',
+                    ],
+                
                     'row_schema' => [
                         [
                             'id' => 'cantidad',
@@ -263,7 +270,7 @@ class SGI_POP_GT_01_FO_09_Checklist_de_Prensas implements FormDefinition
                         ],
                     ],
                 ],
-
+                
                 [
                     'id' => 'titulo_firmas',
                     'type' => 'static_text',
