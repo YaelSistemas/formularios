@@ -1116,12 +1116,43 @@ export default function FormsIndex() {
   };
 
   const filteredForms = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return forms;
-
-    return forms.filter((f) => {
-      const title = String(f?.title || "").toLowerCase();
-      return title.includes(q);
+    const q = search
+      .trim()
+      .toLocaleLowerCase("es-MX");
+  
+    const rows = q
+      ? forms.filter((form) => {
+          const title = String(
+            form?.title ||
+            form?.name ||
+            ""
+          ).toLocaleLowerCase("es-MX");
+  
+          return title.includes(q);
+        })
+      : [...forms];
+  
+    return rows.sort((a, b) => {
+      const titleA = String(
+        a?.title ||
+        a?.name ||
+        ""
+      );
+  
+      const titleB = String(
+        b?.title ||
+        b?.name ||
+        ""
+      );
+  
+      return titleA.localeCompare(
+        titleB,
+        "es-MX",
+        {
+          sensitivity: "base",
+          numeric: true,
+        }
+      );
     });
   }, [forms, search]);
 
