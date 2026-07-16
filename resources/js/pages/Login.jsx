@@ -18,7 +18,11 @@ export default function Login() {
 
     const directPermissions = Array.isArray(user.permissions)
       ? user.permissions
-          .map((p) => (typeof p === "string" ? p : p?.name))
+          .map((permission) =>
+            typeof permission === "string"
+              ? permission
+              : permission?.name
+          )
           .filter(Boolean)
       : [];
 
@@ -30,25 +34,38 @@ export default function Login() {
 
     const rolesFromArray = Array.isArray(user.roles)
       ? user.roles
-          .map((r) => (typeof r === "string" ? r : r?.name))
+          .map((role) =>
+            typeof role === "string"
+              ? role
+              : role?.name
+          )
           .filter(Boolean)
       : [];
 
     const roleSingle = user.role
-      ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
+      ? [
+          typeof user.role === "string"
+            ? user.role
+            : user.role?.name,
+        ].filter(Boolean)
       : [];
 
     return [...new Set([...rolesFromArray, ...roleSingle])];
   };
 
   const isAdmin = (user) => {
-    const roles = normalizeRoles(user).map((r) => String(r).toLowerCase());
+    const roles = normalizeRoles(user).map((role) =>
+      String(role).toLowerCase()
+    );
+
     return roles.includes("administrador");
   };
 
   const hasPermission = (user, permission) => {
     if (isAdmin(user)) return true;
+
     const permissions = normalizePermissions(user);
+
     return permissions.includes(permission);
   };
 
@@ -60,11 +77,27 @@ export default function Login() {
     if (user.status === false) return true;
     if (user.enabled === false) return true;
 
-    const statusValue = String(user.status ?? "").trim().toLowerCase();
-    const stateValue = String(user.state ?? "").trim().toLowerCase();
+    const statusValue = String(user.status ?? "")
+      .trim()
+      .toLowerCase();
 
-    if (statusValue && ["inactive", "inactivo", "0"].includes(statusValue)) return true;
-    if (stateValue && ["inactive", "inactivo", "0"].includes(stateValue)) return true;
+    const stateValue = String(user.state ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (
+      statusValue &&
+      ["inactive", "inactivo", "0"].includes(statusValue)
+    ) {
+      return true;
+    }
+
+    if (
+      stateValue &&
+      ["inactive", "inactivo", "0"].includes(stateValue)
+    ) {
+      return true;
+    }
 
     return false;
   };
@@ -89,12 +122,18 @@ export default function Login() {
       if (!token) {
         if (!navigator.onLine) {
           const offlineUser = getOfflineUser();
+
           if (offlineUser?.id) {
-            localStorage.setItem("user", JSON.stringify(offlineUser));
+            localStorage.setItem(
+              "user",
+              JSON.stringify(offlineUser)
+            );
+
             window.location.href = "/forms";
             return;
           }
         }
+
         return;
       }
 
@@ -108,14 +147,24 @@ export default function Login() {
           return;
         }
 
-        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem(
+          "user",
+          JSON.stringify(user)
+        );
+
         saveOfflineSession(user);
+
         window.location.href = getRedirectPath();
       } catch {
         if (!navigator.onLine) {
           const offlineUser = getOfflineUser();
+
           if (offlineUser?.id) {
-            localStorage.setItem("user", JSON.stringify(offlineUser));
+            localStorage.setItem(
+              "user",
+              JSON.stringify(offlineUser)
+            );
+
             window.location.href = "/forms";
             return;
           }
@@ -126,8 +175,9 @@ export default function Login() {
     })();
   }, []);
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async (event) => {
+    event.preventDefault();
+
     setErr("");
     setLoading(true);
 
@@ -144,12 +194,22 @@ export default function Login() {
       }
 
       localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(user)
+      );
+
       saveOfflineSession(user);
+
       window.location.href = getRedirectPath();
-    } catch (ex) {
+    } catch (error) {
       clearSession();
-      setErr(ex?.message || "Error al iniciar sesión");
+
+      setErr(
+        error?.message ||
+          "Error al iniciar sesión"
+      );
     } finally {
       setLoading(false);
     }
@@ -157,106 +217,221 @@ export default function Login() {
 
   const styles = {
     page: {
+      width: "100%",
       minHeight: "100vh",
+      boxSizing: "border-box",
       background: "#f4f4f5",
+
       display: "flex",
-      alignItems: "center",
+      alignItems: "flex-start",
       justifyContent: "center",
-      padding: 16,
-      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+
+      paddingTop: "clamp(55px, 16vh, 150px)",
+      paddingRight: 16,
+      paddingBottom: 40,
+      paddingLeft: 16,
+
+      fontFamily:
+        "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
     },
+
     card: {
       width: "100%",
-      maxWidth: 460,
-      background: "#fff",
+      maxWidth: 410,
+      boxSizing: "border-box",
+
+      background: "#ffffff",
       border: "1px solid #e4e4e7",
-      borderRadius: 8,
-      boxShadow: "0 2px 8px rgba(0,0,0,.04)",
-      padding: 24,
+      borderRadius: 10,
+
+      boxShadow:
+        "0 10px 30px rgba(0, 0, 0, 0.10)",
+
+      padding: "28px 26px 30px",
     },
+
+    logoContainer: {
+      width: "100%",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 24,
+    },
+
+    logo: {
+      display: "block",
+      width: "100%",
+      maxWidth: 270,
+      height: "auto",
+      maxHeight: 135,
+      objectFit: "contain",
+    },
+
     title: {
-      margin: 0,
-      marginBottom: 8,
-      fontSize: 24,
+      marginTop: 0,
+      marginRight: 0,
+      marginBottom: 22,
+      marginLeft: 0,
+
+      fontSize: 25,
       lineHeight: 1.2,
       color: "#18181b",
       fontWeight: 700,
+      textAlign: "left",
     },
-    subtitle: {
-      margin: 0,
-      marginBottom: 20,
-      color: "#52525b",
-      fontSize: 14,
+
+    fieldGroup: {
+      width: "100%",
+      marginBottom: 17,
     },
+
     label: {
       display: "block",
-      marginBottom: 6,
+      marginBottom: 7,
+
       color: "#27272a",
       fontSize: 14,
+      lineHeight: 1.3,
       fontWeight: 600,
     },
+
     input: {
+      display: "block",
       width: "100%",
+      height: 46,
       boxSizing: "border-box",
-      border: "1px solid #d4d4d8",
-      borderRadius: 8,
-      padding: "12px 14px",
+
+      border: "1px solid #cbd5e1",
+      borderRadius: 7,
+
+      padding: "11px 13px",
+
       fontSize: 14,
-      outline: "none",
-      background: "#fff",
       color: "#18181b",
-      marginBottom: 14,
+      background: "#ffffff",
+
+      outline: "none",
     },
+
     button: {
       width: "100%",
-      border: 0,
-      borderRadius: 8,
+      minHeight: 46,
+
+      border: "none",
+      borderRadius: 7,
+
       padding: "12px 14px",
-      background: loading ? "#94a3b8" : "#2563eb",
-      color: "#fff",
-      fontSize: 14,
+
+      background: loading
+        ? "#94a3b8"
+        : "#2563eb",
+
+      color: "#ffffff",
+      fontSize: 15,
+      lineHeight: 1.3,
       fontWeight: 700,
-      cursor: loading ? "not-allowed" : "pointer",
+
+      cursor: loading
+        ? "not-allowed"
+        : "pointer",
+
+      transition:
+        "background-color 0.2s ease, transform 0.1s ease",
     },
+
     error: {
-      marginBottom: 14,
+      marginBottom: 17,
       padding: 12,
-      borderRadius: 8,
+
+      border: "1px solid #fecaca",
+      borderRadius: 7,
+
       background: "#fef2f2",
       color: "#b91c1c",
-      border: "1px solid #fecaca",
+
       fontSize: 14,
+      lineHeight: 1.4,
     },
   };
 
   return (
     <div style={styles.page}>
-      <form onSubmit={onSubmit} style={styles.card}>
-        <h1 style={styles.title}>Iniciar sesión</h1>
-        <p style={styles.subtitle}>Accede a tus formularios asignados.</p>
+      <form
+        onSubmit={onSubmit}
+        style={styles.card}
+      >
+        <div style={styles.logoContainer}>
+          <img
+            src="/images/Logo-vysisa.png"
+            alt="Grupo VYSISA"
+            style={styles.logo}
+          />
+        </div>
 
-        {err ? <div style={styles.error}>{err}</div> : null}
+        <h1 style={styles.title}>
+          Iniciar sesión
+        </h1>
 
-        <label style={styles.label}>Correo</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="username"
-          style={styles.input}
-        />
+        {err ? (
+          <div style={styles.error}>
+            {err}
+          </div>
+        ) : null}
 
-        <label style={styles.label}>Contraseña</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          style={styles.input}
-        />
+        <div style={styles.fieldGroup}>
+          <label
+            htmlFor="login-email"
+            style={styles.label}
+          >
+            Correo
+          </label>
 
-        <button type="submit" disabled={loading} style={styles.button}>
-          {loading ? "Entrando..." : "Entrar"}
+          <input
+            id="login-email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(event) =>
+              setEmail(event.target.value)
+            }
+            autoComplete="username"
+            placeholder="Ingresa tu correo"
+            required
+            style={styles.input}
+          />
+        </div>
+
+        <div style={styles.fieldGroup}>
+          <label
+            htmlFor="login-password"
+            style={styles.label}
+          >
+            Contraseña
+          </label>
+
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            value={password}
+            onChange={(event) =>
+              setPassword(event.target.value)
+            }
+            autoComplete="current-password"
+            placeholder="Ingresa tu contraseña"
+            required
+            style={styles.input}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={styles.button}
+        >
+          {loading
+            ? "Entrando..."
+            : "Iniciar sesión"}
         </button>
       </form>
     </div>
