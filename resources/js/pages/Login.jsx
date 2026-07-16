@@ -6,6 +6,9 @@ import {
   saveOfflineSession,
 } from "../offline/session";
 
+const OFFLINE_BOOTSTRAP_REASON_KEY =
+  "offline_bootstrap_reason";
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,51 +53,95 @@ export default function Login() {
         ].filter(Boolean)
       : [];
 
-    return [...new Set([...rolesFromArray, ...roleSingle])];
+    return [
+      ...new Set([
+        ...rolesFromArray,
+        ...roleSingle,
+      ]),
+    ];
   };
 
   const isAdmin = (user) => {
-    const roles = normalizeRoles(user).map((role) =>
-      String(role).toLowerCase()
+    const roles = normalizeRoles(user).map(
+      (role) =>
+        String(role).toLowerCase()
     );
 
-    return roles.includes("administrador");
+    return roles.includes(
+      "administrador"
+    );
   };
 
-  const hasPermission = (user, permission) => {
-    if (isAdmin(user)) return true;
+  const hasPermission = (
+    user,
+    permission
+  ) => {
+    if (isAdmin(user)) {
+      return true;
+    }
 
-    const permissions = normalizePermissions(user);
+    const permissions =
+      normalizePermissions(user);
 
-    return permissions.includes(permission);
+    return permissions.includes(
+      permission
+    );
   };
 
   const isInactiveUser = (user) => {
-    if (!user || typeof user !== "object") return false;
+    if (
+      !user ||
+      typeof user !== "object"
+    ) {
+      return false;
+    }
 
-    if (user.active === false) return true;
-    if (user.is_active === false) return true;
-    if (user.status === false) return true;
-    if (user.enabled === false) return true;
+    if (user.active === false) {
+      return true;
+    }
 
-    const statusValue = String(user.status ?? "")
+    if (user.is_active === false) {
+      return true;
+    }
+
+    if (user.status === false) {
+      return true;
+    }
+
+    if (user.enabled === false) {
+      return true;
+    }
+
+    const statusValue = String(
+      user.status ?? ""
+    )
       .trim()
       .toLowerCase();
 
-    const stateValue = String(user.state ?? "")
+    const stateValue = String(
+      user.state ?? ""
+    )
       .trim()
       .toLowerCase();
 
     if (
       statusValue &&
-      ["inactive", "inactivo", "0"].includes(statusValue)
+      [
+        "inactive",
+        "inactivo",
+        "0",
+      ].includes(statusValue)
     ) {
       return true;
     }
 
     if (
       stateValue &&
-      ["inactive", "inactivo", "0"].includes(stateValue)
+      [
+        "inactive",
+        "inactivo",
+        "0",
+      ].includes(stateValue)
     ) {
       return true;
     }
@@ -108,6 +155,15 @@ export default function Login() {
   const clearSession = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
+    try {
+      sessionStorage.removeItem(
+        OFFLINE_BOOTSTRAP_REASON_KEY
+      );
+    } catch {
+      // La limpieza puede continuar aunque sessionStorage no esté disponible.
+    }
+
     clearOfflineSession();
   };
 
@@ -117,19 +173,25 @@ export default function Login() {
 
   useEffect(() => {
     (async () => {
-      const token = localStorage.getItem("token");
+      const token =
+        localStorage.getItem("token");
 
       if (!token) {
         if (!navigator.onLine) {
-          const offlineUser = getOfflineUser();
+          const offlineUser =
+            getOfflineUser();
 
           if (offlineUser?.id) {
             localStorage.setItem(
               "user",
-              JSON.stringify(offlineUser)
+              JSON.stringify(
+                offlineUser
+              )
             );
 
-            window.location.href = "/forms";
+            window.location.href =
+              "/forms";
+
             return;
           }
         }
@@ -138,12 +200,20 @@ export default function Login() {
       }
 
       try {
-        const data = await apiMe();
-        const user = data?.user || data;
+        const data =
+          await apiMe();
 
-        if (isInactiveUser(user)) {
+        const user =
+          data?.user || data;
+
+        if (
+          isInactiveUser(user)
+        ) {
           clearSession();
-          setErr(inactiveMessage);
+          setErr(
+            inactiveMessage
+          );
+
           return;
         }
 
@@ -154,18 +224,28 @@ export default function Login() {
 
         saveOfflineSession(user);
 
-        window.location.href = getRedirectPath();
+        /*
+         * Aquí no se marca como login manual.
+         * Esta redirección corresponde a una sesión que ya existía.
+         */
+        window.location.href =
+          getRedirectPath();
       } catch {
         if (!navigator.onLine) {
-          const offlineUser = getOfflineUser();
+          const offlineUser =
+            getOfflineUser();
 
           if (offlineUser?.id) {
             localStorage.setItem(
               "user",
-              JSON.stringify(offlineUser)
+              JSON.stringify(
+                offlineUser
+              )
             );
 
-            window.location.href = "/forms";
+            window.location.href =
+              "/forms";
+
             return;
           }
         }
@@ -182,18 +262,29 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { token, user } = await apiLogin({
+      const {
+        token,
+        user,
+      } = await apiLogin({
         email: email.trim(),
         password,
       });
 
-      if (isInactiveUser(user)) {
+      if (
+        isInactiveUser(user)
+      ) {
         clearSession();
-        setErr(inactiveMessage);
+        setErr(
+          inactiveMessage
+        );
+
         return;
       }
 
-      localStorage.setItem("token", token);
+      localStorage.setItem(
+        "token",
+        token
+      );
 
       localStorage.setItem(
         "user",
@@ -202,7 +293,23 @@ export default function Login() {
 
       saveOfflineSession(user);
 
-      window.location.href = getRedirectPath();
+      /*
+       * Marcamos que la siguiente carga viene
+       * de un inicio de sesión manual.
+       *
+       * app.jsx consumirá esta marca una sola vez.
+       */
+      try {
+        sessionStorage.setItem(
+          OFFLINE_BOOTSTRAP_REASON_KEY,
+          "login"
+        );
+      } catch {
+        // La redirección puede continuar aunque sessionStorage no esté disponible.
+      }
+
+      window.location.href =
+        getRedirectPath();
     } catch (error) {
       clearSession();
 
@@ -226,7 +333,8 @@ export default function Login() {
       alignItems: "flex-start",
       justifyContent: "center",
 
-      paddingTop: "clamp(55px, 16vh, 150px)",
+      paddingTop:
+        "clamp(55px, 16vh, 150px)",
       paddingRight: 16,
       paddingBottom: 40,
       paddingLeft: 16,
@@ -241,19 +349,22 @@ export default function Login() {
       boxSizing: "border-box",
 
       background: "#ffffff",
-      border: "1px solid #e4e4e7",
+      border:
+        "1px solid #e4e4e7",
       borderRadius: 10,
 
       boxShadow:
         "0 10px 30px rgba(0, 0, 0, 0.10)",
 
-      padding: "28px 26px 30px",
+      padding:
+        "28px 26px 30px",
     },
 
     logoContainer: {
       width: "100%",
       display: "flex",
-      justifyContent: "center",
+      justifyContent:
+        "center",
       alignItems: "center",
       marginBottom: 24,
     },
@@ -301,7 +412,8 @@ export default function Login() {
       height: 46,
       boxSizing: "border-box",
 
-      border: "1px solid #cbd5e1",
+      border:
+        "1px solid #cbd5e1",
       borderRadius: 7,
 
       padding: "11px 13px",
@@ -343,7 +455,8 @@ export default function Login() {
       marginBottom: 17,
       padding: 12,
 
-      border: "1px solid #fecaca",
+      border:
+        "1px solid #fecaca",
       borderRadius: 7,
 
       background: "#fef2f2",
@@ -360,7 +473,11 @@ export default function Login() {
         onSubmit={onSubmit}
         style={styles.card}
       >
-        <div style={styles.logoContainer}>
+        <div
+          style={
+            styles.logoContainer
+          }
+        >
           <img
             src="/images/Logo-vysisa.png"
             alt="Grupo VYSISA"
@@ -373,12 +490,20 @@ export default function Login() {
         </h1>
 
         {err ? (
-          <div style={styles.error}>
+          <div
+            style={
+              styles.error
+            }
+          >
             {err}
           </div>
         ) : null}
 
-        <div style={styles.fieldGroup}>
+        <div
+          style={
+            styles.fieldGroup
+          }
+        >
           <label
             htmlFor="login-email"
             style={styles.label}
@@ -392,7 +517,9 @@ export default function Login() {
             type="email"
             value={email}
             onChange={(event) =>
-              setEmail(event.target.value)
+              setEmail(
+                event.target.value
+              )
             }
             autoComplete="username"
             placeholder="Ingresa tu correo"
@@ -401,7 +528,11 @@ export default function Login() {
           />
         </div>
 
-        <div style={styles.fieldGroup}>
+        <div
+          style={
+            styles.fieldGroup
+          }
+        >
           <label
             htmlFor="login-password"
             style={styles.label}
@@ -415,7 +546,9 @@ export default function Login() {
             type="password"
             value={password}
             onChange={(event) =>
-              setPassword(event.target.value)
+              setPassword(
+                event.target.value
+              )
             }
             autoComplete="current-password"
             placeholder="Ingresa tu contraseña"

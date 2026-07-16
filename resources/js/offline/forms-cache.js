@@ -199,3 +199,141 @@ export async function saveOfflineSubmission(
     pending_sync: true,
   });
 }
+
+// ==========================
+// LIMPIAR DATOS FUERA DEL ALCANCE
+// ==========================
+export async function cleanupOfflineScope(userId, forms = []) {
+  const uid = normalizeUserId(userId);
+
+  if (!uid) {
+    return {
+      deletedDetails: 0,
+      deletedSubmissions: 0,
+      deletedPdfs: 0,
+    };
+  }
+
+  const allowedFormIds = new Set(
+    (Array.isArray(forms) ? forms : [])
+      .map((form) => Number(form?.id || 0))
+      .filter(Boolean)
+  );
+
+  return db.transaction(
+    "rw",
+    db.form_details,
+    db.form_submissions,
+    db.submission_pdfs,
+    async () => {
+      /*
+       * Detalles de formularios almacenados para este usuario.
+       */
+      const existingDetails = await db.form_details
+        .where("user_id")
+        .equals(uid)
+        .toArray();
+
+      /*
+       * Registros almacenados para este usuario.
+       */
+      const existingSubmissions = await db.form_submissions
+        .where("user_id")
+        .equals(uid)
+        .toArray();
+
+      /*
+       * PDFs almacenados para este usuario.
+       */
+      const existingPdfs = await db.submission_pdfs
+        .where("user_id")
+        .equals(uid)
+        .toArray();
+
+      /*
+       * Eliminamos detalles de formularios que ya no
+       * están dentro del alcance del usuario.
+       */
+      const detailIdsToDelete = existingDetails
+        .filter(
+          (row) =>
+            !allowedFormIds.has(
+              Number(row.form_id)
+            )
+        )
+        .map((row) => row.id)
+        .filter(Boolean);
+
+      /*
+       * Eliminamos únicamente registros remotos pertenecientes
+       * a formularios que ya no están asignados.
+       *
+       * Los registros pendientes de sincronizar se conservan.
+       */
+      const submissionIdsToDelete =
+        existingSubmissions
+          .filter((row) => {
+            const outsideScope =
+              !allowedFormIds.has(
+                Number(row.form_id)
+              );
+
+            const isPending =
+              Boolean(row.pending_sync) ||
+              row.synced === false;
+
+            return (
+              outsideScope &&
+              !isPending
+            );
+          })
+          .map((row) => row.id)
+          .filter(Boolean);
+
+      /*
+       * Eliminamos todos los PDFs de formularios
+       * que ya no están permitidos.
+       */
+      const pdfIdsToDelete = existingPdfs
+        .filter(
+          (row) =>
+            !allowedFormIds.has(
+              Number(row.form_id)
+            )
+        )
+        .map((row) => row.id)
+        .filter(Boolean);
+
+      if (detailIdsToDelete.length > 0) {
+        await db.form_details.bulkDelete(
+          detailIdsToDelete
+        );
+      }
+
+      if (
+        submissionIdsToDelete.length > 0
+      ) {
+        await db.form_submissions.bulkDelete(
+          submissionIdsToDelete
+        );
+      }
+
+      if (pdfIdsToDelete.length > 0) {
+        await db.submission_pdfs.bulkDelete(
+          pdfIdsToDelete
+        );
+      }
+
+      return {
+        deletedDetails:
+          detailIdsToDelete.length,
+
+        deletedSubmissions:
+          submissionIdsToDelete.length,
+
+        deletedPdfs:
+          pdfIdsToDelete.length,
+      };
+    }
+  );
+}

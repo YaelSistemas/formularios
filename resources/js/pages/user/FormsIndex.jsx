@@ -416,35 +416,6 @@ export default function FormsIndex() {
     setErr(e?.message || fallback);
   };
 
-  const warmOfflineData = async (rows) => {
-    if (!navigator.onLine) return;
-    if (!currentUserId) return;
-
-    for (const form of rows) {
-      try {
-        const detailData = await apiGet(`/forms/${form.id}`);
-        const detailForm = detailData?.form || null;
-        if (detailForm) {
-          await cacheFormDetail(currentUserId, detailForm);
-        }
-      } catch {
-        // ignore
-      }
-
-      if (canViewSubmissions) {
-        try {
-          const subsData = await apiGet(`/forms/${form.id}/submissions`);
-          const subsRows = Array.isArray(subsData?.submissions)
-            ? subsData.submissions
-            : [];
-          await cacheFormSubmissions(currentUserId, form.id, subsRows);
-        } catch {
-          // ignore
-        }
-      }
-    }
-  };
-
   const loadForms = async () => {
     setErr("");
     setLoadingForms(true);
@@ -456,8 +427,10 @@ export default function FormsIndex() {
       setForms(rows);
       setOfflineMode(false);
 
-      await cacheFormsCatalog(currentUserId, rows);
-      warmOfflineData(rows).catch(() => null);
+      await cacheFormsCatalog(
+        currentUserId,
+        rows
+      );
     } catch (e) {
       const cached = await getCachedFormsCatalog(currentUserId);
 
@@ -613,31 +586,192 @@ export default function FormsIndex() {
     return () => window.removeEventListener("popstate", onPopState);
   }, [canViewSubmissions]);
 
-  useEffect(() => {
-    const onSyncComplete = async () => {
-      if (!navigator.onLine) return;
+  /*
+  |--------------------------------------------------------------------------
+  | Actualización después de subir registros pendientes
+  |--------------------------------------------------------------------------
+  |
+  | Este evento ocurre cuando una captura local se sube al servidor.
+  |
+  | Solo actualizamos:
+  | - El listado de formularios.
+  | - El listado de registros abierto.
+  |
+  | No tocamos fill, response_view ni response_edit para evitar
+  | interrumpir al usuario.
+  |
+  */
 
-      if (mode === "table") {
-        await loadForms();
+  useEffect(() => {
+    const onSyncComplete = async (event) => {
+      if (!navigator.onLine) {
+        return;
       }
 
-      if (selectedId) {
-        if (!detail) {
-          await loadDetail(selectedId);
+      const eventUserId = Number(
+        event?.detail?.userId || 0
+      );
+
+      if (
+        eventUserId &&
+        eventUserId !== currentUserId
+      ) {
+        return;
+      }
+
+      try {
+        if (mode === "table") {
+          await loadForms();
+          return;
         }
 
-        if (canViewSubmissions) {
+        if (
+          mode === "responses" &&
+          selectedId &&
+          canViewSubmissions
+        ) {
+          if (!detail) {
+            await loadDetail(selectedId);
+          }
+
           await loadSubmissions(selectedId);
         }
+      } catch {
+        // La sincronización ya terminó.
+        // Un error al refrescar la vista no debe interrumpir al usuario.
       }
     };
 
-    window.addEventListener("offline-sync-complete", onSyncComplete);
+    window.addEventListener(
+      "offline-sync-complete",
+      onSyncComplete
+    );
 
     return () => {
-      window.removeEventListener("offline-sync-complete", onSyncComplete);
+      window.removeEventListener(
+        "offline-sync-complete",
+        onSyncComplete
+      );
     };
-  }, [selectedId, mode, canViewSubmissions, detail]);
+  }, [
+    currentUserId,
+    selectedId,
+    mode,
+    canViewSubmissions,
+    detail,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Actualización después del bootstrap silencioso
+  |--------------------------------------------------------------------------
+  |
+  | bootstrap.js ya guardó la información nueva en IndexedDB.
+  | Por eso aquí leemos directamente la caché y evitamos volver a
+  | descargar los mismos datos desde el servidor.
+  |
+  | No modificamos la interfaz cuando el usuario está:
+  | - Llenando un formulario.
+  | - Viendo un registro.
+  | - Editando un registro.
+  |
+  */
+
+  useEffect(() => {
+    const onBootstrapComplete = async (event) => {
+      const eventUserId = Number(
+        event?.detail?.userId || 0
+      );
+
+      if (!currentUserId) {
+        return;
+      }
+
+      if (
+        eventUserId &&
+        eventUserId !== currentUserId
+      ) {
+        return;
+      }
+
+      try {
+        /*
+         * Si está viendo el catálogo, mostramos los formularios
+         * nuevos, modificados o retirados.
+         */
+        if (mode === "table") {
+          const cachedForms =
+            await getCachedFormsCatalog(
+              currentUserId
+            );
+
+          setForms(cachedForms);
+          setOfflineMode(false);
+          setErr("");
+
+          return;
+        }
+
+        /*
+         * Si está viendo los registros de un formulario,
+         * actualizamos únicamente ese listado.
+         */
+        if (
+          mode === "responses" &&
+          selectedId &&
+          canViewSubmissions
+        ) {
+          const [
+            cachedDetail,
+            cachedSubmissions,
+          ] = await Promise.all([
+            getCachedFormDetail(
+              currentUserId,
+              selectedId
+            ),
+
+            getCachedFormSubmissions(
+              currentUserId,
+              selectedId
+            ),
+          ]);
+
+          if (cachedDetail) {
+            setDetail(cachedDetail);
+          }
+
+          setSubs(cachedSubmissions);
+          setOfflineMode(false);
+          setErr("");
+        }
+
+        /*
+         * Para los modos fill, response_view y response_edit
+         * no hacemos nada. La información sí queda descargada
+         * en IndexedDB, pero no se interrumpe la pantalla actual.
+         */
+      } catch {
+        // Un error al leer la caché no debe interrumpir al usuario.
+      }
+    };
+
+    window.addEventListener(
+      "offline-bootstrap-complete",
+      onBootstrapComplete
+    );
+
+    return () => {
+      window.removeEventListener(
+        "offline-bootstrap-complete",
+        onBootstrapComplete
+      );
+    };
+  }, [
+    currentUserId,
+    selectedId,
+    mode,
+    canViewSubmissions,
+  ]);
 
   useEffect(() => {
     const onOfflineRecordSaved = async (event) => {

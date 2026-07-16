@@ -1,10 +1,23 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { setupAutoSync } from "./offline/sync";
+
+import {
+  setupAutoSync,
+  syncNow,
+} from "./offline/sync";
+
 import { getOfflineUser } from "./offline/session";
+
 import OfflineBootstrapScreen from "./components/OfflineBootstrapScreen";
+
 import {
   shouldRunOfflineBootstrap,
   runOfflineBootstrap,
@@ -29,234 +42,837 @@ import AdminForms from "./pages/admin/AdminForms";
 // PWA SW register (vite-plugin-pwa)
 import { registerSW } from "virtual:pwa-register";
 
+/*
+|--------------------------------------------------------------------------
+| Configuración de actualización offline
+|--------------------------------------------------------------------------
+*/
+
+const OFFLINE_BOOTSTRAP_REASON_KEY =
+  "offline_bootstrap_reason";
+
+/*
+ * Cada 45 segundos se consulta únicamente bootstrap-meta.
+ * Solo si existen cambios se descarga el bootstrap completo.
+ */
+const REMOTE_CHECK_INTERVAL_MS = 45000;
+
+/*
+ * Cada 15 segundos se intenta subir la cola local pendiente.
+ */
+const LOCAL_SYNC_INTERVAL_MS = 15000;
+
+/*
+|--------------------------------------------------------------------------
+| Service Worker
+|--------------------------------------------------------------------------
+*/
+
 const updateSW = registerSW({
   immediate: true,
+
   onNeedRefresh() {
-    console.log("Nueva versión disponible");
+    console.log(
+      "Nueva versión disponible"
+    );
+
     updateSW(true);
   },
+
   onOfflineReady() {
-    console.log("La app ya está lista para usarse offline");
+    console.log(
+      "La app ya está lista para usarse offline"
+    );
   },
 });
 
-setupAutoSync({
-  intervalMs: 15000,
-  runOnStart: true,
-});
+/*
+|--------------------------------------------------------------------------
+| Usuario almacenado
+|--------------------------------------------------------------------------
+*/
 
 function getStoredUser() {
   try {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
+    const raw =
+      localStorage.getItem("user");
+
+    return raw
+      ? JSON.parse(raw)
+      : null;
   } catch {
     return null;
   }
 }
 
+/*
+|--------------------------------------------------------------------------
+| Motivo del bootstrap
+|--------------------------------------------------------------------------
+|
+| Login.jsx guardará temporalmente:
+|
+| offline_bootstrap_reason = login
+|
+| La marca se consume una sola vez.
+|
+*/
+
+function consumeOfflineBootstrapReason() {
+  try {
+    const reason =
+      sessionStorage.getItem(
+        OFFLINE_BOOTSTRAP_REASON_KEY
+      ) || "";
+
+    sessionStorage.removeItem(
+      OFFLINE_BOOTSTRAP_REASON_KEY
+    );
+
+    return reason;
+  } catch {
+    return "";
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Roles y permisos
+|--------------------------------------------------------------------------
+*/
+
 function normalizeRoles(user) {
-  if (!user) return [];
+  if (!user) {
+    return [];
+  }
 
-  const rolesFromArray = Array.isArray(user.roles)
-    ? user.roles
-        .map((r) => (typeof r === "string" ? r : r?.name))
-        .filter(Boolean)
-    : [];
+  const rolesFromArray =
+    Array.isArray(user.roles)
+      ? user.roles
+          .map((role) =>
+            typeof role === "string"
+              ? role
+              : role?.name
+          )
+          .filter(Boolean)
+      : [];
 
-  const roleSingle = user.role
-    ? [typeof user.role === "string" ? user.role : user.role?.name].filter(Boolean)
-    : [];
+  const roleSingle =
+    user.role
+      ? [
+          typeof user.role === "string"
+            ? user.role
+            : user.role?.name,
+        ].filter(Boolean)
+      : [];
 
-  return [...new Set([...rolesFromArray, ...roleSingle])];
+  return [
+    ...new Set([
+      ...rolesFromArray,
+      ...roleSingle,
+    ]),
+  ];
 }
 
 function normalizePermissions(user) {
-  if (!user) return [];
+  if (!user) {
+    return [];
+  }
 
-  const directPermissions = Array.isArray(user.permissions)
-    ? user.permissions
-        .map((p) => (typeof p === "string" ? p : p?.name))
-        .filter(Boolean)
-    : [];
+  const directPermissions =
+    Array.isArray(user.permissions)
+      ? user.permissions
+          .map((permission) =>
+            typeof permission === "string"
+              ? permission
+              : permission?.name
+          )
+          .filter(Boolean)
+      : [];
 
-  return [...new Set(directPermissions)];
+  return [
+    ...new Set(directPermissions),
+  ];
 }
 
 function isAdmin(user) {
-  const roles = normalizeRoles(user).map((r) => String(r).toLowerCase());
-  return roles.includes("administrador");
+  const roles =
+    normalizeRoles(user).map((role) =>
+      String(role).toLowerCase()
+    );
+
+  return roles.includes(
+    "administrador"
+  );
 }
 
-function hasPermission(user, permission) {
-  if (isAdmin(user)) return true;
-  const permissions = normalizePermissions(user);
-  return permissions.includes(permission);
+function hasPermission(
+  user,
+  permission
+) {
+  if (isAdmin(user)) {
+    return true;
+  }
+
+  const permissions =
+    normalizePermissions(user);
+
+  return permissions.includes(
+    permission
+  );
 }
+
+/*
+|--------------------------------------------------------------------------
+| Acceso offline
+|--------------------------------------------------------------------------
+*/
 
 function canEnterOffline() {
-  if (typeof navigator !== "undefined" && navigator.onLine) return false;
-  const offlineUser = getOfflineUser();
-  return !!offlineUser?.id;
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.onLine
+  ) {
+    return false;
+  }
+
+  const offlineUser =
+    getOfflineUser();
+
+  return Boolean(
+    offlineUser?.id
+  );
 }
+
+/*
+|--------------------------------------------------------------------------
+| Protección de rutas
+|--------------------------------------------------------------------------
+*/
 
 function RequireAuth({ children }) {
-  const token = localStorage.getItem("token");
+  const token =
+    localStorage.getItem("token");
 
-  if (token) return children;
+  if (token) {
+    return children;
+  }
 
   if (canEnterOffline()) {
-    const offlineUser = getOfflineUser();
+    const offlineUser =
+      getOfflineUser();
+
     if (offlineUser) {
-      localStorage.setItem("user", JSON.stringify(offlineUser));
+      localStorage.setItem(
+        "user",
+        JSON.stringify(offlineUser)
+      );
     }
+
     return children;
   }
 
-  return <Navigate to="/login" replace />;
+  return (
+    <Navigate
+      to="/login"
+      replace
+    />
+  );
 }
 
-function RequireAdminPanelAccess({ children }) {
+function RequireAdminPanelAccess({
+  children,
+}) {
   const user = getStoredUser();
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
 
-  if (isAdmin(user) || hasPermission(user, "admin.panel.view")) {
+  if (
+    isAdmin(user) ||
+    hasPermission(
+      user,
+      "admin.panel.view"
+    )
+  ) {
     return children;
   }
 
-  return <Navigate to="/forms" replace />;
+  return (
+    <Navigate
+      to="/forms"
+      replace
+    />
+  );
 }
 
-function RequireModulePermission({ permission, children }) {
+function RequireModulePermission({
+  permission,
+  children,
+}) {
   const user = getStoredUser();
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
 
-  if (isAdmin(user) || hasPermission(user, permission)) {
+  if (
+    isAdmin(user) ||
+    hasPermission(
+      user,
+      permission
+    )
+  ) {
     return children;
   }
 
-  return <Navigate to="/admin" replace />;
+  return (
+    <Navigate
+      to="/admin"
+      replace
+    />
+  );
 }
 
 function AdminIndexRedirect() {
   const user = getStoredUser();
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
 
   if (isAdmin(user)) {
-    return <Navigate to="/admin/users" replace />;
+    return (
+      <Navigate
+        to="/admin/users"
+        replace
+      />
+    );
   }
 
   const adminModules = [
-    { path: "/admin/users", permission: "usuarios.view" },
-    { path: "/admin/roles", permission: "roles.view" },
-    { path: "/admin/permissions", permission: "permisos.view" },
-    { path: "/admin/unidades-servicio", permission: "unidades_servicio.view" },
-    { path: "/admin/empresas", permission: "empresas.view" },
-    { path: "/admin/grupos", permission: "grupos.view" },
-    { path: "/admin/forms", permission: "formularios.admin.view" },
+    {
+      path: "/admin/users",
+      permission: "usuarios.view",
+    },
+    {
+      path: "/admin/roles",
+      permission: "roles.view",
+    },
+    {
+      path: "/admin/permissions",
+      permission: "permisos.view",
+    },
+    {
+      path: "/admin/unidades-servicio",
+      permission:
+        "unidades_servicio.view",
+    },
+    {
+      path: "/admin/empresas",
+      permission: "empresas.view",
+    },
+    {
+      path: "/admin/grupos",
+      permission: "grupos.view",
+    },
+    {
+      path: "/admin/forms",
+      permission:
+        "formularios.admin.view",
+    },
   ];
 
-  const firstAllowed = adminModules.find((item) =>
-    hasPermission(user, item.permission)
-  );
+  const firstAllowed =
+    adminModules.find((item) =>
+      hasPermission(
+        user,
+        item.permission
+      )
+    );
 
   if (firstAllowed) {
-    return <Navigate to={firstAllowed.path} replace />;
+    return (
+      <Navigate
+        to={firstAllowed.path}
+        replace
+      />
+    );
   }
 
-  return <Navigate to="/forms" replace />;
+  return (
+    <Navigate
+      to="/forms"
+      replace
+    />
+  );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Aplicación principal
+|--------------------------------------------------------------------------
+*/
+
 function App() {
-  const [bootState, setBootState] = useState({
-    checking: false,
-    running: false,
-    progress: null,
-  });
+  const [bootState, setBootState] =
+    useState({
+      checking: false,
+      running: false,
+      progress: null,
+    });
 
   useEffect(() => {
     let cancelled = false;
 
-    async function boot() {
-      try {
-        const user = getStoredUser();
-        const token = localStorage.getItem("token");
+    /*
+     * Evita que los eventos online, visibilitychange
+     * y el intervalo consulten al mismo tiempo.
+     */
+    let activeRefresh = null;
 
-        if (!user?.id || !token || !navigator.onLine) {
-          return;
+    /*
+    |--------------------------------------------------------------------------
+    | Contexto de la sesión actual
+    |--------------------------------------------------------------------------
+    */
+
+    function getOnlineSession() {
+      const user = getStoredUser();
+
+      const token =
+        localStorage.getItem(
+          "token"
+        );
+
+      if (
+        !user?.id ||
+        !token ||
+        !navigator.onLine
+      ) {
+        return null;
+      }
+
+      return {
+        user,
+        token,
+        userId: Number(user.id),
+      };
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ocultar pantalla de progreso
+    |--------------------------------------------------------------------------
+    */
+
+    function closeBootstrapScreen() {
+      if (cancelled) {
+        return;
+      }
+
+      setBootState({
+        checking: false,
+        running: false,
+        progress: null,
+      });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Actualizar información offline
+    |--------------------------------------------------------------------------
+    |
+    | visible = true
+    | Muestra OfflineBootstrapScreen.
+    |
+    | visible = false
+    | Descarga en segundo plano.
+    |
+    */
+
+    async function refreshOfflineData({
+      visible = false,
+      reason = "background",
+      syncPending = false,
+    } = {}) {
+      /*
+       * Si ya hay una revisión en proceso,
+       * esperamos esa misma revisión.
+       */
+      if (activeRefresh) {
+        return activeRefresh;
+      }
+
+      activeRefresh = (async () => {
+        const session =
+          getOnlineSession();
+
+        if (!session) {
+          return {
+            ok: false,
+            skipped: true,
+            reason: "no_online_session",
+          };
         }
 
-        const check = await shouldRunOfflineBootstrap();
+        const {
+          userId,
+          token,
+        } = session;
 
+        /*
+         * En inicio, reconexión o regreso del segundo plano,
+         * primero intentamos subir las capturas pendientes.
+         */
+        if (syncPending) {
+          await syncNow().catch(
+            () => null
+          );
+        }
+
+        const check =
+          await shouldRunOfflineBootstrap({
+            userId,
+          });
+
+        /*
+         * Si el meta no cambió, no mostramos pantalla
+         * ni descargamos el bootstrap completo.
+         */
         if (!check?.shouldRun) {
-          return;
+          return {
+            ok: true,
+            skipped: true,
+            reason:
+              check?.reason ||
+              "no_changes",
+          };
         }
 
-        if (!cancelled) {
+        /*
+         * La pantalla solo se activa cuando se solicitó
+         * explícitamente modo visible.
+         */
+        if (
+          visible &&
+          !cancelled
+        ) {
           setBootState({
             checking: false,
             running: true,
             progress: {
               formsDone: 0,
-              formsTotal: Number(check?.remoteMeta?.forms_count || 0),
+
+              formsTotal: Number(
+                check?.remoteMeta
+                  ?.forms_count || 0
+              ),
+
               recordsDone: 0,
-              recordsTotal: Number(check?.remoteMeta?.submissions_count || 0),
+
+              recordsTotal: Number(
+                check?.remoteMeta
+                  ?.submissions_count ||
+                  0
+              ),
+
               pdfsDone: 0,
-              pdfsTotal: Number(check?.remoteMeta?.pdfs_count || 0),
-              message: "Preparando datos offline...",
+
+              pdfsTotal: Number(
+                check?.remoteMeta
+                  ?.pdfs_count || 0
+              ),
+
+              message:
+                "Preparando datos offline...",
             },
           });
         }
 
-        await runOfflineBootstrap({
-          userId: Number(user.id),
-          token,
-          onProgress: (progress) => {
-            if (cancelled) return;
-            setBootState({
-              checking: false,
-              running: true,
-              progress,
-            });
-          },
-        });
+        try {
+          const result =
+            await runOfflineBootstrap({
+              userId,
+              token,
 
-        if (!cancelled) {
-          setBootState({
-            checking: false,
-            running: false,
-            progress: null,
-          });
+              /*
+               * Reutilizamos el meta que ya consultamos
+               * para no hacer una petición duplicada.
+               */
+              remoteMeta:
+                check.remoteMeta,
+
+              reason,
+
+              mode: visible
+                ? "visible"
+                : "silent",
+
+              /*
+               * En modo silencioso no enviamos onProgress,
+               * por lo tanto no se altera la interfaz.
+               */
+              onProgress: visible
+                ? (progress) => {
+                    if (cancelled) {
+                      return;
+                    }
+
+                    setBootState({
+                      checking: false,
+                      running: true,
+                      progress,
+                    });
+                  }
+                : undefined,
+            });
+
+          return result;
+        } finally {
+          if (visible) {
+            closeBootstrapScreen();
+          }
         }
-      } catch (e) {
-        if (!cancelled) {
-          setBootState({
-            checking: false,
-            running: false,
-            progress: null,
-          });
-        }
+      })();
+
+      try {
+        return await activeRefresh;
+      } finally {
+        activeRefresh = null;
       }
     }
 
-    boot();
+    /*
+    |--------------------------------------------------------------------------
+    | Sincronización periódica de la cola local
+    |--------------------------------------------------------------------------
+    |
+    | Solo sube capturas pendientes.
+    | No descarga formularios ni PDFs.
+    |
+    */
+
+    const stopAutoSync =
+      setupAutoSync({
+        intervalMs:
+          LOCAL_SYNC_INTERVAL_MS,
+
+        /*
+         * El inicio lo coordina este archivo para mantener
+         * el orden correcto:
+         *
+         * 1. Subir pendientes.
+         * 2. Consultar cambios.
+         * 3. Descargar cambios.
+         */
+        runOnStart: false,
+      });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Carga inicial
+    |--------------------------------------------------------------------------
+    |
+    | Después del login:
+    | - visible
+    |
+    | Recarga, reapertura o navegación normal:
+    | - silenciosa
+    |
+    */
+
+    async function runInitialRefresh() {
+      const session =
+        getOnlineSession();
+
+      if (!session) {
+        return;
+      }
+
+      const storedReason =
+        consumeOfflineBootstrapReason();
+
+      const isLogin =
+        storedReason === "login";
+
+      await refreshOfflineData({
+        visible: isLogin,
+
+        reason: isLogin
+          ? "login"
+          : "reload",
+
+        syncPending: true,
+      });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recuperación de internet
+    |--------------------------------------------------------------------------
+    |
+    | Primero sube pendientes y después consulta cambios.
+    | La pantalla aparece solamente si realmente existen cambios.
+    |
+    */
+
+    function handleOnline() {
+      refreshOfflineData({
+        visible: true,
+        reason: "reconnect",
+        syncPending: true,
+      }).catch(() => null);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Regreso del segundo plano
+    |--------------------------------------------------------------------------
+    |
+    | Se actualiza silenciosamente para no interrumpir
+    | al usuario ni borrar una captura en proceso.
+    |
+    */
+
+    function handleVisibilityChange() {
+      if (
+        document.visibilityState !==
+        "visible"
+      ) {
+        return;
+      }
+
+      if (!navigator.onLine) {
+        return;
+      }
+
+      refreshOfflineData({
+        visible: false,
+        reason: "visibility",
+        syncPending: true,
+      }).catch(() => null);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Revisión periódica de cambios remotos
+    |--------------------------------------------------------------------------
+    |
+    | Solo consulta bootstrap-meta.
+    | Si existe un cambio, descarga silenciosamente.
+    |
+    */
+
+    const remoteCheckIntervalId =
+      window.setInterval(() => {
+        if (!navigator.onLine) {
+          return;
+        }
+
+        if (
+          document.visibilityState !==
+          "visible"
+        ) {
+          return;
+        }
+
+        refreshOfflineData({
+          visible: false,
+          reason: "interval",
+          syncPending: false,
+        }).catch(() => null);
+      }, REMOTE_CHECK_INTERVAL_MS);
+
+    window.addEventListener(
+      "online",
+      handleOnline
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    runInitialRefresh().catch(
+      () => {
+        closeBootstrapScreen();
+      }
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Limpieza
+    |--------------------------------------------------------------------------
+    */
 
     return () => {
       cancelled = true;
+
+      stopAutoSync?.();
+
+      window.clearInterval(
+        remoteCheckIntervalId
+      );
+
+      window.removeEventListener(
+        "online",
+        handleOnline
+      );
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
     };
   }, []);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Pantalla visible de preparación
+  |--------------------------------------------------------------------------
+  */
+
   if (bootState.running) {
-    return <OfflineBootstrapScreen progress={bootState.progress} />;
+    return (
+      <OfflineBootstrapScreen
+        progress={
+          bootState.progress
+        }
+      />
+    );
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Rutas
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <BrowserRouter>
       <Routes>
         {/* Public */}
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
         {/* Panel normal */}
         <Route
@@ -267,8 +883,20 @@ function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<Navigate to="/forms" replace />} />
-          <Route path="forms" element={<FormsIndex />} />
+          <Route
+            index
+            element={
+              <Navigate
+                to="/forms"
+                replace
+              />
+            }
+          />
+
+          <Route
+            path="forms"
+            element={<FormsIndex />}
+          />
         </Route>
 
         {/* Admin con layout + subrutas */}
@@ -282,12 +910,19 @@ function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<AdminIndexRedirect />} />
+          <Route
+            index
+            element={
+              <AdminIndexRedirect />
+            }
+          />
 
           <Route
             path="users"
             element={
-              <RequireModulePermission permission="usuarios.view">
+              <RequireModulePermission
+                permission="usuarios.view"
+              >
                 <AdminUsers />
               </RequireModulePermission>
             }
@@ -296,7 +931,9 @@ function App() {
           <Route
             path="roles"
             element={
-              <RequireModulePermission permission="roles.view">
+              <RequireModulePermission
+                permission="roles.view"
+              >
                 <AdminRoles />
               </RequireModulePermission>
             }
@@ -305,7 +942,9 @@ function App() {
           <Route
             path="permissions"
             element={
-              <RequireModulePermission permission="permisos.view">
+              <RequireModulePermission
+                permission="permisos.view"
+              >
                 <AdminPermissions />
               </RequireModulePermission>
             }
@@ -314,7 +953,9 @@ function App() {
           <Route
             path="unidades-servicio"
             element={
-              <RequireModulePermission permission="unidades_servicio.view">
+              <RequireModulePermission
+                permission="unidades_servicio.view"
+              >
                 <AdminUnidadesServicio />
               </RequireModulePermission>
             }
@@ -323,7 +964,9 @@ function App() {
           <Route
             path="empresas"
             element={
-              <RequireModulePermission permission="empresas.view">
+              <RequireModulePermission
+                permission="empresas.view"
+              >
                 <AdminEmpresas />
               </RequireModulePermission>
             }
@@ -332,7 +975,9 @@ function App() {
           <Route
             path="grupos"
             element={
-              <RequireModulePermission permission="grupos.view">
+              <RequireModulePermission
+                permission="grupos.view"
+              >
                 <AdminGrupos />
               </RequireModulePermission>
             }
@@ -341,7 +986,9 @@ function App() {
           <Route
             path="forms"
             element={
-              <RequireModulePermission permission="formularios.admin.view">
+              <RequireModulePermission
+                permission="formularios.admin.view"
+              >
                 <AdminForms />
               </RequireModulePermission>
             }
@@ -349,10 +996,22 @@ function App() {
         </Route>
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to="/"
+              replace
+            />
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("app")).render(<App />);
+ReactDOM.createRoot(
+  document.getElementById("app")
+).render(
+  <App />
+);

@@ -13,69 +13,157 @@ class OfflineBootstrapController extends Controller
     public function meta(Request $request)
     {
         $user = $request->user();
-
+    
         if (!$user) {
-            return response()->json(['message' => 'No autorizado'], 401);
+            return response()->json([
+                'message' => 'No autorizado',
+            ], 401);
         }
-
+    
         $isAdmin = $user->hasRole('Administrador');
-
-        // 🔹 Formularios accesibles
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Formularios accesibles
+        |--------------------------------------------------------------------------
+        */
+    
         $formsQuery = Form::query()
             ->where('status', 'PUBLICADO');
-
+    
         if (!$isAdmin) {
-            $formsQuery->whereHas('assignedUsers', function ($q) use ($user) {
-                $q->where('users.id', $user->id);
+            $formsQuery->whereHas('assignedUsers', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
             });
         }
-
-        $forms = $formsQuery->pluck('id');
-
-        // 🔹 Submissions visibles
-        $submissionsQuery = FormSubmission::query()
-            ->whereIn('form_id', $forms);
-
-        if (!$isAdmin) {
-            $unidadIds = $user->unidadesServicio()->pluck('unidades_servicio.id');
-
-            if ($unidadIds->isEmpty()) {
-                return response()->json([
-                    'forms_count' => 0,
-                    'submissions_count' => 0,
-                    'pdfs_count' => 0,
-                    'last_change_at' => null,
-                    'unit_scope_hash' => 'empty',
-                ]);
-            }
-
-            $submissionsQuery->whereHas('user.unidadesServicio', function ($q) use ($unidadIds) {
-                $q->whereIn('unidades_servicio.id', $unidadIds);
-            });
-        }
-
-        $submissionsCount = (clone $submissionsQuery)->count();
-
-        // 🔹 Última modificación
-        $lastChange = (clone $submissionsQuery)
-            ->max('updated_at') ?? now();
-
-        // 🔹 Hash de alcance (MUY IMPORTANTE)
-        $unidadIds = $user->unidadesServicio()->pluck('unidades_servicio.id')->sort()->values()->toArray();
-        $formIds = $forms->sort()->values()->toArray();
-
-        $scopeData = json_encode([
-            'units' => $unidadIds,
-            'forms' => $formIds,
+    
+        /*
+         * Obtenemos también updated_at porque necesitamos detectar
+         * cambios en la definición o configuración de los formularios.
+         */
+        $forms = $formsQuery->get([
+            'id',
+            'updated_at',
         ]);
-
+    
+        $formIds = $forms
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->sort()
+            ->values();
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Unidades de servicio del usuario
+        |--------------------------------------------------------------------------
+        */
+    
+        $unidadIds = $isAdmin
+            ? collect()
+            : $user->unidadesServicio()
+                ->pluck('unidades_servicio.id')
+                ->map(fn ($id) => (int) $id)
+                ->sort()
+                ->values();
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Registros visibles
+        |--------------------------------------------------------------------------
+        */
+    
+        $submissionsQuery = FormSubmission::query()
+            ->whereIn('form_id', $formIds);
+    
+        if (!$isAdmin) {
+            if ($unidadIds->isEmpty()) {
+                /*
+                 * El usuario puede tener formularios asignados, pero si no tiene
+                 * unidades no debe ver registros de otros usuarios.
+                 *
+                 * No regresamos todo en ceros porque los formularios asignados
+                 * sí deben seguir contando.
+                 */
+                $submissionsQuery->whereRaw('1 = 0');
+            } else {
+                $submissionsQuery->whereHas(
+                    'user.unidadesServicio',
+                    function ($query) use ($unidadIds) {
+                        $query->whereIn(
+                            'unidades_servicio.id',
+                            $unidadIds
+                        );
+                    }
+                );
+            }
+        }
+    
+        $submissionsCount = (clone $submissionsQuery)->count();
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Último cambio real
+        |--------------------------------------------------------------------------
+        |
+        | Revisamos tanto formularios como registros.
+        | No usamos now() porque generaría un cambio diferente en cada petición.
+        */
+    
+        $lastFormChange = $forms->max('updated_at');
+    
+        $lastSubmissionChange = (clone $submissionsQuery)
+            ->max('updated_at');
+    
+        $lastChange = collect([
+            $lastFormChange,
+            $lastSubmissionChange,
+        ])
+            ->filter()
+            ->map(function ($date) {
+                return \Illuminate\Support\Carbon::parse($date);
+            })
+            ->sortDesc()
+            ->first();
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Hash del alcance
+        |--------------------------------------------------------------------------
+        |
+        | Detecta:
+        | - Formularios asignados o retirados.
+        | - Unidades agregadas o retiradas.
+        | - Cambio entre administrador y usuario normal.
+        */
+    
+        $scopeData = json_encode([
+            'is_admin' => $isAdmin,
+            'units' => $isAdmin
+                ? []
+                : $unidadIds->all(),
+            'forms' => $formIds->all(),
+        ]);
+    
         $unitScopeHash = md5($scopeData);
-
+    
         return response()->json([
-            'forms_count' => $forms->count(),
+            'forms_count' => $formIds->count(),
             'submissions_count' => $submissionsCount,
+    
+            /*
+             * Actualmente cada registro corresponde a un PDF disponible.
+             * Por eso se conserva el mismo conteo.
+             */
             'pdfs_count' => $submissionsCount,
-            'last_change_at' => $lastChange,
+    
+            /*
+             * Será null únicamente cuando no exista ningún formulario
+             * ni registro que tenga una fecha de modificación.
+             */
+            'last_change_at' => $lastChange
+                ? $lastChange->toISOString()
+                : null,
+    
             'unit_scope_hash' => $unitScopeHash,
         ]);
     }
