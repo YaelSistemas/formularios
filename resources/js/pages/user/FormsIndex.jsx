@@ -482,12 +482,48 @@ export default function FormsIndex() {
     setSubs([]);
   
     try {
-      const data = await apiGet(`/forms/${id}/submissions`);
-      const rows = Array.isArray(data?.submissions) ? data.submissions : [];
+      /*
+       * Sin conexión no intentamos consultar la API.
+       * Leemos directamente los registros guardados en IndexedDB.
+       *
+       * Un arreglo vacío también es válido:
+       * significa que el formulario no tiene registros guardados.
+       */
+      if (!navigator.onLine) {
+        const cached =
+          await getCachedFormSubmissions(
+            currentUserId,
+            id
+          );
   
-      await cacheFormSubmissions(currentUserId, id, rows);
+        setSubs(cached);
+        setOfflineMode(true);
+        setErr("");
   
-      const merged = await getCachedFormSubmissions(currentUserId, id);
+        return;
+      }
+  
+      const data = await apiGet(
+        `/forms/${id}/submissions`
+      );
+  
+      const rows = Array.isArray(
+        data?.submissions
+      )
+        ? data.submissions
+        : [];
+  
+      await cacheFormSubmissions(
+        currentUserId,
+        id,
+        rows
+      );
+  
+      const merged =
+        await getCachedFormSubmissions(
+          currentUserId,
+          id
+        );
   
       setSubs(merged);
       setOfflineMode(false);
@@ -500,15 +536,59 @@ export default function FormsIndex() {
         token,
       }).catch(() => null);
     } catch (e) {
-      const cached = await getCachedFormSubmissions(currentUserId, id);
+      const cached =
+        await getCachedFormSubmissions(
+          currentUserId,
+          id
+        );
   
+      const errorMessage = String(
+        e?.message || ""
+      ).toLowerCase();
+  
+      const isNetworkError =
+        !navigator.onLine ||
+        errorMessage.includes(
+          "no-response"
+        ) ||
+        errorMessage.includes(
+          "failed to fetch"
+        ) ||
+        errorMessage.includes(
+          "networkerror"
+        ) ||
+        errorMessage.includes(
+          "network request failed"
+        );
+  
+      /*
+       * Cuando falla la red usamos la caché incluso
+       * cuando está vacía.
+       */
+      if (isNetworkError) {
+        setSubs(cached);
+        setOfflineMode(true);
+        setErr("");
+  
+        return;
+      }
+  
+      /*
+       * Si existe información guardada, todavía podemos
+       * mostrarla aunque el servidor haya fallado.
+       */
       if (cached.length > 0) {
         setSubs(cached);
         setOfflineMode(true);
         setErr("");
-      } else {
-        setAuthError(e, "Error cargando registros");
+  
+        return;
       }
+  
+      setAuthError(
+        e,
+        "Error cargando registros"
+      );
     } finally {
       setLoadingSubs(false);
     }
