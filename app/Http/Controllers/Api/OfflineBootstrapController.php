@@ -6,125 +6,134 @@ use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\FormSubmission;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class OfflineBootstrapController extends Controller
 {
     public function meta(Request $request)
     {
         $user = $request->user();
-    
+
         if (!$user) {
             return response()->json([
                 'message' => 'No autorizado',
             ], 401);
         }
-    
+
         $isAdmin = $user->hasRole('Administrador');
-    
+
         /*
         |--------------------------------------------------------------------------
         | Formularios accesibles
         |--------------------------------------------------------------------------
         */
-    
+
         $formsQuery = Form::query()
             ->where('status', 'PUBLICADO');
-    
+
         if (!$isAdmin) {
-            $formsQuery->whereHas('assignedUsers', function ($query) use ($user) {
-                $query->where('users.id', $user->id);
-            });
+            $formsQuery->whereHas(
+                'assignedUsers',
+                function ($query) use ($user) {
+                    $query->where(
+                        'users.id',
+                        $user->id
+                    );
+                }
+            );
         }
-    
+
         /*
-         * Obtenemos también updated_at porque necesitamos detectar
-         * cambios en la definición o configuración de los formularios.
+         * Obtenemos updated_at para detectar cambios
+         * en las definiciones de los formularios.
          */
         $forms = $formsQuery->get([
             'id',
             'updated_at',
         ]);
-    
+
         $formIds = $forms
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->sort()
             ->values();
-    
+
         /*
         |--------------------------------------------------------------------------
         | Unidades de servicio del usuario
         |--------------------------------------------------------------------------
+        |
+        | Guardamos tanto ID como nombre porque el filtro de registros
+        | utiliza el nombre de la unidad contra answers.taller.
+        |
         */
-    
-        $unidadIds = $isAdmin
+
+        $unitScope = $isAdmin
             ? collect()
             : $user->unidadesServicio()
-                ->pluck('unidades_servicio.id')
-                ->map(fn ($id) => (int) $id)
-                ->sort()
+                ->get([
+                    'unidades_servicio.id',
+                    'unidades_servicio.nombre',
+                ])
+                ->map(function ($unidad) {
+                    return [
+                        'id' => (int) $unidad->id,
+                        'nombre' => trim(
+                            (string) $unidad->nombre
+                        ),
+                    ];
+                })
+                ->sortBy('id')
                 ->values();
-    
+
         /*
         |--------------------------------------------------------------------------
         | Registros visibles
         |--------------------------------------------------------------------------
+        |
+        | El scope visibleTo aplica:
+        |
+        | Administrador:
+        | - Todos los registros.
+        |
+        | Usuario normal:
+        | - Sus propios registros.
+        | - Registros cuyo answers.taller coincida con una de sus unidades.
+        |
         */
-    
+
         $submissionsQuery = FormSubmission::query()
-            ->whereIn('form_id', $formIds);
-    
-        if (!$isAdmin) {
-            if ($unidadIds->isEmpty()) {
-                /*
-                 * El usuario puede tener formularios asignados, pero si no tiene
-                 * unidades no debe ver registros de otros usuarios.
-                 *
-                 * No regresamos todo en ceros porque los formularios asignados
-                 * sí deben seguir contando.
-                 */
-                $submissionsQuery->whereRaw('1 = 0');
-            } else {
-                $submissionsQuery->whereHas(
-                    'user.unidadesServicio',
-                    function ($query) use ($unidadIds) {
-                        $query->whereIn(
-                            'unidades_servicio.id',
-                            $unidadIds
-                        );
-                    }
-                );
-            }
-        }
-    
-        $submissionsCount = (clone $submissionsQuery)->count();
-    
+            ->whereIn('form_id', $formIds)
+            ->visibleTo($user);
+
+        $submissionsCount = (clone $submissionsQuery)
+            ->count();
+
         /*
         |--------------------------------------------------------------------------
         | Último cambio real
         |--------------------------------------------------------------------------
-        |
-        | Revisamos tanto formularios como registros.
-        | No usamos now() porque generaría un cambio diferente en cada petición.
         */
-    
-        $lastFormChange = $forms->max('updated_at');
-    
+
+        $lastFormChange = $forms->max(
+            'updated_at'
+        );
+
         $lastSubmissionChange = (clone $submissionsQuery)
             ->max('updated_at');
-    
+
         $lastChange = collect([
             $lastFormChange,
             $lastSubmissionChange,
         ])
             ->filter()
             ->map(function ($date) {
-                return \Illuminate\Support\Carbon::parse($date);
+                return \Illuminate\Support\Carbon::parse(
+                    $date
+                );
             })
             ->sortDesc()
             ->first();
-    
+
         /*
         |--------------------------------------------------------------------------
         | Hash del alcance
@@ -133,108 +142,150 @@ class OfflineBootstrapController extends Controller
         | Detecta:
         | - Formularios asignados o retirados.
         | - Unidades agregadas o retiradas.
+        | - Cambios en el nombre de una unidad.
         | - Cambio entre administrador y usuario normal.
+        |
         */
-    
+
         $scopeData = json_encode([
             'is_admin' => $isAdmin,
+
             'units' => $isAdmin
                 ? []
-                : $unidadIds->all(),
+                : $unitScope->all(),
+
             'forms' => $formIds->all(),
-        ]);
-    
-        $unitScopeHash = md5($scopeData);
-    
+        ], JSON_UNESCAPED_UNICODE);
+
+        $unitScopeHash = md5(
+            $scopeData
+        );
+
         return response()->json([
             'forms_count' => $formIds->count(),
-            'submissions_count' => $submissionsCount,
-    
+
+            'submissions_count' =>
+                $submissionsCount,
+
             /*
-             * Actualmente cada registro corresponde a un PDF disponible.
-             * Por eso se conserva el mismo conteo.
+             * Cada registro corresponde a un PDF.
              */
-            'pdfs_count' => $submissionsCount,
-    
-            /*
-             * Será null únicamente cuando no exista ningún formulario
-             * ni registro que tenga una fecha de modificación.
-             */
+            'pdfs_count' =>
+                $submissionsCount,
+
             'last_change_at' => $lastChange
                 ? $lastChange->toISOString()
                 : null,
-    
-            'unit_scope_hash' => $unitScopeHash,
+
+            'unit_scope_hash' =>
+                $unitScopeHash,
         ]);
     }
 
     public function bootstrap(Request $request)
     {
         $user = $request->user();
-    
+
         if (!$user) {
-            return response()->json(['message' => 'No autorizado'], 401);
+            return response()->json([
+                'message' => 'No autorizado',
+            ], 401);
         }
-    
-        $isAdmin = $user->hasRole('Administrador');
-    
-        // 🔹 Formularios accesibles
-        $formsQuery = \App\Models\Form::query()
+
+        $isAdmin = $user->hasRole(
+            'Administrador'
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Formularios accesibles
+        |--------------------------------------------------------------------------
+        */
+
+        $formsQuery = Form::query()
             ->where('status', 'PUBLICADO');
-    
+
         if (!$isAdmin) {
-            $formsQuery->whereHas('assignedUsers', function ($q) use ($user) {
-                $q->where('users.id', $user->id);
-            });
-        }
-    
-        $forms = $formsQuery->get();
-    
-        // 🔹 IDs de unidades
-        $unidadIds = $user->unidadesServicio()->pluck('unidades_servicio.id');
-    
-        $submissionsByForm = [];
-    
-        foreach ($forms as $form) {
-            $query = \App\Models\FormSubmission::query()
-                ->with(['user:id,name'])
-                ->where('form_id', $form->id);
-    
-            if (!$isAdmin) {
-                if ($unidadIds->isEmpty()) {
-                    $submissionsByForm[$form->id] = [];
-                    continue;
+            $formsQuery->whereHas(
+                'assignedUsers',
+                function ($query) use ($user) {
+                    $query->where(
+                        'users.id',
+                        $user->id
+                    );
                 }
-    
-                $query->whereHas('user.unidadesServicio', function ($q) use ($unidadIds) {
-                    $q->whereIn('unidades_servicio.id', $unidadIds);
-                });
-            }
-    
-            $subs = $query
+            );
+        }
+
+        $forms = $formsQuery->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Registros visibles agrupados por formulario
+        |--------------------------------------------------------------------------
+        */
+
+        $submissionsByForm = [];
+
+        foreach ($forms as $form) {
+            $query = FormSubmission::query()
+                ->with([
+                    'user:id,name',
+                ])
+                ->where(
+                    'form_id',
+                    $form->id
+                )
+                ->visibleTo($user);
+
+            $submissions = $query
                 ->orderByDesc('consecutive')
                 ->orderByDesc('id')
                 ->limit(100)
-                ->get(['id', 'form_id', 'consecutive', 'user_id', 'answers', 'created_at'])
-                ->map(function ($sub) {
+                ->get([
+                    'id',
+                    'form_id',
+                    'consecutive',
+                    'user_id',
+                    'answers',
+                    'created_at',
+                ])
+                ->map(function ($submission) {
                     return [
-                        'id' => $sub->id,
-                        'form_id' => $sub->form_id,
-                        'consecutive' => $sub->consecutive,
-                        'user_id' => $sub->user_id,
-                        'user_name' => $sub->user?->name,
-                        'answers' => $sub->answers,
-                        'created_at' => $sub->created_at,
+                        'id' =>
+                            $submission->id,
+
+                        'form_id' =>
+                            $submission->form_id,
+
+                        'consecutive' =>
+                            $submission->consecutive,
+
+                        'user_id' =>
+                            $submission->user_id,
+
+                        'user_name' =>
+                            $submission->user?->name,
+
+                        'answers' =>
+                            $submission->answers,
+
+                        'created_at' =>
+                            $submission->created_at,
                     ];
                 })
                 ->values();
-    
-            $submissionsByForm[$form->id] = $subs;
+
+            $submissionsByForm[
+                $form->id
+            ] = $submissions;
         }
-    
+
         return response()->json([
             'forms' => $forms,
-            'submissions_by_form' => $submissionsByForm,
+
+            'submissions_by_form' =>
+                $submissionsByForm,
         ]);
     }
 }

@@ -175,40 +175,42 @@ class FormSubmissionsController extends Controller
         $user = $request->user();
     
         if (!$user) {
-            return response()->json(['message' => 'No autorizado.'], 401);
+            return response()->json([
+                'message' => 'No autorizado.',
+            ], 401);
         }
     
         if (!$user->hasRole('Administrador')) {
             if ($form->status !== 'PUBLICADO') {
-                return response()->json(['message' => 'No encontrado.'], 404);
+                return response()->json([
+                    'message' => 'No encontrado.',
+                ], 404);
             }
     
             if (!$this->userCanAccessForm($user->id, $form)) {
-                return response()->json(['message' => 'No autorizado para este formulario.'], 403);
+                return response()->json([
+                    'message' => 'No autorizado para este formulario.',
+                ], 403);
             }
         }
     
         $query = FormSubmission::query()
             ->with(['user:id,name'])
-            ->where('form_id', $form->id);
-    
-        if (!$user->hasRole('Administrador')) {
-            $unidadIds = $user->unidadesServicio()->pluck('unidades_servicio.id');
-    
-            if ($unidadIds->isEmpty()) {
-                return response()->json(['submissions' => []]);
-            }
-    
-            $query->whereHas('user.unidadesServicio', function ($q) use ($unidadIds) {
-                $q->whereIn('unidades_servicio.id', $unidadIds);
-            });
-        }
+            ->where('form_id', $form->id)
+            ->visibleTo($user);
     
         $subs = $query
             ->orderByDesc('consecutive')
             ->orderByDesc('id')
             ->limit(100)
-            ->get(['id', 'form_id', 'consecutive', 'user_id', 'answers', 'created_at'])
+            ->get([
+                'id',
+                'form_id',
+                'consecutive',
+                'user_id',
+                'answers',
+                'created_at',
+            ])
             ->map(function ($sub) {
                 return [
                     'id' => $sub->id,
@@ -222,7 +224,9 @@ class FormSubmissionsController extends Controller
             })
             ->values();
     
-        return response()->json(['submissions' => $subs]);
+        return response()->json([
+            'submissions' => $subs,
+        ]);
     }
 
     public function update(Request $request, Form $form, FormSubmission $submission)
