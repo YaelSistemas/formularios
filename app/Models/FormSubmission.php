@@ -70,10 +70,23 @@ class FormSubmission extends Model
              * de sus unidades de servicio.
              */
             if ($unidadNombres->isNotEmpty()) {
-                $q->orWhereIn(
-                    'answers->taller',
-                    $unidadNombres->all()
-                );
+                $nombres = $unidadNombres->all();
+            
+                $q->orWhere(function (Builder $tallerQuery) use ($nombres) {
+                    $tallerQuery
+                        ->whereIn(
+                            'answers->taller',
+                            $nombres
+                        )
+                        ->orWhereIn(
+                            'answers->taller_origen',
+                            $nombres
+                        )
+                        ->orWhereIn(
+                            'answers->taller_solicita',
+                            $nombres
+                        );
+                });
             }
         });
     }

@@ -1185,18 +1185,58 @@ export default function FormsIndex() {
 
   const getSubmissionSummary = (submission) => {
     const ans = submission?.answers || {};
-
+  
+    /*
+     * Formularios normales:
+     * muestran únicamente el taller.
+     */
     const taller =
-      ans.taller ?? ans.id_taller ?? ans.taller_nombre ?? ans.workshop ?? "";
-
-    const inspector =
-      ans.nombre_inspector ?? ans.inspector ?? ans.inspector_name ?? "";
-
+      ans.taller ??
+      ans.id_taller ??
+      ans.taller_nombre ??
+      ans.workshop ??
+      "";
+  
+    /*
+     * Checklist de Prensas:
+     * utiliza dos campos diferentes.
+     */
+    const tallerOrigen =
+      ans.taller_origen ??
+      "";
+  
+    const tallerSolicita =
+      ans.taller_solicita ??
+      "";
+  
     const parts = [];
-
-    if (taller) parts.push(`Taller: ${taller}`);
-    if (inspector) parts.push(`Inspector: ${inspector}`);
-
+  
+    if (tallerOrigen) {
+      parts.push(
+        `Taller de origen: ${tallerOrigen}`
+      );
+    }
+  
+    if (tallerSolicita) {
+      parts.push(
+        `Taller que solicita: ${tallerSolicita}`
+      );
+    }
+  
+    /*
+     * Si no es el formulario de prensas,
+     * mostramos el taller normal.
+     */
+    if (
+      !tallerOrigen &&
+      !tallerSolicita &&
+      taller
+    ) {
+      parts.push(
+        `Taller: ${taller}`
+      );
+    }
+  
     return parts.join(" | ") || "—";
   };
 
