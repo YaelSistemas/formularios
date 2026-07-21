@@ -16,31 +16,46 @@ class AuthController extends Controller
             'email'    => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
-
-        // Carga roles/permisos para responder consistente
+    
         $user = User::query()
             ->with(['roles', 'permissions'])
             ->where('email', $data['email'])
             ->first();
-
+    
         if (!$user || !Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Credenciales incorrectas.'],
             ]);
         }
-
-        // Validar si el usuario está inactivo
+    
         if (!(bool) $user->activo) {
             return response()->json([
                 'message' => 'Tu usuario no tiene acceso en este momento. Comunícate con tu administrador o con el equipo de Sistemas.',
             ], 403);
         }
-
-        // 1 sesión activa por usuario
-        $user->tokens()->delete();
-
-        $token = $user->createToken('pwa')->plainTextToken;
-
+    
+        // Crear nueva sesión
+        $newToken = $user->createToken('pwa');
+        $token = $newToken->plainTextToken;
+        
+        /*
+         * Mantener únicamente las 2 sesiones más recientes.
+         */
+        $tokenIds = $user->tokens()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->pluck('id');
+        
+        $tokensToDelete = $tokenIds
+            ->skip(2)
+            ->values();
+        
+        if ($tokensToDelete->isNotEmpty()) {
+            $user->tokens()
+                ->whereIn('id', $tokensToDelete->all())
+                ->delete();
+        }
+    
         return response()->json([
             'token' => $token,
             'user'  => $this->userPayload($user),
@@ -75,14 +90,24 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $user = $request->user();
-
+    
         if (!$user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+            return response()->json([
+                'message' => 'Unauthenticated',
+            ], 401);
         }
-
-        $user->tokens()->delete();
-
-        return response()->json(['ok' => true]);
+    
+        /*
+         * Elimina únicamente la sesión actual.
+         * Las otras sesiones del usuario permanecen activas.
+         */
+        $request->user()
+            ->currentAccessToken()
+            ?->delete();
+    
+        return response()->json([
+            'ok' => true,
+        ]);
     }
 
     /**
