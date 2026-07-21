@@ -36,8 +36,8 @@ export default defineConfig({
         "pwa-512-maskable.png",
       ],
       manifest: {
-        name: "Formularios PWA",
-        short_name: "Formularios",
+        name: "Formularios Vysisa",
+        short_name: "Formularios Vysisa",
         start_url: "/",
         scope: "/",
         display: "standalone",

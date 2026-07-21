@@ -566,13 +566,13 @@ export default function AppLayout() {
             </div>
 
             <div style={S.topbarRight}>
-              <div style={S.topbarTitle}>Formularios PWA</div>
+              <div style={S.topbarTitle}>Formularios Vysisa</div>
             </div>
           </>
         ) : (
           <>
             <div style={S.topbarLeft}>
-              <div style={S.topbarTitle}>Formularios PWA</div>
+              <div style={S.topbarTitle}>Formularios Vysisa</div>
             </div>
 
             <div style={{ position: "relative" }} ref={userMenuRef}>
