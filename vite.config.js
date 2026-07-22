@@ -79,7 +79,7 @@ export default defineConfig({
 
         // ❗ importante: NO cachear html aquí
         globPatterns: [
-          "**/*.{js,css,ico,png,svg,woff,woff2,webmanifest}",
+          "**/*.{js,css,ico,png,svg,woff,woff2}",
         ],
 
         runtimeCaching: [
