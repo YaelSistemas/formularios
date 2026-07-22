@@ -66,6 +66,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
+        inlineWorkboxRuntime: true,
 
         // 👉 SPA fallback
         navigateFallback: "/",
