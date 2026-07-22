@@ -419,21 +419,39 @@ export default function FormsIndex() {
   const loadForms = async () => {
     setErr("");
     setLoadingForms(true);
-
+  
     try {
+      // Si ya sabemos que estamos offline, no intentamos consultar la API.
+      if (!navigator.onLine) {
+        const cached = await getCachedFormsCatalog(currentUserId);
+  
+        setForms(cached);
+        setOfflineMode(true);
+  
+        if (cached.length > 0) {
+          setErr("");
+        } else {
+          setErr(
+            "No hay formularios guardados en este dispositivo para trabajar sin conexión."
+          );
+        }
+  
+        return;
+      }
+  
+      // Modo online: consultar datos actuales del servidor.
       const data = await apiGet("/forms");
       const rows = Array.isArray(data?.forms) ? data.forms : [];
-
+  
       setForms(rows);
       setOfflineMode(false);
-
-      await cacheFormsCatalog(
-        currentUserId,
-        rows
-      );
+  
+      await cacheFormsCatalog(currentUserId, rows);
     } catch (e) {
+      // Puede existir red local, pero no comunicación real con el servidor.
+      // En ese caso usamos la información guardada.
       const cached = await getCachedFormsCatalog(currentUserId);
-
+  
       if (cached.length > 0) {
         setForms(cached);
         setOfflineMode(true);
