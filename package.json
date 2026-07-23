@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "postbuild": "node -e \"require('fs').copyFileSync('public/build/manifest.webmanifest','public/manifest.webmanifest')\"",
         "dev": "vite"
     },
     "devDependencies": {
