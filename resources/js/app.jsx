@@ -14,7 +14,12 @@ import {
   syncNow,
 } from "./offline/sync";
 
-import { getOfflineUser } from "./offline/session";
+import { apiMe } from "./services/api";
+
+import {
+  getOfflineUser,
+  saveOfflineSession,
+} from "./offline/session";
 
 import OfflineBootstrapScreen from "./components/OfflineBootstrapScreen";
 
@@ -50,6 +55,9 @@ import { registerSW } from "virtual:pwa-register";
 
 const OFFLINE_BOOTSTRAP_REASON_KEY =
   "offline_bootstrap_reason";
+
+const CURRENT_USER_UPDATED_EVENT =
+  "current-user-updated";
 
 /*
  * Cada 20 segundos se consulta únicamente bootstrap-meta.
@@ -449,6 +457,122 @@ function App() {
 
     /*
     |--------------------------------------------------------------------------
+    | Actualización del usuario, roles y permisos
+    |--------------------------------------------------------------------------
+    */
+
+    let activeUserRefresh = null;
+
+    async function refreshCurrentUser() {
+      /*
+       * Evita varias peticiones apiMe simultáneas.
+       */
+      if (activeUserRefresh) {
+        return activeUserRefresh;
+      }
+
+      activeUserRefresh = (async () => {
+        const token =
+          localStorage.getItem("token");
+
+        if (
+          !token ||
+          !navigator.onLine
+        ) {
+          return {
+            ok: false,
+            skipped: true,
+          };
+        }
+
+        try {
+          const data =
+            await apiMe();
+
+          const updatedUser =
+            data?.user || data;
+
+          if (!updatedUser?.id) {
+            return {
+              ok: false,
+              skipped: true,
+            };
+          }
+
+          const previousUser =
+            getStoredUser();
+
+          const changed =
+            JSON.stringify(
+              previousUser ?? null
+            ) !==
+            JSON.stringify(
+              updatedUser
+            );
+
+          /*
+           * Actualiza el usuario utilizado
+           * por la aplicación.
+           */
+          localStorage.setItem(
+            "user",
+            JSON.stringify(
+              updatedUser
+            )
+          );
+
+          /*
+           * Actualiza también la copia
+           * utilizada cuando está offline.
+           */
+          saveOfflineSession(
+            updatedUser
+          );
+
+          /*
+           * Avisamos a los componentes solamente
+           * cuando realmente cambió el usuario,
+           * sus roles o sus permisos.
+           */
+          if (changed) {
+            window.dispatchEvent(
+              new CustomEvent(
+                CURRENT_USER_UPDATED_EVENT,
+                {
+                  detail:
+                    updatedUser,
+                }
+              )
+            );
+          }
+
+          return {
+            ok: true,
+            changed,
+            user: updatedUser,
+          };
+        } catch (error) {
+          console.error(
+            "No se pudo actualizar el usuario:",
+            error
+          );
+
+          return {
+            ok: false,
+            error,
+          };
+        }
+      })();
+
+      try {
+        return await activeUserRefresh;
+      } finally {
+        activeUserRefresh = null;
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Contexto de la sesión actual
     |--------------------------------------------------------------------------
     */
@@ -699,6 +823,8 @@ function App() {
     */
 
     async function runInitialRefresh() {
+      await refreshCurrentUser();
+    
       const session =
         getOnlineSession();
 
@@ -734,11 +860,15 @@ function App() {
     */
 
     function handleOnline() {
-      refreshOfflineData({
-        visible: true,
-        reason: "reconnect",
-        syncPending: true,
-      }).catch(() => null);
+      refreshCurrentUser()
+        .then(() =>
+          refreshOfflineData({
+            visible: true,
+            reason: "reconnect",
+            syncPending: true,
+          })
+        )
+        .catch(() => null);
     }
 
     /*
@@ -763,11 +893,15 @@ function App() {
         return;
       }
 
-      refreshOfflineData({
-        visible: false,
-        reason: "visibility",
-        syncPending: true,
-      }).catch(() => null);
+      refreshCurrentUser()
+        .then(() =>
+          refreshOfflineData({
+            visible: false,
+            reason: "visibility",
+            syncPending: true,
+          })
+        )
+        .catch(() => null);
     }
 
     /*
@@ -793,11 +927,15 @@ function App() {
           return;
         }
 
-        refreshOfflineData({
-          visible: false,
-          reason: "interval",
-          syncPending: false,
-        }).catch(() => null);
+        refreshCurrentUser()
+          .then(() =>
+            refreshOfflineData({
+              visible: false,
+              reason: "interval",
+              syncPending: false,
+            })
+          )
+          .catch(() => null);
       }, REMOTE_CHECK_INTERVAL_MS);
 
     window.addEventListener(

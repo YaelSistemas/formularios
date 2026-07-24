@@ -17,6 +17,9 @@ import {
   preloadVisibleSubmissionPdfs,
 } from "../../offline/pdf-cache";
 
+const CURRENT_USER_UPDATED_EVENT =
+  "current-user-updated";
+
 function Card({ children, style }) {
   return (
     <div
@@ -264,30 +267,150 @@ export default function FormsIndex() {
     }
   });
 
-  const token = useMemo(() => localStorage.getItem("token"), []);
-  const currentUserId = Number(me?.id || 0);
+  useEffect(() => {
+    function handleCurrentUserUpdated(
+      event
+    ) {
+      const updatedUser =
+        event?.detail;
+
+      if (!updatedUser?.id) {
+        return;
+      }
+
+      setMe(updatedUser);
+
+      /*
+       * Cerramos menús o ventanas que podrían
+       * contener acciones del rol anterior.
+       */
+      setMobileActions({
+        open: false,
+        form: null,
+      });
+
+      setMobileSubmissionActions({
+        open: false,
+        submission: null,
+      });
+
+      setHistoryModal({
+        open: false,
+        submission: null,
+      });
+
+      setHistoryLoading(false);
+      setHistoryError("");
+      setHistoryData([]);
+      setErr("");
+    }
+
+    window.addEventListener(
+      CURRENT_USER_UPDATED_EVENT,
+      handleCurrentUserUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        CURRENT_USER_UPDATED_EVENT,
+        handleCurrentUserUpdated
+      );
+    };
+  }, []);
+
+  const token = useMemo(
+    () => localStorage.getItem("token"),
+    []
+  );
+
+  const currentUserId = Number(
+    me?.id || 0
+  );
+
+  const roleSet = useMemo(() => {
+    const rolesFromArray =
+      Array.isArray(me?.roles)
+        ? me.roles
+            .map((role) =>
+              typeof role === "string"
+                ? role
+                : role?.name
+            )
+            .filter(Boolean)
+        : [];
+
+    const roleSingle =
+      me?.role
+        ? [
+            typeof me.role === "string"
+              ? me.role
+              : me.role?.name,
+          ].filter(Boolean)
+        : [];
+
+    return new Set(
+      [
+        ...rolesFromArray,
+        ...roleSingle,
+      ].map((role) =>
+        String(role)
+          .trim()
+          .toLowerCase()
+      )
+    );
+  }, [me]);
+
+  const isAdmin =
+    !!me?.is_admin ||
+    roleSet.has("administrador");
 
   const permissionSet = useMemo(() => {
     const raw = me?.permissions;
 
-    if (!Array.isArray(raw)) return new Set();
+    if (!Array.isArray(raw)) {
+      return new Set();
+    }
 
     return new Set(
       raw
-        .map((p) => (typeof p === "string" ? p : p?.name))
+        .map((permission) =>
+          typeof permission === "string"
+            ? permission
+            : permission?.name
+        )
         .filter(Boolean)
     );
   }, [me]);
 
-  const canCreateRecord = permissionSet.has("formularios.create");
-  const canSubmitForm = permissionSet.has("formularios.submit");
-  const canViewSubmissions = permissionSet.has("formularios.submissions.view");
-  const canEditSubmission = permissionSet.has("formularios.edit");
-  const canDeleteSubmission = permissionSet.has("formularios.delete");
+  const canCreateRecord =
+    isAdmin ||
+    permissionSet.has(
+      "formularios.create"
+    );
 
-  const isAdmin =
-    !!me?.is_admin ||
-    (Array.isArray(me?.roles) && me.roles.includes("Administrador"));
+  const canSubmitForm =
+    isAdmin ||
+    permissionSet.has(
+      "formularios.submit"
+    );
+
+  const canViewSubmissions =
+    isAdmin ||
+    permissionSet.has(
+      "formularios.submissions.view"
+    );
+
+  const canEditSubmission =
+    isAdmin ||
+    permissionSet.has(
+      "formularios.edit"
+    );
+
+  const canDeleteSubmission =
+    isAdmin ||
+    permissionSet.has(
+      "formularios.delete"
+    );
 
   const noPermissionMessage = (actionText) =>
     `No cuentas con los permisos necesarios para ${actionText}. Contacta a tu administrador o al equipo de Sistemas.`;

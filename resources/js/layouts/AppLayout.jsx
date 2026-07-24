@@ -3,13 +3,19 @@ import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { apiPost } from "../services/api";
 import { getAvatarColors, getInitialsFromName } from "../utils/userBadge";
 
+const CURRENT_USER_UPDATED_EVENT =
+  "current-user-updated";
+
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [me] = useState(() => {
+  const [me, setMe] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("user") || "null");
+      return JSON.parse(
+        localStorage.getItem("user") ||
+          "null"
+      );
     } catch {
       return null;
     }
@@ -59,6 +65,34 @@ export default function AppLayout() {
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
+
+  useEffect(() => {
+    function handleCurrentUserUpdated(
+      event
+    ) {
+      const updatedUser =
+        event?.detail;
+  
+      if (!updatedUser?.id) {
+        return;
+      }
+  
+      setMe(updatedUser);
+      setUserMenuOpen(false);
+    }
+  
+    window.addEventListener(
+      CURRENT_USER_UPDATED_EVENT,
+      handleCurrentUserUpdated
+    );
+  
+    return () => {
+      window.removeEventListener(
+        CURRENT_USER_UPDATED_EVENT,
+        handleCurrentUserUpdated
+      );
+    };
+  }, []);
 
   useEffect(() => {
     function onResize() {

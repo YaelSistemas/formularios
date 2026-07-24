@@ -8,6 +8,9 @@ import {
 import { apiMe, apiPost } from "../services/api";
 import { getAvatarColors, getInitialsFromName } from "../utils/userBadge";
 
+const CURRENT_USER_UPDATED_EVENT =
+  "current-user-updated";
+
 export default function AdminLayout() {
   const location = useLocation();
 
@@ -33,6 +36,35 @@ export default function AdminLayout() {
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
+
+  useEffect(() => {
+    function handleCurrentUserUpdated(
+      event
+    ) {
+      const updatedUser =
+        event?.detail;
+  
+      if (!updatedUser?.id) {
+        return;
+      }
+  
+      setMe(updatedUser);
+      setUserMenuOpen(false);
+      setErr("");
+    }
+  
+    window.addEventListener(
+      CURRENT_USER_UPDATED_EVENT,
+      handleCurrentUserUpdated
+    );
+  
+    return () => {
+      window.removeEventListener(
+        CURRENT_USER_UPDATED_EVENT,
+        handleCurrentUserUpdated
+      );
+    };
+  }, []);
 
   const normalizeRoles = (user) => {
     if (!user) return [];
@@ -132,6 +164,41 @@ export default function AdminLayout() {
       active: location.pathname.startsWith("/admin/forms"),
     },
   ].filter(Boolean);
+
+  const currentModuleAccess = [
+    {
+      prefix: "/admin/users",
+      allowed: canViewUsers,
+    },
+    {
+      prefix: "/admin/roles",
+      allowed: canViewRoles,
+    },
+    {
+      prefix: "/admin/permissions",
+      allowed: canViewPermissions,
+    },
+    {
+      prefix: "/admin/unidades-servicio",
+      allowed: canViewUnidadesServicio,
+    },
+    {
+      prefix: "/admin/empresas",
+      allowed: canViewEmpresas,
+    },
+    {
+      prefix: "/admin/grupos",
+      allowed: canViewGrupos,
+    },
+    {
+      prefix: "/admin/forms",
+      allowed: canViewFormsAdmin,
+    },
+  ].find((item) =>
+    location.pathname.startsWith(
+      item.prefix
+    )
+  );
 
   useEffect(() => {
     function onResize() {
@@ -552,10 +619,25 @@ export default function AdminLayout() {
 
   if (!canAccessAdminPanel) {
     return (
-      <div style={{ padding: 16 }}>
-        <h2>Acceso denegado</h2>
-        <p>No cuentas con permiso para entrar al panel admin.</p>
-      </div>
+      <Navigate
+        to="/forms"
+        replace
+      />
+    );
+  }
+  
+  if (
+    currentModuleAccess &&
+    !currentModuleAccess.allowed
+  ) {
+    return (
+      <Navigate
+        to={
+          visibleAdminLinks[0]?.to ||
+          "/forms"
+        }
+        replace
+      />
     );
   }
 
