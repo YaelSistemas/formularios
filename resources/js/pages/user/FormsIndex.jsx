@@ -20,6 +20,39 @@ import {
 const CURRENT_USER_UPDATED_EVENT =
   "current-user-updated";
 
+const FORM_FOLIO_PREFIXES = Object.freeze({
+  sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil: "CEP",
+  sst_pop_ta_07_fo_01_inspeccion_de_compresor: "C",
+  sst_pop_ta_05_fo_02_inspeccion_de_equipo_de_oxicorte: "EO",
+  sst_pop_ta_05_fo_03_checklist_maquina_de_soldar: "MS",
+  sst_pop_ta_04_fo_04_checklist_linea_retractil_y_puntos_fijos: "LR",
+  sst_pop_ta_04_fo_03_inspeccion_de_linea_de_vida: "LV",
+  sst_pop_ta_04_fo_02_inspeccion_de_arnes_de_seguridad: "AS",
+  sst_pop_ta_04_fo_01_checklist_de_sand_blast: "SB",
+  sst_pop_ta_01_fo_08_checklist_de_tirfor: "CT",
+  sst_pop_ta_01_fo_07_checklist_de_tecle: "T",
+  sst_pop_ta_01_fo_06_checklist_de_polipasto_manual_de_cadena: "MC",
+  sst_pop_ta_01_fo_04_checklist_de_inspeccion_de_escaleras_portatiles: "EP",
+  sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal: "EPP",
+  sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles: "UM",
+  sst_pgi_ta_02_fo_03_checklist_de_botiquines: "B",
+  sst_pgi_ta_02_fo_02_checklist_de_extintor: "E",
+  sst_pgi_ta_01_fo_01_boleta_de_observaciones: "BO",
+  sgi_pop_lg_01_fo_09_checklist_eslingas_de_cadenas: "EC",
+  sgi_pop_lg_01_fo_08_inspeccion_de_grua_viajera: "GV",
+  sgi_pop_lg_01_fo_06_checklist_de_mantenimiento_grua_viajera: "MGV",
+  sgi_pop_lg_01_fo_04_checklist_de_mantenimiento_cortadora_de_banda: "MCB",
+  sgi_pop_lg_01_fo_03_checklist_semanal_montacargas: "SM",
+  sgi_pop_lg_01_07_checklist_mantenimiento_sistema_electrico: "MSE",
+  sgi_pop_gt_01_fo_11_checklist_de_inspeccion_de_estrobos: "CIE",
+  sgi_pop_gt_01_fo_10_checklist_inspeccion_de_eslingas: "IE",
+  sgi_pop_gt_01_fo_09_checklist_de_prensas: "P",
+  sgi_pop_gt_01_fo_08_lista_de_herramientas_materiales: "HM",
+  sgi_pop_fo_01_checklist_de_prensas_para_pasamanos: "PP",
+  sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia: "ILV",
+  sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo: "DH",
+});
+
 function Card({ children, style }) {
   return (
     <div
@@ -326,6 +359,43 @@ export default function FormsIndex() {
   const currentUserId = Number(
     me?.id || 0
   );
+
+  const selectedFormKey = useMemo(() => {
+    const catalogForm = forms.find(
+      (form) =>
+        Number(form?.id) === Number(selectedId)
+    );
+  
+    return String(
+      detail?.key ||
+        detail?.form_key ||
+        detail?.payload?._code_key ||
+        catalogForm?.key ||
+        catalogForm?.form_key ||
+        catalogForm?.payload?._code_key ||
+        ""
+    ).trim();
+  }, [detail, forms, selectedId]);
+  
+  const getSubmissionFolio = (submission) => {
+    const consecutive =
+      submission?.consecutive ??
+      submission?.id ??
+      "—";
+  
+    const prefix =
+      FORM_FOLIO_PREFIXES[selectedFormKey];
+  
+    /*
+     * Si algún formulario no está configurado,
+     * conservamos la forma anterior para no romper la vista.
+     */
+    if (!prefix) {
+      return `Registro ${consecutive}`;
+    }
+  
+    return `${prefix}${consecutive}`;
+  };
 
   const roleSet = useMemo(() => {
     const rolesFromArray =
@@ -1136,8 +1206,11 @@ export default function FormsIndex() {
       return;
     }
 
+    const folio =
+      getSubmissionFolio(submission);
+    
     const ok = window.confirm(
-      `¿Seguro que deseas eliminar el registro ${submission.consecutive ?? submission.id}? Esta acción no se puede deshacer.`
+      `¿Seguro que deseas eliminar el folio ${folio}? Esta acción no se puede deshacer.`
     );
 
     if (!ok) return;
@@ -1154,7 +1227,7 @@ export default function FormsIndex() {
 
       await loadSubmissions(selectedId);
       setSuccessMsg(
-        `El registro ${submission.consecutive ?? submission.id} se eliminó correctamente.`
+        `El folio ${folio} se eliminó correctamente.`
       );
     } catch (e) {
       setAuthError(e, "Error eliminando registro");
@@ -1607,22 +1680,44 @@ export default function FormsIndex() {
 
   const filteredSubs = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return subs;
-
-    return subs.filter((s) => {
-      const registroLabel = `registro ${s.consecutive ?? s.id}`.toLowerCase();
-      const registroId = String(s.consecutive ?? s.id ?? "").toLowerCase();
-      const userName = String(getSubmissionUserName(s)).toLowerCase();
-      const summary = String(getSubmissionSummary(s)).toLowerCase();
-
+  
+    if (!q) {
+      return subs;
+    }
+  
+    return subs.filter((submission) => {
+      const consecutive =
+        submission?.consecutive ??
+        submission?.id ??
+        "";
+  
+      const folio =
+        getSubmissionFolio(submission)
+          .toLowerCase();
+  
+      const previousLabel =
+        `registro ${consecutive}`
+          .toLowerCase();
+  
+      const userName = String(
+        getSubmissionUserName(submission)
+      ).toLowerCase();
+  
+      const summary = String(
+        getSubmissionSummary(submission)
+      ).toLowerCase();
+  
       return (
-        registroLabel.includes(q) ||
-        registroId.includes(q) ||
+        folio.includes(q) ||
+        previousLabel.includes(q) ||
+        String(consecutive)
+          .toLowerCase()
+          .includes(q) ||
         userName.includes(q) ||
         summary.includes(q)
       );
     });
-  }, [subs, search]);
+  }, [subs, search, selectedFormKey]);
 
   const createdHistory = useMemo(() => {
     return historyData.find((item) => item.action === "created") || null;
@@ -1762,7 +1857,7 @@ export default function FormsIndex() {
                   onChange={handleDesktopSearchChange}
                   placeholder={
                     mode === "responses"
-                      ? "Buscar registro o usuario..."
+                      ? "Buscar folio o usuario..."
                       : "Buscar formulario..."
                   }
                   style={{
@@ -1783,7 +1878,7 @@ export default function FormsIndex() {
                 onSearchChange={setSearch}
                 placeholder={
                   mode === "responses"
-                    ? "Buscar registro o usuario..."
+                    ? "Buscar folio o usuario..."
                     : "Buscar formulario..."
                 }
               />
@@ -2063,7 +2158,7 @@ export default function FormsIndex() {
                         }}
                       >
                         <div style={{ fontWeight: 800, color: "#0f172a" }}>
-                          Registro {s.consecutive ?? s.id}
+                          {getSubmissionFolio(s)}
                         </div>
                         <div style={{ fontSize: 12, color: "#64748b" }}>
                           {formatDate(s.created_at)}
@@ -2163,7 +2258,7 @@ export default function FormsIndex() {
                           verticalAlign: "middle",
                         }}
                       >
-                        Registro
+                        Folio
                       </th>
                       <th
                         style={{
@@ -2253,7 +2348,7 @@ export default function FormsIndex() {
                               justifyItems: "center",
                             }}
                           >
-                            <div>Registro {s.consecutive ?? s.id}</div>
+                            <div>{getSubmissionFolio(s)}</div>
 
                             {(s.offline_pending || s.pending_sync) ? (
                               <span
@@ -2559,9 +2654,9 @@ export default function FormsIndex() {
                   lineHeight: 1.4,
                 }}
               >
-                Registro{" "}
-                {mobileSubmissionActions.submission.consecutive ??
-                  mobileSubmissionActions.submission.id}
+                {getSubmissionFolio(
+                  mobileSubmissionActions.submission
+                )}
               </div>
               <div
                 style={{
@@ -2726,9 +2821,10 @@ export default function FormsIndex() {
                     lineHeight: 1.3,
                   }}
                 >
-                  Historial del registro{" "}
-                  {historyModal.submission.consecutive ??
-                    historyModal.submission.id}
+                  Historial del folio{" "}
+                  {getSubmissionFolio(
+                    historyModal.submission
+                  )}
                 </div>
                 <div
                   style={{
