@@ -601,10 +601,17 @@ export default function AdminUsers() {
       errors.name = `No se puede ${actionText} el usuario porque falta el nombre.`;
     }
     if (!fEmail.trim()) {
-      errors.email = `No se puede ${actionText} el usuario porque falta el correo.`;
+      errors.email = `No se puede ${actionText} el usuario porque falta el correo o nombre de usuario.`;
     }
-    if (formMode === "create" && !fPassword.trim()) {
-      errors.password = "No se puede crear el usuario porque falta la contraseña.";
+    
+    const passwordValue = fPassword.trim();
+    
+    if (formMode === "create" && !passwordValue) {
+      errors.password =
+        "No se puede crear el usuario porque falta la contraseña.";
+    } else if (passwordValue && passwordValue.length < 1) {
+      errors.password =
+        "La contraseña debe tener al menos 4 caracteres.";
     }
     if (!fRole) {
       errors.role = `No se puede ${actionText} el usuario porque falta el rol.`;
@@ -1316,7 +1323,7 @@ export default function AdminUsers() {
                 rememberFocus();
                 setQDraft(e.target.value);
               }}
-              placeholder="Buscar por nombre, correo, rol, unidad, empresa o grupo"
+              placeholder="Buscar por nombre, correo, usuario, rol, unidad, empresa o grupo"
               style={S.input}
             />
           </div>
@@ -1392,7 +1399,7 @@ export default function AdminUsers() {
                 <thead>
                   <tr>
                     <th style={S.th}>Nombre</th>
-                    <th style={S.th}>Correo</th>
+                    <th style={S.th}>Correo / Usuario</th>
                     <th style={S.th}>Rol</th>
                     <th style={S.th}>Unidad de servicio</th>
                     <th style={S.th}>Empresa</th>
@@ -1578,21 +1585,32 @@ export default function AdminUsers() {
                   </div>
 
                   <div style={S.fieldWrap}>
-                    <div style={S.label}>Correo</div>
+                    <div style={S.label}>Correo o nombre de usuario</div>
+                  
                     <input
                       value={fEmail}
                       onChange={(e) => {
                         setFEmail(e.target.value);
-                        setFieldErrors((prev) => ({ ...prev, email: "" }));
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          email: "",
+                        }));
                       }}
-                      type="email"
+                      type="text"
                       style={{
                         ...S.inputFull,
-                        borderColor: fieldErrors.email ? "#fecaca" : "#dbeafe",
+                        borderColor: fieldErrors.email
+                          ? "#fecaca"
+                          : "#dbeafe",
                       }}
-                      placeholder="correo@empresa.com"
+                      placeholder="Ej. operador@grupo-vysisa.mx u Operador 01"
                     />
-                    {fieldErrors.email ? <div style={S.errorText}>{fieldErrors.email}</div> : null}
+                  
+                    {fieldErrors.email ? (
+                      <div style={S.errorText}>
+                        {fieldErrors.email}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div style={S.fieldWrap}>
@@ -1815,7 +1833,7 @@ export default function AdminUsers() {
                               </div>
 
                               <div style={S.historyFieldBox}>
-                                <div style={S.historyFieldLabel}>Correo</div>
+                                <div style={S.historyFieldLabel}>Correo / Usuario</div>
                                 {renderHistoryValue("text", snapshot?.email)}
                               </div>
 
@@ -1897,7 +1915,7 @@ export default function AdminUsers() {
                               </div>
 
                               <div style={S.historyFieldBox}>
-                                <div style={S.historyFieldLabel}>Correo</div>
+                                <div style={S.historyFieldLabel}>Correo / Usuario</div>
                                 {renderHistoryValue("text", snapshot?.email)}
                               </div>
 

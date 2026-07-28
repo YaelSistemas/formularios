@@ -124,13 +124,17 @@ class UsersController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge([
+            'email' => trim((string) $request->input('email', '')),
+        ]);
+
         $messages = [
             'name.required' => 'No se puede crear el usuario porque falta el nombre.',
-            'email.required' => 'No se puede crear el usuario porque falta el correo.',
-            'email.email' => 'El correo no tiene un formato válido.',
-            'email.unique' => 'El correo ya está registrado.',
+            'email.required' => 'No se puede crear el usuario porque falta el correo o nombre de usuario.',
+            'email.string' => 'El correo o nombre de usuario no es válido.',
+            'email.unique' => 'El correo o nombre de usuario ya está registrado.',
             'password.required' => 'No se puede crear el usuario porque falta la contraseña.',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
+            'password.min' => 'La contraseña debe tener al menos 1 caracteres.',
 
             'roles.required' => 'No se puede crear el usuario porque falta el rol.',
             'roles.array' => 'El rol enviado no es válido.',
@@ -158,8 +162,26 @@ class UsersController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:6'],
+            'email' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('users', 'email'),
+                function ($attribute, $value, $fail) {
+                    /*
+                     * Si contiene @, se considera correo y debe tener
+                     * un formato válido. Si no contiene @, se considera
+                     * nombre de usuario.
+                     */
+                    if (
+                        str_contains($value, '@') &&
+                        !filter_var($value, FILTER_VALIDATE_EMAIL)
+                    ) {
+                        $fail('El correo no tiene un formato válido.');
+                    }
+                },
+            ],
+            'password' => ['required', 'string', 'min:1'],
 
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
@@ -245,12 +267,16 @@ class UsersController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $request->merge([
+            'email' => trim((string) $request->input('email', '')),
+        ]);
+
         $messages = [
             'name.required' => 'No se puede actualizar el usuario porque falta el nombre.',
-            'email.required' => 'No se puede actualizar el usuario porque falta el correo.',
-            'email.email' => 'El correo no tiene un formato válido.',
-            'email.unique' => 'El correo ya está registrado.',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
+            'email.required' => 'No se puede actualizar el usuario porque falta el correo o nombre de usuario.',
+            'email.string' => 'El correo o nombre de usuario no es válido.',
+            'email.unique' => 'El correo o nombre de usuario ya está registrado.',
+            'password.min' => 'La contraseña debe tener al menos 1 caracteres.',
 
             'roles.required' => 'No se puede actualizar el usuario porque falta el rol.',
             'roles.array' => 'El rol enviado no es válido.',
@@ -280,11 +306,23 @@ class UsersController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required',
-                'email',
+                'string',
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),
+                function ($attribute, $value, $fail) {
+                    /*
+                     * Si contiene @, debe ser un correo válido.
+                     * Si no contiene @, se acepta como nombre de usuario.
+                     */
+                    if (
+                        str_contains($value, '@') &&
+                        !filter_var($value, FILTER_VALIDATE_EMAIL)
+                    ) {
+                        $fail('El correo no tiene un formato válido.');
+                    }
+                },
             ],
-            'password' => ['nullable', 'string', 'min:6'],
+            'password' => ['nullable', 'string', 'min:1'],
 
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
@@ -460,7 +498,7 @@ class UsersController extends Controller
     {
         return [
             'name' => ['label' => 'Nombre', 'type' => 'text'],
-            'email' => ['label' => 'Correo', 'type' => 'text'],
+            'email' => ['label' => 'Correo / Usuario', 'type' => 'text'],
             'roles' => ['label' => 'Rol', 'type' => 'list'],
             'unidades_servicio' => ['label' => 'Unidad de servicio', 'type' => 'list'],
             'empresas' => ['label' => 'Empresa', 'type' => 'list'],

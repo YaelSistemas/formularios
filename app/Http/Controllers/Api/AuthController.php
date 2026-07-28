@@ -12,8 +12,16 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
+        /*
+         * El campo sigue llamándose "email" para no afectar el frontend,
+         * pero ahora puede contener un correo o un nombre de usuario.
+         */
+        $request->merge([
+            'email' => trim((string) $request->input('email', '')),
+        ]);
+    
         $data = $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ]);
     
@@ -37,7 +45,7 @@ class AuthController extends Controller
         // Crear nueva sesión
         $newToken = $user->createToken('pwa');
         $token = $newToken->plainTextToken;
-        
+    
         /*
          * Mantener únicamente las 2 sesiones más recientes.
          */
@@ -45,11 +53,11 @@ class AuthController extends Controller
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->pluck('id');
-        
+    
         $tokensToDelete = $tokenIds
             ->skip(2)
             ->values();
-        
+    
         if ($tokensToDelete->isNotEmpty()) {
             $user->tokens()
                 ->whereIn('id', $tokensToDelete->all())
@@ -58,7 +66,7 @@ class AuthController extends Controller
     
         return response()->json([
             'token' => $token,
-            'user'  => $this->userPayload($user),
+            'user' => $this->userPayload($user),
         ]);
     }
 

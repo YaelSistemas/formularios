@@ -16,6 +16,9 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [showUserHelp, setShowUserHelp] = useState(false);
+  const [showPasswordHelp, setShowPasswordHelp] = useState(false);
+
   const normalizePermissions = (user) => {
     if (!user) return [];
 
@@ -406,6 +409,50 @@ export default function Login() {
       fontWeight: 600,
     },
 
+    labelRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 7,
+      marginBottom: 7,
+    },
+    
+    helpButton: {
+      width: 20,
+      height: 20,
+      padding: 0,
+    
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+    
+      border: "1px solid #93c5fd",
+      borderRadius: "50%",
+    
+      background: "#eff6ff",
+      color: "#1d4ed8",
+    
+      fontSize: 12,
+      fontWeight: 800,
+      lineHeight: 1,
+    
+      cursor: "pointer",
+    },
+    
+    helpText: {
+      marginTop: 0,
+      marginBottom: 8,
+      padding: "9px 10px",
+    
+      border: "1px solid #bfdbfe",
+      borderRadius: 7,
+    
+      background: "#eff6ff",
+      color: "#1e3a8a",
+    
+      fontSize: 12,
+      lineHeight: 1.45,
+    },
+
     input: {
       display: "block",
       width: "100%",
@@ -504,25 +551,51 @@ export default function Login() {
             styles.fieldGroup
           }
         >
-          <label
-            htmlFor="login-email"
-            style={styles.label}
-          >
-            Correo
-          </label>
-
+          <div style={styles.labelRow}>
+            <label
+              htmlFor="login-email"
+              style={{
+                ...styles.label,
+                marginBottom: 0,
+              }}
+            >
+              Nombre de Usuario o Correo
+            </label>
+          
+            <button
+              type="button"
+              onClick={() =>
+                setShowUserHelp((current) => !current)
+              }
+              aria-label="Mostrar ayuda para el correo o nombre de usuario"
+              aria-expanded={showUserHelp}
+              title="Ayuda"
+              style={styles.helpButton}
+            >
+              ?
+            </button>
+          </div>
+          
+          {showUserHelp ? (
+            <div style={styles.helpText}>
+              Ingresa tu nombre completo,
+              comenzando por tus nombres y después tus apellidos,
+              respetando los espacios.
+              <br />
+              <strong>Ejemplo:</strong> Angel Fernando Sanchez Martinez
+            </div>
+          ) : null}
+          
           <input
             id="login-email"
             name="email"
-            type="email"
+            type="text"
             value={email}
             onChange={(event) =>
-              setEmail(
-                event.target.value
-              )
+              setEmail(event.target.value)
             }
             autoComplete="username"
-            placeholder="Ingresa tu correo"
+            placeholder="Ingresa tu Nombre de Usuario"
             required
             style={styles.input}
           />
@@ -533,22 +606,48 @@ export default function Login() {
             styles.fieldGroup
           }
         >
-          <label
-            htmlFor="login-password"
-            style={styles.label}
-          >
-            Contraseña
-          </label>
-
+          <div style={styles.labelRow}>
+            <label
+              htmlFor="login-password"
+              style={{
+                ...styles.label,
+                marginBottom: 0,
+              }}
+            >
+              Contraseña
+            </label>
+          
+            <button
+              type="button"
+              onClick={() =>
+                setShowPasswordHelp((current) => !current)
+              }
+              aria-label="Mostrar ayuda para la contraseña"
+              aria-expanded={showPasswordHelp}
+              title="Ayuda"
+              style={styles.helpButton}
+            >
+              ?
+            </button>
+          </div>
+          
+          {showPasswordHelp ? (
+            <div style={styles.helpText}>
+              Ingresa tu número de empleado sin considerar los
+              ceros al inicio.
+              <br />
+              <strong>Ejemplo:</strong> Si tu número de empleado es
+              000123, escribe 123.
+            </div>
+          ) : null}
+          
           <input
             id="login-password"
             name="password"
             type="password"
             value={password}
             onChange={(event) =>
-              setPassword(
-                event.target.value
-              )
+              setPassword(event.target.value)
             }
             autoComplete="current-password"
             placeholder="Ingresa tu contraseña"
