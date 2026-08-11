@@ -154,7 +154,7 @@ class SGI_POP_GT_01_FO_09_Checklist_de_Prensas implements FormDefinition
                     'id' => 'taller_solicita',
                     'label' => 'Taller que solicita',
                     'type' => 'select',
-                    'required' => true,
+                    'required' => false,
                     'options' => [
                         'Apaxco',
                         'Aztecas',
