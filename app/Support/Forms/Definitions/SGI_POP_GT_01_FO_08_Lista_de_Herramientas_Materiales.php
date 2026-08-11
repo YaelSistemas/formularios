@@ -111,13 +111,13 @@ class SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales implements FormDefini
                     'id' => 'nombre_revisa',
                     'label' => 'Nombre de quien revisa',
                     'type' => 'text',
-                    'required' => true,
+                    'required' => false,
                 ],
                 [
                     'id' => 'firma_revisa',
                     'label' => 'Firma de quien revisa',
                     'type' => 'signature',
-                    'required' => true,
+                    'required' => false,
                     'save_path' => 'forms/signatures/SGIPOPGT01FO08_ListaHerramientasMateriales/Revisa',
                 ],
 

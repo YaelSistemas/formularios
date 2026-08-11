@@ -206,9 +206,29 @@ export default function SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales({
 
   const openTableModal = (field) => {
     if (readOnly) return;
-
+  
     clearTableModalError();
-    setTableRowDraft(buildRowDraft(field, null));
+  
+    const draft = buildRowDraft(field, null);
+  
+    // Autogenerar N° de Item solamente para la tabla de herramientas
+    if (field.id === "tabla_herramientas_materiales") {
+      const rows = Array.isArray(answers[field.id])
+        ? answers[field.id]
+        : [];
+  
+      const numerosExistentes = rows
+        .map((row) => Number(row?.numero_item))
+        .filter((numero) => Number.isFinite(numero) && numero > 0);
+  
+      draft.numero_item =
+        numerosExistentes.length > 0
+          ? Math.max(...numerosExistentes) + 1
+          : 1;
+    }
+  
+    setTableRowDraft(draft);
+  
     setTableModal({
       open: true,
       field,
@@ -1307,7 +1327,8 @@ export default function SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales({
         style={getOuterFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b>
+          {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {formFieldErrorId === f.id && formFieldError ? (
@@ -1371,8 +1392,6 @@ export default function SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales({
     if (!validateSimpleRequiredField(taller, "Debes seleccionar el Taller.")) return false;
     if (!validateSimpleRequiredField(nombreElabora, "Debes capturar el Nombre de quien elabora.")) return false;
     if (!validateSimpleRequiredField(firmaElabora, "Debes capturar la Firma de quien elabora.")) return false;
-    if (!validateSimpleRequiredField(nombreRevisa, "Debes capturar el Nombre de quien revisa.")) return false;
-    if (!validateSimpleRequiredField(firmaRevisa, "Debes capturar la Firma de quien revisa.")) return false;
 
     if (!tablaHerramientasMateriales) {
       setMsg("No se encontró la tabla de Herramientas Materiales.");
