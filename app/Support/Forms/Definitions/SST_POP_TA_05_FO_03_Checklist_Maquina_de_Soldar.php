@@ -117,13 +117,13 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                     'id' => 'nombre_supervisor',
                     'label' => 'Nombre del Supervisor',
                     'type' => 'text',
-                    'required' => true,
+                    'required' => false,
                 ],
                 [
                     'id' => 'firma_supervisor',
                     'label' => 'Firma del Supervisor',
                     'type' => 'signature',
-                    'required' => true,
+                    'required' => false,
                 ],
 
                 [
@@ -203,7 +203,7 @@ class SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar implements FormDefinition
                 'id' => "{$key}_observaciones",
                 'label' => 'Observaciones',
                 'type' => 'textarea',
-                'required' => true,
+                'required' => false,
             ];
         }
 

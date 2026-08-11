@@ -936,7 +936,8 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
         style={getOuterFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b> 
+          {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {renderFieldErrorMessage(f.id)}
@@ -956,7 +957,8 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
         style={getInnerFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{labelText || f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{labelText || f.label}</b>
+          {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {renderFieldErrorMessage(f.id)}
@@ -1027,24 +1029,6 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
       return false;
     }
 
-    if (
-      !validateSimpleRequiredField(
-        nombreSupervisor,
-        "Debes capturar el Nombre del supervisor."
-      )
-    ) {
-      return false;
-    }
-
-    if (
-      !validateSimpleRequiredField(
-        firmaSupervisor,
-        "Debes capturar la Firma del supervisor."
-      )
-    ) {
-      return false;
-    }
-
     if (!validateSimpleRequiredField(numeroSerie, "Debes capturar el No. de Serie.")) {
       return false;
     }
@@ -1059,20 +1043,16 @@ export default function SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar({
     }
 
     for (const item of checklistItems) {
-      if (!validateSimpleRequiredField(item.status, `Debes responder: ${item.label}.`)) {
-        return false;
-      }
-
       if (
         !validateSimpleRequiredField(
-          item.obs,
-          `Debes capturar las observaciones de: ${item.label}.`
+          item.status,
+          `Debes responder: ${item.label}.`
         )
       ) {
         return false;
       }
     }
-
+    
     setMsg("");
     return true;
   };
