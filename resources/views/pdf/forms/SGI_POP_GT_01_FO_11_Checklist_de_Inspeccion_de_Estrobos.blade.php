@@ -490,22 +490,24 @@
                 <td style="
                     border:1px solid #000;
                     text-align:center;
-                    vertical-align:middle;
+                    vertical-align:top;
                     padding:4px 2px;
                     height:75px;
                 ">
-        
+                
                     <div style="
                         font-weight:bold;
-                        margin-bottom:2px;
                         font-size:9px;
+                        height:14px;
+                        line-height:14px;
                     ">
                         REALIZÓ
                     </div>
-        
+                
                     <div style="
                         height:32px;
                         text-align:center;
+                        line-height:32px;
                     ">
                         @if(!empty($answers['firma_inspector']))
                             <img
@@ -514,53 +516,62 @@
                                     width:120px;
                                     height:30px;
                                     object-fit:contain;
+                                    vertical-align:middle;
                                 "
                             >
+                        @else
+                            &nbsp;
                         @endif
                     </div>
-        
+                
                     <div style="
                         width:100%;
+                        height:10px;
+                        line-height:10px;
                         margin-top:2px;
                         text-align:center;
                         font-size:7px;
                     ">
-                        {{ $answers['nombre_inspector'] ?? '' }}
+                        {{ !empty($answers['nombre_inspector']) ? $answers['nombre_inspector'] : ' ' }}
                     </div>
-        
+                
                     <div style="
+                        height:10px;
+                        line-height:10px;
                         margin-top:1px;
                         font-size:7px;
                         font-weight:bold;
                     ">
                         NOMBRE Y FIRMA
                     </div>
-        
+                
                 </td>
         
                 <!-- ESPACIO -->
                 <td style="border:none;"></td>
         
-                <!-- SUPERVISOR -->
+                <!-- SUPERVISÓ -->
                 <td style="
                     border:1px solid #000;
                     text-align:center;
-                    vertical-align:middle;
+                    vertical-align:top;
                     padding:4px 2px;
                     height:75px;
                 ">
-        
+                
                     <div style="
                         font-weight:bold;
-                        margin-bottom:2px;
                         font-size:9px;
+                        height:14px;
+                        line-height:14px;
                     ">
                         SUPERVISÓ
                     </div>
-        
+                
                     <div style="
                         height:32px;
                         text-align:center;
+                        line-height:32px;
                     ">
                         @if(!empty($answers['firma_supervisor']))
                             <img
@@ -569,28 +580,35 @@
                                     width:120px;
                                     height:30px;
                                     object-fit:contain;
+                                    vertical-align:middle;
                                 "
                             >
+                        @else
+                            &nbsp;
                         @endif
                     </div>
-        
+                
                     <div style="
                         width:100%;
+                        height:10px;
+                        line-height:10px;
                         margin-top:2px;
                         text-align:center;
                         font-size:7px;
                     ">
-                        {{ $answers['nombre_supervisor'] ?? '' }}
+                        {{ !empty($answers['nombre_supervisor']) ? $answers['nombre_supervisor'] : ' ' }}
                     </div>
-        
+                
                     <div style="
+                        height:10px;
+                        line-height:10px;
                         margin-top:1px;
                         font-size:7px;
                         font-weight:bold;
                     ">
                         NOMBRE Y FIRMA
                     </div>
-        
+                
                 </td>
         
                 <!-- ESPACIO FINAL -->

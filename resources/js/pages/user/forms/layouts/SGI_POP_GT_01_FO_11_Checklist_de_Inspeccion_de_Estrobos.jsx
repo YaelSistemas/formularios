@@ -1307,7 +1307,8 @@ export default function SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos(
         style={getOuterFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b>
+          {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {formFieldErrorId === f.id && formFieldError ? (
@@ -1420,9 +1421,6 @@ export default function SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos(
         }
       }
     }
-
-    if (!validateSimpleRequiredField(nombreSupervisor, "Debes capturar el Nombre del Supervisor.")) return false;
-    if (!validateSimpleRequiredField(firmaSupervisor, "Debes capturar la Firma del Supervisor.")) return false;
 
     setMsg("");
     return true;
