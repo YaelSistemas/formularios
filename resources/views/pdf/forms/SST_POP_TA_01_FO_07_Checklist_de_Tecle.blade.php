@@ -582,8 +582,13 @@
                                 vertical-align:middle;
                                 padding:6px 4px;
                                 font-size:9px;
+                                height:12px;
                             ">
-                                {{ data_get($answers, 'nombre_trabajador_elabora_checklist') }}
+                                @if(data_get($answers, 'nombre_trabajador_elabora_checklist'))
+                                    {{ data_get($answers, 'nombre_trabajador_elabora_checklist') }}
+                                @else
+                                    &nbsp;
+                                @endif
                             </td>
                         </tr>
         
@@ -650,8 +655,13 @@
                                 vertical-align:middle;
                                 padding:6px 4px;
                                 font-size:9px;
+                                height:12px;
                             ">
-                                {{ data_get($answers, 'nombre_supervisor_trabajador') }}
+                                @if(data_get($answers, 'nombre_supervisor_trabajador'))
+                                    {{ data_get($answers, 'nombre_supervisor_trabajador') }}
+                                @else
+                                    &nbsp;
+                                @endif
                             </td>
                         </tr>
         
