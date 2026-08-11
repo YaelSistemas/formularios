@@ -1393,7 +1393,8 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
         style={getOuterFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b>
+          {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {formFieldErrorId === f.id && formFieldError ? (
@@ -1508,8 +1509,6 @@ export default function SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast({
 
     if (!validateSimpleRequiredField(nombreInspecciona, "Debes capturar el Nombre de quien inspecciona.")) return false;
     if (!validateSimpleRequiredField(firmaInspecciona, "Debes capturar la Firma de quien inspecciona.")) return false;
-    if (!validateSimpleRequiredField(nombreSupervisa, "Debes capturar el Nombre de quien supervisa.")) return false;
-    if (!validateSimpleRequiredField(firmaSupervisa, "Debes capturar la Firma de quien supervisa.")) return false;
 
     setMsg("");
     return true;
