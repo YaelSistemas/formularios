@@ -1307,7 +1307,8 @@ export default function SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas({
         style={getOuterFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b>
+          {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {formFieldErrorId === f.id && formFieldError ? (
@@ -1371,8 +1372,6 @@ export default function SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas({
     if (!validateSimpleRequiredField(taller, "Debes seleccionar el Taller.")) return false;
     if (!validateSimpleRequiredField(nombreColaboradorInspecciona, "Debes capturar el Nombre del Colaborador que Inspecciona.")) return false;
     if (!validateSimpleRequiredField(firmaColaboradorInspecciona, "Debes capturar la Firma del Colaborador que Inspecciona.")) return false;
-    if (!validateSimpleRequiredField(nombreSupervisor, "Debes capturar el Nombre del Supervisor.")) return false;
-    if (!validateSimpleRequiredField(firmaSupervisor, "Debes capturar la Firma del Supervisor.")) return false;
 
     if (!tablaEslingas) {
       setMsg("No se encontró la tabla de Inspección de Eslingas.");

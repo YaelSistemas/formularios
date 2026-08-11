@@ -111,13 +111,13 @@ class SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas implements FormDefini
                     'id' => 'nombre_supervisor',
                     'label' => 'Nombre del Supervisor',
                     'type' => 'text',
-                    'required' => true,
+                    'required' => false,
                 ],
                 [
                     'id' => 'firma_supervisor',
                     'label' => 'Firma del Supervisor',
                     'type' => 'signature',
-                    'required' => true,
+                    'required' => false,
                     'save_path' => 'forms/signatures/SGIPOPGT01FO10_ChecklistInspeccionEslingas/Supervisor',
                 ],
 
