@@ -293,7 +293,7 @@
                     'observaciones' => data_get($rowGrua, 'grua_10_observaciones', ''),
                 ],
                 [
-                    'descripcion' => 'Comprobar luz de torreta o estroboótica',
+                    'descripcion' => 'Comprobar luz de torreta o estrobótica',
                     'estado' => data_get($rowGrua, 'grua_11_estado', ''),
                     'observaciones' => data_get($rowGrua, 'grua_11_observaciones', ''),
                 ],
