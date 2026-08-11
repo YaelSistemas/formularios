@@ -887,7 +887,8 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
         style={getOuterFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b>
+            {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {renderFieldErrorMessage(f.id)}
@@ -1070,24 +1071,6 @@ export default function SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte({
       !validateSimpleRequiredField(
         firmaInspector,
         "Debes capturar la Firma del inspector."
-      )
-    ) {
-      return false;
-    }
-
-    if (
-      !validateSimpleRequiredField(
-        nombreSupervisor,
-        "Debes capturar el Nombre del supervisor."
-      )
-    ) {
-      return false;
-    }
-
-    if (
-      !validateSimpleRequiredField(
-        firmaSupervisor,
-        "Debes capturar la Firma del supervisor."
       )
     ) {
       return false;
