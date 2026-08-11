@@ -297,14 +297,14 @@ class SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera implements FormDefinition
 
                         [
                             'id' => 'grua_11_estado',
-                            'label' => 'Comprobar luz de torreta o estroboótica',
+                            'label' => 'Comprobar luz de torreta o estrobótica',
                             'type' => 'radio',
                             'required' => true,
                             'options' => $estadoOptions,
                         ],
                         [
                             'id' => 'grua_11_observaciones',
-                            'label' => 'Observaciones - Luz de Torreta o Estroboótica',
+                            'label' => 'Observaciones - Luz de Torreta o Estrobótica',
                             'type' => 'textarea',
                             'required' => false,
                         ],
