@@ -1320,7 +1320,10 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
             lineHeight: 1.4,
           }}
         >
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b>{" "}
+          {f.required !== false ? (
+            <span style={{ color: "crimson" }}>*</span>
+          ) : null}
         </label>
 
         {formFieldErrorId === f.id && formFieldError ? (
@@ -1453,14 +1456,6 @@ export default function SST_POP_TA_07_FO_01_Inspeccion_de_Compresor({
           }
         }
       }
-    }
-
-    if (!validateSimpleRequiredField(responsableSeguridad)) {
-      return false;
-    }
-
-    if (!validateSimpleRequiredField(firmaResponsableSeguridad)) {
-      return false;
     }
 
     setMsg("");
