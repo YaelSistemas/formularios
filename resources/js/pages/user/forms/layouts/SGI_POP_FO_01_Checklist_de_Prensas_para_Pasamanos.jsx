@@ -1532,7 +1532,7 @@ export default function SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos({
         if (col.type === "static_text" || col.type === "fixed_image") continue;
         const value = row[col.id];
 
-        if (isObservationColumn(col)) {
+        if (isOptionalColumn(col)) {
           continue;
         }
 
