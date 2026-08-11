@@ -1489,7 +1489,8 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
         style={getOuterFieldBlockStyle(f.id)}
       >
         <label style={{ fontSize: isMobile ? 14 : 14, color: "#0f172a", lineHeight: 1.4 }}>
-          <b>{f.label}</b> <span style={{ color: "crimson" }}>*</span>
+          <b>{f.label}</b>
+          {f.required ? <span style={{ color: "crimson" }}> *</span> : null}
         </label>
 
         {formFieldErrorId === f.id && formFieldError ? (
@@ -1621,9 +1622,7 @@ export default function SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cad
 
     if (!validateSimpleRequiredField(nombreTrabajadorElaboraChecklist, "Debes capturar el Nombre del trabajador que elabora el checklist.")) return false;
     if (!validateSimpleRequiredField(firmaTrabajadorElaboraChecklist, "Debes capturar la Firma del trabajador que elabora el checklist.")) return false;
-    if (!validateSimpleRequiredField(nombreSupervisorTrabajador, "Debes capturar el Nombre del supervisor del trabajador.")) return false;
-    if (!validateSimpleRequiredField(firmaSupervisorTrabajador, "Debes capturar la Firma del supervisor del trabajador.")) return false;
-
+    
     setMsg("");
     return true;
   };
