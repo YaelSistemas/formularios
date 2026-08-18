@@ -609,7 +609,7 @@ export default function SST_PGI_TA_02_FO_03_Checklist_de_Botiquines({
   const buildModalGroups = (rowSchema) => {
     const groups = [];
     let currentGroup = null;
-
+  
     rowSchema.forEach((col) => {
       if (col.type === "fixed_image") {
         groups.push({
@@ -620,7 +620,7 @@ export default function SST_PGI_TA_02_FO_03_Checklist_de_Botiquines({
         });
         return;
       }
-
+  
       if (col.type === "static_text") {
         currentGroup = {
           kind: "collapsible_section",
@@ -629,19 +629,35 @@ export default function SST_PGI_TA_02_FO_03_Checklist_de_Botiquines({
           title: getSectionTitle(col),
           fields: [],
         };
+  
         groups.push(currentGroup);
         return;
       }
-
-      const id = String(col.id || "");
+  
+      // Observaciones debe quedar fuera de cualquier sección
+      if (isObservationColumn(col)) {
+        currentGroup = null;
+  
+        groups.push({
+          kind: "single",
+          id: col.id,
+          titleField: null,
+          fields: [col],
+        });
+  
+        return;
+      }
+  
       const belongsToSection =
-        Boolean(currentGroup) && col.type !== "static_text" && col.type !== "fixed_image";
-
+        Boolean(currentGroup) &&
+        col.type !== "static_text" &&
+        col.type !== "fixed_image";
+  
       if (belongsToSection && currentGroup) {
         currentGroup.fields.push(col);
         return;
       }
-
+  
       groups.push({
         kind: "single",
         id: col.id,
@@ -649,7 +665,7 @@ export default function SST_PGI_TA_02_FO_03_Checklist_de_Botiquines({
         fields: [col],
       });
     });
-
+  
     return groups;
   };
 

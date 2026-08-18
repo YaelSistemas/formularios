@@ -176,7 +176,7 @@
 
         .botiquin-observaciones-cell {
             border: 1px solid #000;
-            text-align: left;
+            text-align: center;
             vertical-align: middle;
             padding: 1px 2px;
             height: 18px;
@@ -394,9 +394,9 @@
         
             '0.5%',  // 22
         
-            '3.70%', '3.70%', '3.70%', // 23-25
+            '4.5%', '4.5%', // 23-24
         
-            '10%',   // 26
+            '12.1%',   // 25
         ];
 
         $unidadBotiquin = [
@@ -420,9 +420,8 @@
             19 => 'pza.', // columna 20
             20 => 'pza.', // columna 21
     
-            22 => 'pza.', // columna 23
-            23 => 'pr.', // columna 24
-            24 => 'pza.', // columna 25
+            22 => 'pr.', // columna 23
+            23 => 'pza.', // columna 24
         ];
 
         $estadoBotiquin = function ($valor) {
@@ -480,15 +479,14 @@
             19 => 'torniquete_compresor_elastico',
             20 => 'jeringa_desechable',
 
-            22 => 'kit_rcp_barrera',
-            23 => 'guantes_latex',
-            24 => 'cubre_bocas',
+            22 => 'guantes_latex',
+            23 => 'cubre_bocas',
         ];
 
         $columnasSeparadorasBotiquin = [1, 11, 16, 21];
     @endphp
 
-    <!-- TABLA 26 COLUMNAS X 5 FILAS -->
+    <!-- TABLA 25 COLUMNAS X 5 FILAS -->
     <table style="
         width:100%;
         margin-top:10px;
@@ -511,7 +509,7 @@
 
         @for($fila = 0; $fila < 5; $fila++)
             <tr style="{{ $fila === 1 ? 'height:65px;' : '' }}">
-                @for($columna = 0; $columna < 26; $columna++)
+                @for($columna = 0; $columna < 25; $columna++)
 
                     {{-- COLUMNA 1 --}}
                     @if($columna === 0 && $fila === 0)
@@ -799,7 +797,7 @@
                     
                     {{-- FILA 1 - MATERIAL BRIGADISTA --}}
                     @elseif($fila === 0 && $columna === 22)
-                        <td colspan="3" style="
+                        <td colspan="2" style="
                             border:1px solid #000;
                             background:#e5e7eb;
                             text-align:center;
@@ -810,20 +808,11 @@
                             Material Brigadista
                         </td>
                     
-                    {{-- OMITIR COLUMNAS 24 Y 25 EN FILA 1 POR EL COLSPAN --}}
-                    @elseif($fila === 0 && $columna >= 23 && $columna <= 24)
+                    {{-- OMITIR COLUMNA 24 EN FILA 1 POR EL COLSPAN --}}
+                    @elseif($fila === 0 && $columna === 23)
                     
                     {{-- FILA 2 - MATERIAL BRIGADISTA --}}
                     @elseif($fila === 1 && $columna === 22)
-                        <td class="botiquin-header-vertical">
-                            <div class="botiquin-vertical-wrap">
-                                <div class="botiquin-vertical-text">
-                                    Kit de RCP / Barrera
-                                </div>
-                            </div>
-                        </td>
-                    
-                    @elseif($fila === 1 && $columna === 23)
                         <td class="botiquin-header-vertical">
                             <div class="botiquin-vertical-wrap">
                                 <div class="botiquin-vertical-text">
@@ -832,7 +821,7 @@
                             </div>
                         </td>
                     
-                    @elseif($fila === 1 && $columna === 24)
+                    @elseif($fila === 1 && $columna === 23)
                         <td class="botiquin-header-vertical">
                             <div class="botiquin-vertical-wrap">
                                 <div class="botiquin-vertical-text">
@@ -841,8 +830,8 @@
                             </div>
                         </td>
 
-                    {{-- COLUMNA 26 - FILA 1 VACÍA SIN BORDES --}}
-                    @elseif($fila === 0 && $columna === 25)
+                    {{-- COLUMNA 25 - FILA 1 VACÍA SIN BORDES --}}
+                    @elseif($fila === 0 && $columna === 24)
                         <td style="
                             border:none;
                             padding:0;
@@ -850,8 +839,8 @@
                             &nbsp;
                         </td>
                     
-                    {{-- COLUMNA 26 - OBSERVACIONES --}}
-                    @elseif($fila === 1 && $columna === 25)
+                    {{-- COLUMNA 25 - OBSERVACIONES --}}
+                    @elseif($fila === 1 && $columna === 24)
                         <td rowspan="4" style="
                             border:1px solid #000;
                             text-align:center;
@@ -861,8 +850,8 @@
                             Observaciones
                         </td>
                     
-                    {{-- OMITIR COLUMNA 26 EN FILAS 3 A 5 POR EL ROWSPAN --}}
-                    @elseif($columna === 25 && $fila > 1)
+                    {{-- OMITIR COLUMNA 25 EN FILAS 3 A 5 POR EL ROWSPAN --}}
+                    @elseif($columna === 24 && $fila > 1)
                     
                     {{-- FILA 3 - CANTIDADES MATERIAL SECO --}}
                     @elseif($fila === 2 && $columna === 2)
@@ -924,9 +913,6 @@
                     
                     @elseif($fila === 2 && $columna === 23)
                         <td style="border:1px solid #000; text-align:center; vertical-align:middle;">2</td>
-                    
-                    @elseif($fila === 2 && $columna === 24)
-                        <td style="border:1px solid #000; text-align:center; vertical-align:middle;">2</td>
 
                     {{-- FILAS 4 Y 5 - UNIDADES INDIVIDUALES --}}
                     @elseif($fila === 3 && array_key_exists($columna, $unidadBotiquin))
@@ -965,7 +951,7 @@
             @endphp
 
             <tr style="height:18px;">
-                @for($columna = 0; $columna < 26; $columna++)
+                @for($columna = 0; $columna < 25; $columna++)
 
                     {{-- COLUMNA 1 - NÚMERO DE BOTIQUÍN --}}
                     @if($columna === 0)
@@ -983,8 +969,8 @@
                             {{ $estadoBotiquin(data_get($registroBotiquin, $camposBotiquinPorColumna[$columna], '')) }}
                         </td>
 
-                    {{-- COLUMNA 26 - OBSERVACIONES --}}
-                    @elseif($columna === 25)
+                    {{-- COLUMNA 25 - OBSERVACIONES --}}
+                    @elseif($columna === 24)
                         <td class="botiquin-observaciones-cell">
                             {{ data_get($registroBotiquin, 'observaciones', '') }}
                         </td>

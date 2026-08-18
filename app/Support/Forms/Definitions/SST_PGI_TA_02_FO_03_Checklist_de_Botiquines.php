@@ -288,13 +288,6 @@ class SST_PGI_TA_02_FO_03_Checklist_de_Botiquines implements FormDefinition
                             'text' => 'Material Brigadista',
                         ],
                         [
-                            'id' => 'kit_rcp_barrera',
-                            'label' => 'Kit de RCP / Barrera (1 pza.)',
-                            'type' => 'radio',
-                            'required' => true,
-                            'options' => $estadoMaterialOptions,
-                        ],
-                        [
                             'id' => 'guantes_latex',
                             'label' => 'Guantes Latex (2 pr.)',
                             'type' => 'radio',
