@@ -242,6 +242,8 @@
     if ($paginasBotiquines->isEmpty()) {
         $paginasBotiquines = collect([collect()]);
     }
+
+    $totalPaginasBotiquines = $paginasBotiquines->count();
 @endphp
 
 @foreach($paginasBotiquines as $paginaBotiquinIndex => $registrosPaginaBotiquin)
@@ -267,7 +269,10 @@
             </td>
 
             <td class="right-cell">
-                PÁGINA: {{ str_pad($paginaBotiquinIndex + 1, 2, '0', STR_PAD_LEFT) }}
+                PÁGINA:
+                {{ str_pad($paginaBotiquinIndex + 1, 2, '0', STR_PAD_LEFT) }}
+                DE
+                {{ str_pad($totalPaginasBotiquines, 2, '0', STR_PAD_LEFT) }}
             </td>
         </tr>
 
@@ -287,13 +292,13 @@
             </td>
 
             <td class="right-cell">
-                NÚMERO DE REVISIÓN: 09
+                NÚMERO DE REVISIÓN: 10
             </td>
         </tr>
 
         <tr>
             <td class="right-cell">
-                FECHA DE EMISIÓN: 27/03/2025
+                FECHA DE EMISIÓN: 01/08/2026
             </td>
         </tr>
     </table>
