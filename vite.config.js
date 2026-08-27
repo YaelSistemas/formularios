@@ -1,19 +1,23 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import laravel from "laravel-vite-plugin";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 const buildRevision = `${Date.now()}`;
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+  const devHost = env.VITE_DEV_HOST || "127.0.0.1";
+
+  return {
   server: {
     host: "0.0.0.0",
     port: 5173,
     strictPort: true,
     cors: true,
-    origin: "http://192.168.1.171:5173",
+    origin: `http://${devHost}:5173`,
     hmr: {
-      host: "192.168.1.171",
+      host: devHost,
     },
   },
 
@@ -99,4 +103,6 @@ export default defineConfig({
       },
     }),
   ],
+  };
 });
+
