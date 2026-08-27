@@ -85,71 +85,36 @@
         }
 
 
-        .evidence-wrapper {
-            width: 100%;
-            height: 144px;
-            overflow: hidden;
+        /* Páginas adicionales de evidencias fotográficas */
+        .evidence-page {
+            page-break-before: always;
         }
 
-        .evidence-table {
-            width: 100%;
-            height: 144px;
+        .evidence-page-table {
+            width: 99.6%;
+            margin-top: 10px;
             border-collapse: collapse;
             table-layout: fixed;
-            margin: 0;
-            padding: 0;
         }
 
-        .evidence-table td {
+        .evidence-page-table td {
+            width: 50%;
+            height: 245px;
             border: none;
-            padding: 0;
-            height: 144px;
+            padding: 8px;
             text-align: center;
             vertical-align: middle;
             overflow: hidden;
         }
 
-                        .evidence-table img {
+        .evidence-page-image {
             display: block;
+            max-width: 96%;
+            max-height: 230px;
+            width: auto;
+            height: auto;
             margin: 0 auto;
             object-fit: contain;
-        }
-
-        /* Una imagen normal */
-        .evidence-image-normal-single {
-            width: 300px;
-            height: 136px;
-        }
-
-        /* Dos imágenes normales o de proporciones diferentes */
-        .evidence-image-normal-double {
-            width: 96%;
-            height: 136px;
-        }
-
-        /* Una imagen extremadamente panorámica */
-        .evidence-image-panoramic-single {
-            width: 96%;
-            height: 136px;
-            object-fit: contain;
-        }
-
-        /* Dos imágenes extremadamente panorámicas, apiladas */
-        .evidence-image-stacked {
-            width: 96%;
-            height: 66px;
-            display: block;
-            margin: 0 auto;
-            object-fit: contain;
-        }
-
-        .evidence-row-stacked td {
-            height: 72px;
-            max-height: 72px;
-            padding: 0;
-            text-align: center;
-            vertical-align: middle;
-            overflow: hidden;
         }
 
         .bold-center {
@@ -188,6 +153,45 @@
 
     $tallerValor =
         data_get($answers, 'taller', '') ?: '';
+
+    /*
+     * Falta seleccionada para resaltarla en el PDF.
+     */
+    $tipoObservacionSeleccionado = trim(
+        (string) data_get($answers, 'tipo_observacion', '')
+    );
+    
+    $faltaCometidaSeleccionada = trim(
+        (string) data_get($answers, 'falta_cometida_seleccionada', '')
+    );
+    
+    $marcarFalta = function (
+        string $tipo,
+        string $valor,
+        string $texto
+    ) use (
+        $tipoObservacionSeleccionado,
+        $faltaCometidaSeleccionada
+    ) {
+        $tipoCoincide =
+            mb_strtolower(trim($tipoObservacionSeleccionado), 'UTF-8') ===
+            mb_strtolower(trim($tipo), 'UTF-8');
+    
+        $faltaCoincide =
+            mb_strtolower(trim($faltaCometidaSeleccionada), 'UTF-8') ===
+            mb_strtolower(trim($valor), 'UTF-8');
+    
+        $style = '';
+    
+        if ($tipoCoincide && $faltaCoincide) {
+            $style =
+                'color:#b91c1c;' .
+                'font-weight:bold;' .
+                'text-decoration:underline;';
+        }
+    
+        return '<span style="' . $style . '">' . e($texto) . '</span>';
+    };
 
     /*
      * Firmas de los observados.
@@ -284,11 +288,16 @@
     }
 
     /*
-     * Evidencias fotográficas.
-     * Solo se muestran las primeras 2 imágenes para conservar
-     * el espacio fijo de las columnas 9 a 13, filas 25 a 36.
+     * EVIDENCIAS FOTOGRÁFICAS
+     *
+     * Se preparan TODAS las imágenes y se dividen
+     * automáticamente en grupos de 4 por página.
      */
-    $evidenciasRaw = data_get($answers, 'evidencia_fotografica', []);
+    $evidenciasRaw = data_get(
+        $answers,
+        'evidencia_fotografica',
+        []
+    );
 
     if (is_string($evidenciasRaw)) {
         $evidenciasRaw = [$evidenciasRaw];
@@ -301,13 +310,16 @@
     $evidenciasSrc = [];
 
     foreach ($evidenciasRaw as $evidencia) {
-        if (count($evidenciasSrc) >= 2) {
-            break;
-        }
-
+        /*
+         * Puede venir como:
+         * - string con ruta
+         * - arreglo con data base64
+         * - arreglo con path/url/file/ruta
+         */
         if (is_array($evidencia)) {
             $evidencia =
-                $evidencia['path']
+                $evidencia['data']
+                ?? $evidencia['path']
                 ?? $evidencia['url']
                 ?? $evidencia['file']
                 ?? $evidencia['ruta']
@@ -318,8 +330,30 @@
             continue;
         }
 
-        $rutaEvidencia = ltrim(trim($evidencia), '/');
-        $evidenciaPath = storage_path('app/public/' . $rutaEvidencia);
+        $evidencia = trim($evidencia);
+
+        /*
+         * Si ya viene como imagen base64, se utiliza directamente.
+         */
+        if (str_starts_with($evidencia, 'data:image/')) {
+            $evidenciasSrc[] = [
+                'src' => $evidencia,
+            ];
+
+            continue;
+        }
+
+        /*
+         * Si viene como ruta guardada.
+         */
+        $rutaEvidencia = ltrim(
+            str_replace('\\', '/', $evidencia),
+            '/'
+        );
+
+        $evidenciaPath = storage_path(
+            'app/public/' . $rutaEvidencia
+        );
 
         if (!file_exists($evidenciaPath)) {
             $evidenciaPath = public_path($rutaEvidencia);
@@ -337,27 +371,6 @@
             continue;
         }
 
-                $dimensionesEvidencia = @getimagesize($evidenciaPath);
-
-        $anchoEvidencia = (int) (
-            $dimensionesEvidencia[0] ?? 0
-        );
-
-        $altoEvidencia = (int) (
-            $dimensionesEvidencia[1] ?? 0
-        );
-
-        $relacionEvidencia =
-            $altoEvidencia > 0
-                ? $anchoEvidencia / $altoEvidencia
-                : 1;
-
-        /*
-         * Una imagen se considera panorámica solamente cuando
-         * su ancho es por lo menos cinco veces mayor que su altura.
-         */
-        $esPanoramica = $relacionEvidencia >= 5;
-
         $evidenciasSrc[] = [
             'src' =>
                 'data:' .
@@ -366,28 +379,32 @@
                 base64_encode(
                     file_get_contents($evidenciaPath)
                 ),
-
-            'es_panoramica' => $esPanoramica,
         ];
     }
 
-    $cantidadEvidencias = count($evidenciasSrc);
-
-        $cantidadPanoramicas = 0;
-
-    foreach ($evidenciasSrc as $evidenciaPreparada) {
-        if (!empty($evidenciaPreparada['es_panoramica'])) {
-            $cantidadPanoramicas++;
-        }
-    }
+    /*
+     * Máximo 4 evidencias por página.
+     */
+    $paginasEvidencias = array_chunk(
+        $evidenciasSrc,
+        4
+    );
 
     /*
-     * Solamente se apilan cuando las DOS evidencias
-     * son extremadamente panorámicas.
+     * Página 1 = formulario.
+     * Las páginas siguientes contienen evidencias.
      */
-    $apilarEvidencias =
-        $cantidadEvidencias === 2
-        && $cantidadPanoramicas === 2;
+    $totalPaginas =
+        1 + count($paginasEvidencias);
+
+    $numeroPagina = function ($numero) {
+        return str_pad(
+            (string) $numero,
+            2,
+            '0',
+            STR_PAD_LEFT
+        );
+    };
 @endphp
 
 <div class="sheet">
@@ -423,7 +440,7 @@
         <!-- FILA 2 -->
         <tr>
             <td class="right-cell">
-                FECHA DE EMISIÓN: 06/06/2025
+                FECHA DE EMISIÓN: 01/08/2026
             </td>
         </tr>
 
@@ -434,7 +451,7 @@
             </td>
 
             <td class="right-cell">
-                NÚMERO DE REVISIÓN: 00
+                NÚMERO DE REVISIÓN: 01
             </td>
         </tr>
 
@@ -445,7 +462,10 @@
             </td>
 
             <td class="right-cell">
-                PÁGINA: 01
+                PÁGINA:
+                {{ $numeroPagina(1) }}
+                DE
+                {{ $numeroPagina($totalPaginas) }}
             </td>
         </tr>
     </table>
@@ -560,7 +580,11 @@
 
             <!-- Columna 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                BROMAS O DISTRACCIONES EN ÁREA DE TRABAJO
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Bromas o Distracciones en Área de Trabajo',
+                    'BROMAS O DISTRACCIONES EN ÁREA DE TRABAJO'
+                ) !!}
             </td>
             
             <!-- Columna 11 -->
@@ -571,7 +595,11 @@
             
             <!-- Columna 13 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                NO APLICAR PROCEDIMIENTOS DE SEGURIDAD
+                {!! $marcarFalta(
+                    'Desviación',
+                    'No Aplicar Procedimientos de Seguridad',
+                    'NO APLICAR PROCEDIMIENTOS DE SEGURIDAD'
+                ) !!}
             </td>
         </tr>
 
@@ -585,7 +613,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                NO PORTAR EPP ESPECÍFICO POR ACTIVIDAD
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'No Portar EPP Específico por Actividad',
+                    'NO PORTAR EPP ESPECÍFICO POR ACTIVIDAD'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -596,7 +628,11 @@
             
             <!-- 13 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                NO APLICAR PROCEDIMIENTOS OPERATIVOS
+                {!! $marcarFalta(
+                    'Desviación',
+                    'No Aplicar Procedimientos Operativos',
+                    'NO APLICAR PROCEDIMIENTOS OPERATIVOS'
+                ) !!}
             </td>
         </tr>
 
@@ -610,7 +646,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                TRABAJAR CON EQUIPO EN MOVIMIENTO
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Trabajar con Equipo en Movimiento',
+                    'TRABAJAR CON EQUIPO EN MOVIMIENTO'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -621,7 +661,11 @@
             
             <!-- 13 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                NO PORTAR CREDENCIALES O DOCUMENTOS DE ACCESO
+                {!! $marcarFalta(
+                    'Desviación',
+                    'No Portar Credenciales o documentos de Acceso',
+                    'NO PORTAR CREDENCIALES O DOCUMENTOS DE ACCESO'
+                ) !!}
             </td>
         </tr>
 
@@ -649,7 +693,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                USO DE HERRAMIENTAS EN MAL ESTADO
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Uso de Herramientas en Mal Estado',
+                    'USO DE HERRAMIENTAS EN MAL ESTADO'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -660,7 +708,11 @@
             
             <!-- 13 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                NO TRAER TARJETA Y CANDADO P/BLOQUEO
+                {!! $marcarFalta(
+                    'Desviación',
+                    'No Traer Tarjeta y Candado P/Bloqueo',
+                    'NO TRAER TARJETA Y CANDADO P/BLOQUEO'
+                ) !!}
             </td>
         </tr>
 
@@ -674,7 +726,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                EXCESO DE VELOCIDAD O MOVIMIENTO INAPROPIADO
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Exceso de Velocidad o Movimiento Inapropiado',
+                    'EXCESO DE VELOCIDAD O MOVIMIENTO INAPROPIADO'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -685,7 +741,11 @@
             
             <!-- 13 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                NO INFORMAR SITUACIONES ANORMALES O RIESGOS DETECTADOS
+                {!! $marcarFalta(
+                    'Desviación',
+                    'No Informar Situaciones Anormales o Riesgos Detectados',
+                    'NO INFORMAR SITUACIONES ANORMALES O RIESGOS DETECTADOS'
+                ) !!}
             </td>
         </tr>
 
@@ -850,7 +910,33 @@
             <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- resto de la fila igual -->
+            <!-- 9 -->
+            <td style="border:none;"></td>
+
+            <!-- 10 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Trabajar en Alturas sin Medidas de Seguridad',
+                    'TRABAJAR EN ALTURAS SIN MEDIDAS DE SEGURIDAD'
+                ) !!}
+            </td>
+
+            <!-- 11 -->
+            <td style="border:none;"></td>
+
+            <!-- 12 -->
+            <td style="border:none;"></td>
+
+            <!-- 13 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Desviación',
+                    'No Desbloquear Equipos de los Clientes',
+                    'NO DESBLOQUEAR EQUIPOS DE LOS CLIENTES'
+                ) !!}
+            </td>
+
 
         <!-- FILA 9 -->
         <tr>
@@ -874,7 +960,32 @@
             <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- resto de la fila igual -->
+            <!-- 9 -->
+            <td style="border:none;"></td>
+
+            <!-- 10 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Uso Inadecuado de EPP',
+                    'USO INADECUADO DE EPP'
+                ) !!}
+            </td>
+
+            <!-- 11 -->
+            <td style="border:none;"></td>
+
+            <!-- 12 -->
+            <td style="border:none;"></td>
+
+            <!-- 13 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Desviación',
+                    'Otros, especifique',
+                    'OTROS, ESPECIFIQUE'
+                ) !!}
+            </td>
 
         <!-- FILA 10 -->
         <tr>
@@ -886,7 +997,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                NO REALIZAR BLOQUEOS Y ETIQUETADO
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'No Realizar Bloqueos y Etiquetados',
+                    'NO REALIZAR BLOQUEOS Y ETIQUETADO'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -907,7 +1022,7 @@
 
             <!-- Columnas 4 y 5-->
             <td colspan="2" class="bold-center" style="border:none; font-size:6px; text-align:center;">
-                ACTO INSEGURO / CONDICIÓN PELIGROSA / DESVIACIÓN
+                ACTO INSEGURO / CONDICIÓN PELIGROSA / DESVIACIÓN / INCIDENTE
             </td>
         
             <!-- 6 -->
@@ -918,7 +1033,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                DAÑO A LA MAQUINARIA
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Daño a la Maquinaria',
+                    'DAÑO A LA MAQUINARIA'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -956,7 +1075,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                DAÑO A INSTALACIONES
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Daño a las Instalaciones',
+                    'DAÑO A INSTALACIONES'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -980,7 +1103,11 @@
             
             <!-- 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                OTROS, ESPECIFIQUE
+                {!! $marcarFalta(
+                    'Acto Inseguro',
+                    'Otros, especifique',
+                    'OTROS, ESPECIFIQUE'
+                ) !!}
             </td>
             
             <!-- 11 -->
@@ -1008,11 +1135,11 @@
             <td style="border:none;"></td>
         
             <!-- Columnas 12 y 13 -->
-            <td colspan="2" class="bold-center">
-                {{ data_get($answers, 'tipo_observacion', '') }}
+            <td colspan="2" class="bold-center" style="border:none; text-align:left;">
+                Incidente / Accidente
             </td>
         </tr>
-
+        
         <!-- FILA 15 -->
         <tr>
             <!-- Columnas 2 y 3 -->
@@ -1023,194 +1150,280 @@
             </td>
         
             <!-- Columnas 4 y 5 -->
-            <td rowspan="8" colspan="2" style="vertical-align:middle; text-align:center; font-size:8px; padding:4px;">
-                {{ data_get($answers, 'descripcion_observacion', '') }}
-            </td>
-
-            <!-- 6 -->
-            <td style="border:none;"></td>
-            
-            <!-- 9 -->
-            <td style="border:none;"></td>
-            
-            <!-- 10 -->
-            <td style="border:none; font-size:7px; text-align:left;">
-                ÁREAS SIN DELIMITACIÓN O SEÑALIZACIÓN ADECUADA
-            </td>
-            
-            <!-- 11 -->
-            <td style="border:none;"></td>
-            
-            <!-- Columnas 12 y 13: FALTA COMETIDA SELECCIONADA -->
             <td
-                colspan="2"
-                style="
-                    vertical-align:middle;
-                    text-align:center;
-                    font-size:7px;
-                    font-weight:bold;
-                    padding:2px 4px;
-                    border-bottom:none;
-                "
-            >
-                {{ data_get($answers, 'falta_cometida_seleccionada', '') }}
-            </td>
-        </tr>
-
-        <!-- FILA 16 -->
-        <tr>
-            <!-- Columnas 2 y 3 -->
-            <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
-            <td style="border:none;"></td>
-
-            <!-- 9 -->
-            <td style="border:none;"></td>
-            
-            <!-- 10 -->
-            <td style="border:none; font-size:7px; text-align:left;">
-                EQUIPOS O MAQUINARIA CON MANTENIMIENTO DEFICIENTE
-            </td>
-            
-            <!-- 11 -->
-            <td style="border:none;"></td>
-
-            <!-- Columnas 12 y 13: DESCRIPCIÓN DE LA FALTA COMETIDA -->
-            <td
-                rowspan="7"
+                rowspan="8"
                 colspan="2"
                 style="
                     vertical-align:middle;
                     text-align:center;
                     font-size:8px;
-                    font-weight:bold;
                     padding:4px;
-                    border-top:none;
                 "
             >
-                {{ data_get($answers, 'descripcion_falta_cometida', '') }}
+                {{ data_get($answers, 'descripcion_observacion', '') }}
+            </td>
+        
+            <!-- Columna 6 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 9 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 10 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Áreas sin Delimitacion o Señalización Adecuada',
+                    'ÁREAS SIN DELIMITACIÓN O SEÑALIZACIÓN ADECUADA'
+                ) !!}
+            </td>
+        
+            <!-- Columna 11 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Incidente',
+                    'Accidente con posible Incapacidad',
+                    'ACCIDENTE CON POSIBLE INCAPACIDAD'
+                ) !!}
             </td>
         </tr>
-
+        
+        <!-- FILA 16 -->
+        <tr>
+            <!-- Columnas 2 y 3 -->
+            <td colspan="2" style="border:none;"></td>
+        
+            <!-- Columna 6 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 9 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 10 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Equipos o Maquinaria con Matenimiento Deficiente',
+                    'EQUIPOS O MAQUINARIA CON MANTENIMIENTO DEFICIENTE'
+                ) !!}
+            </td>
+        
+            <!-- Columna 11 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Incidente',
+                    'Incidente con Daños a la Propiedad',
+                    'INCIDENTE CON DAÑOS A LA PROPIEDAD'
+                ) !!}
+            </td>
+        </tr>
+        
         <!-- FILA 17 -->
         <tr>
             <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
+        
+            <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- 9 -->
+            <!-- Columna 9 -->
             <td style="border:none;"></td>
-            
-            <!-- 10 -->
+        
+            <!-- Columna 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                INSTALACIONES ELÉCTRICAS EXPUESTAS O EN MAL ESTADO
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Instalaciones Eléctricas Expuestas o en Mal Estado',
+                    'INSTALACIONES ELÉCTRICAS EXPUESTAS O EN MAL ESTADO'
+                ) !!}
             </td>
-            
-            <!-- 11 -->
+        
+            <!-- Columna 11 -->
             <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Incidente',
+                    'Incidentes "Near Miss"',
+                    'INCIDENTES "NEAR MISS"'
+                ) !!}
+            </td>
         </tr>
-
+        
         <!-- FILA 18 -->
         <tr>
             <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
+        
+            <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- 9 -->
+            <!-- Columna 9 -->
             <td style="border:none;"></td>
-            
-            <!-- 10 -->
+        
+            <!-- Columna 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                PISO RESBALADIZO O CON OBSTÁCULOS
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Piso Resbaladizo o con Obstaculos',
+                    'PISO RESBALADIZO O CON OBSTÁCULOS'
+                ) !!}
             </td>
-            
-            <!-- 11 -->
+        
+            <!-- Columna 11 -->
             <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 -->
+            <td style="border:none; font-size:7px; text-align:left;">
+                {!! $marcarFalta(
+                    'Incidente',
+                    'Otros Especifique',
+                    'OTROS ESPECIFIQUE'
+                ) !!}
+            </td>
         </tr>
-
+        
         <!-- FILA 19 -->
         <tr>
             <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
+        
+            <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- 9 -->
+            <!-- Columna 9 -->
             <td style="border:none;"></td>
-            
-            <!-- 10 -->
+        
+            <!-- Columna 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                ILUMINACIÓN INSUFICIENTE
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Iluminación Insuficiente',
+                    'ILUMINACIÓN INSUFICIENTE'
+                ) !!}
             </td>
-            
-            <!-- 11 -->
+        
+            <!-- Columna 11 -->
             <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 VACÍA -->
+            <td style="border:none; font-size:7px; text-align:left;">
+            </td>
         </tr>
-
+        
         <!-- FILA 20 -->
         <tr>
             <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
+        
+            <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- 9 -->
+            <!-- Columna 9 -->
             <td style="border:none;"></td>
-            
-            <!-- 10 -->
+        
+            <!-- Columna 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                ALMACENAMIENTO INADECUADO DE MATERIALES
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Almacenamiento Inadecuado de Materiales',
+                    'ALMACENAMIENTO INADECUADO DE MATERIALES'
+                ) !!}
             </td>
-            
-            <!-- 11 -->
+        
+            <!-- Columna 11 -->
             <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 VACÍA -->
+            <td style="border:none; font-size:7px; text-align:left;">
+            </td>
         </tr>
-
+        
         <!-- FILA 21 -->
         <tr>
             <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
+        
+            <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- 9 -->
+            <!-- Columna 9 -->
             <td style="border:none;"></td>
-            
-            <!-- 10 -->
+        
+            <!-- Columna 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                FALTA DE SEÑALIZACIÓN DE EMERGENCIA O RUTAS DE EVACUACIÓN
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Falta de Señalización de Emergencia o Rutas de Evacuación',
+                    'FALTA DE SEÑALIZACIÓN DE EMERGENCIA O RUTAS DE EVACUACIÓN'
+                ) !!}
             </td>
-            
-            <!-- 11 -->
+        
+            <!-- Columna 11 -->
             <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 VACÍA -->
+            <td style="border:none; font-size:7px; text-align:left;">
+            </td>
         </tr>
-
+        
         <!-- FILA 22 -->
         <tr>
             <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
+        
+            <!-- Columna 6 -->
             <td style="border:none;"></td>
         
-            <!-- 9 -->
+            <!-- Columna 9 -->
             <td style="border:none;"></td>
-            
-            <!-- 10 -->
+        
+            <!-- Columna 10 -->
             <td style="border:none; font-size:7px; text-align:left;">
-                OTROS, ESPECIFIQUE
+                {!! $marcarFalta(
+                    'Condición Peligrosa',
+                    'Otros, especifique',
+                    'OTROS, ESPECIFIQUE'
+                ) !!}
             </td>
-            
-            <!-- 11 -->
+        
+            <!-- Columna 11 -->
             <td style="border:none;"></td>
+        
+            <!-- Columna 12 -->
+            <td style="border:none;"></td>
+        
+            <!-- Columna 13 VACÍA -->
+            <td style="border:none; font-size:7px; text-align:left;">
+            </td>
         </tr>
 
         <!-- FILA 23 -->
@@ -1226,151 +1439,79 @@
 
         <!-- FILA 24 -->
         <tr>
-            <!-- Columna 1 unida -->
+            <!-- Columna 1 -->
             <td rowspan="14" style="border-right:none;"></td>
-    
-            <!-- Columnas 2 a 6 -->
-            <td colspan="5" style="border-bottom:none; border-left:none; border-right:none;"></td>
-    
-            <!-- Columna 7 unida -->
-            <td rowspan="14" style="border-left:none;"></td>
-    
-            <!-- Columna 8 unida -->
-            <td rowspan="14" style="border-right:none;"></td>
-    
-            <!-- Columnas 9 a 13 -->
-            <td colspan="5" style="border-bottom:none; border-left:none; border-right:none;"></td>
-    
-            <!-- Columna 14 unida -->
-            <td rowspan="14" style="border-left:none; border-right:none;"></td>
+        
+            <!-- Columnas 2 a 13 -->
+            <td colspan="12" style="
+                border-bottom:none;
+                border-left:none;
+                border-right:none;
+            "></td>
+        
+            <!-- Columna 14 -->
+            <td rowspan="14" style="
+                border-left:none;
+                border-right:none;
+            "></td>
         </tr>
 
         <!-- FILA 25 -->
         <tr>
             <!-- Columnas 2 y 3 -->
-            <td colspan="2" style="border:none; text-align:center; font-size:7px; padding:0; vertical-align:bottom;">
-                <div style="position:relative; top:1px; left:-27px; text-align:center;">
+            <td colspan="2" style="
+                border:none;
+                text-align:center;
+                font-size:7px;
+                padding:0;
+                vertical-align:bottom;
+            ">
+                <div style="
+                    position:relative;
+                    top:1px;
+                    left:-27px;
+                    text-align:center;
+                ">
                     ACCIÓN CORRECTIVA:
                 </div>
             </td>
         
-            <!-- Columnas 4 y 5 -->
-            <td rowspan="4" colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; font-size:7px; padding:4px; font-weight:bold;">
-                {{ data_get($answers, 'acciones_preventivas_correctivas', '') }}
-            </td>
-
-            <!-- 6 -->
-            <td style="border:none;"></td>
-        
-            <!-- Columnas 9 a 13, filas 25 a 36: EVIDENCIAS -->
+            <!-- Columnas 4 a 13 -->
             <td
-                rowspan="12"
-                colspan="5"
+                rowspan="4"
+                colspan="10"
                 style="
-                    border:none;
-                    padding:0;
-                    height:144px;
+                    border:1px solid #000;
                     text-align:center;
                     vertical-align:middle;
+                    font-size:7px;
+                    padding:4px;
+                    font-weight:bold;
                 "
             >
-                                @if($cantidadEvidencias > 0)
-                    <div class="evidence-wrapper">
-                        <table class="evidence-table">
-
-                            {{-- UNA SOLA EVIDENCIA --}}
-                            @if($cantidadEvidencias === 1)
-
-                                @php
-                                    $evidencia = $evidenciasSrc[0];
-                                @endphp
-
-                                <tr>
-                                    <td style="width:100%;">
-                                        <img
-                                            src="{{ $evidencia['src'] }}"
-                                            class="{{
-                                                $evidencia['es_panoramica']
-                                                    ? 'evidence-image-panoramic-single'
-                                                    : 'evidence-image-normal-single'
-                                            }}"
-                                        >
-                                    </td>
-                                </tr>
-
-                            {{-- DOS EVIDENCIAS Y AL MENOS UNA PANORÁMICA --}}
-                            @elseif($apilarEvidencias)
-
-                                @foreach($evidenciasSrc as $evidencia)
-                                    <tr class="evidence-row-stacked">
-                                        <td style="width:100%;">
-                                            <img
-                                                src="{{ $evidencia['src'] }}"
-                                                class="evidence-image-stacked"
-                                            >
-                                        </td>
-                                    </tr>
-                                @endforeach
-
-                            {{-- DOS EVIDENCIAS NORMALES: LADO A LADO --}}
-                            @else
-
-                                <tr>
-                                    @foreach($evidenciasSrc as $evidencia)
-                                        <td style="width:50%;">
-                                            <img
-                                                src="{{ $evidencia['src'] }}"
-                                                class="evidence-image-normal-double"
-                                            >
-                                        </td>
-                                    @endforeach
-                                </tr>
-
-                            @endif
-
-                        </table>
-                    </div>
-                @endif
+                {{ data_get($answers, 'acciones_preventivas_correctivas', '') }}
             </td>
         </tr>
 
         <!-- FILA 26 -->
         <tr>
-            <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
-            <td style="border:none;"></td>
-        
-
         </tr>
         
         <!-- FILA 27 -->
         <tr>
-            <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
-            <td style="border:none;"></td>
-        
-
         </tr>
-
+        
         <!-- FILA 28 -->
         <tr>
-            <!-- Columnas 2 y 3 -->
             <td colspan="2" style="border:none;"></td>
-
-            <!-- 6 -->
-            <td style="border:none;"></td>
-        
-
         </tr>
 
         <!-- FILA 29 -->
         <tr>
             <!-- Columnas 2 a 6 -->
-            <td colspan="5" style="border:none;">
+            <td colspan="12" style="border:none;">
             </td>
         </tr>
 
@@ -1378,6 +1519,9 @@
         <tr>
         
             @php
+                /*
+                 * FIRMA DE QUIEN REPORTA
+                 */
                 $firmaReporta = data_get($answers, 'firma_reporta_observacion');
                 $firmaReportaSrc = null;
         
@@ -1392,76 +1536,74 @@
                             base64_encode(file_get_contents($firmaPath));
                     }
                 }
-            @endphp
         
-            <!-- Columnas 2, 3 y 4 -->
-            <td rowspan="2" colspan="3" style="border-top:none; border-right:none; border-left:none; border-bottom:1px solid #000; 
-            text-align:center; vertical-align:bottom; font-size:8px; font-weight:bold; padding-bottom:2px;">
-                {{ data_get($answers, 'nombre_reporta_observacion', '') }}
-            </td>
-        
-            <!-- Columnas 5 y 6 -->
-            <td rowspan="2" colspan="2" style="border-top:none; border-right:none; border-left:none; border-bottom:1px solid #000; 
-            text-align:center; vertical-align:middle; padding:0;">
-                @if($firmaReportaSrc)
-                    <img src="{{ $firmaReportaSrc }}" style="
-                        max-height:40px;
-                        max-width:100px;
-                        display:block;
-                        margin:0 auto;
-                        object-fit:contain;
-                    ">
-                @endif
-        
-            </td>
-        </tr>
-
-        <!-- FILA 31 -->
-        <tr>
-        
-        </tr>
-
-        <!-- FILA 32 -->
-        <tr>
-            <!-- Columnas 2 a 6 -->
-            <td colspan="5" style="border:none; text-align:center; font-size:7px; padding:0; vertical-align:top;">
-                <div style="position:relative; top:0px; text-align:center;">
-                    NOMBRE Y FIRMA DE QUIEN REPORTA OBSERVACIÓN
-                </div>
-            </td>
-        </tr>
-
-        <!-- FILA 33 -->
-        <tr>
-        
-            @php
+                /*
+                 * OBSERVADOS
+                 */
                 $cantidadObservados = count($firmasObservados);
         
                 $observadosIzquierda = [];
+                $observadosCentro = [];
                 $observadosDerecha = [];
-        
-                if ($cantidadObservados >= 3) {
+                
+                if ($cantidadObservados >= 4) {
                     foreach ($firmasObservados as $index => $observado) {
-                        if ($index % 2 === 0) {
+                
+                        $posicion = $index % 3;
+                
+                        if ($posicion === 0) {
                             $observadosIzquierda[] = $observado;
+                        } elseif ($posicion === 1) {
+                            $observadosCentro[] = $observado;
                         } else {
                             $observadosDerecha[] = $observado;
                         }
                     }
-        
+                
                     /*
-                     * Los nuevos nombres y firmas se muestran arriba.
-                     * Los primeros permanecen junto al borde inferior.
+                     * Los nuevos observados quedan arriba.
+                     *
+                     * 4 arriba de 1
+                     * 5 arriba de 2
+                     * 6 arriba de 3
+                     * 7 arriba de 4
+                     * etc.
                      */
                     $observadosIzquierda = array_reverse($observadosIzquierda);
+                    $observadosCentro = array_reverse($observadosCentro);
                     $observadosDerecha = array_reverse($observadosDerecha);
+                }
+        
+                /*
+                 * Ajustamos automáticamente el tamaño de las firmas
+                 * para que se vean completas sin ocupar demasiado.
+                 */
+                if ($cantidadObservados <= 3) {
+                    $maxObservadosPorColumna = 1;
+                } else {
+                    $maxObservadosPorColumna = max(
+                        count($observadosIzquierda),
+                        count($observadosCentro),
+                        count($observadosDerecha)
+                    );
+                }
+                
+                if ($maxObservadosPorColumna <= 1) {
+                    $altoFirmaObservado = 38;
+                } elseif ($maxObservadosPorColumna === 2) {
+                    $altoFirmaObservado = 23;
+                } else {
+                    $altoFirmaObservado = 15;
                 }
             @endphp
         
-            <!-- NOMBRES DE LOS OBSERVADOS -->
+        
+            <!-- ====================================================== -->
+            <!-- QUIEN REPORTA: COLUMNAS 2 A 6 -->
+            <!-- ====================================================== -->
             <td
-                rowspan="3"
-                colspan="3"
+                rowspan="6"
+                colspan="5"
                 style="
                     border-top:none;
                     border-right:none;
@@ -1469,287 +1611,495 @@
                     border-bottom:1px solid #000;
                     text-align:center;
                     vertical-align:bottom;
-                    font-size:6px;
-                    font-weight:bold;
                     padding:0 4px 2px 4px;
                 "
             >
-                @if($cantidadObservados === 1)
-        
-                    <div style="
-                        margin:0;
-                        line-height:12px;
-                        text-align:center;
-                    ">
-                        {{ $firmasObservados[0]['nombre'] ?: '—' }}
-                    </div>
-        
-                @elseif($cantidadObservados === 2)
-        
-                    <table style="
-                        width:100%;
-                        border-collapse:collapse;
-                        table-layout:fixed;
-                        margin:0;
-                        padding:0;
-                    ">
-                        <tr>
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 4px 0 0;
-                                vertical-align:bottom;
-                                text-align:center;
-                                font-size:6px;
-                                font-weight:bold;
-                                line-height:8px;
-                            ">
-                                {{ $firmasObservados[0]['nombre'] ?: '—' }}
-                            </td>
-        
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 0 0 4px;
-                                vertical-align:bottom;
-                                text-align:center;
-                                font-size:6px;
-                                font-weight:bold;
-                                line-height:8px;
-                            ">
-                                {{ $firmasObservados[1]['nombre'] ?: '—' }}
-                            </td>
-                        </tr>
-                    </table>
-        
-                @elseif($cantidadObservados >= 3)
-        
-                    <table style="
-                        width:100%;
-                        border-collapse:collapse;
-                        table-layout:fixed;
-                        margin:0;
-                        padding:0;
-                    ">
-                        <tr>
-                            <!-- LADO IZQUIERDO -->
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 4px 0 0;
-                                vertical-align:bottom;
-                                text-align:center;
-                                font-size:6px;
-                                font-weight:bold;
-                            ">
-                                @foreach($observadosIzquierda as $observado)
-                                    <div style="
-                                        margin:0;
-                                        padding:0;
-                                        line-height:8px;
-                                        min-height:8px;
-                                        text-align:center;
-                                    ">
-                                        {{ $observado['nombre'] ?: '—' }}
-                                    </div>
-                                @endforeach
-                            </td>
-        
-                            <!-- LADO DERECHO -->
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 0 0 4px;
-                                vertical-align:bottom;
-                                text-align:center;
-                                font-size:6px;
-                                font-weight:bold;
-                            ">
-                                @foreach($observadosDerecha as $observado)
-                                    <div style="
-                                        margin:0;
-                                        padding:0;
-                                        line-height:8px;
-                                        min-height:8px;
-                                        text-align:center;
-                                    ">
-                                        {{ $observado['nombre'] ?: '—' }}
-                                    </div>
-                                @endforeach
-                            </td>
-                        </tr>
-                    </table>
-        
-                @else
-        
-                    {{ $nombreObservadoRaw }}
-        
-                @endif
-            </td>
-        
-            <!-- FIRMAS DE LOS OBSERVADOS -->
-            <td
-                rowspan="3"
-                colspan="2"
-                style="
-                    border-top:none;
-                    border-right:none;
-                    border-left:none;
-                    border-bottom:1px solid #000;
+                <!-- FIRMA ARRIBA -->
+                <div style="
+                    height:44px;
                     text-align:center;
-                    vertical-align:bottom;
-                    padding:0 2px 2px 2px;
-                "
-            >
-                @if($cantidadObservados === 1)
-        
-                    @if(!empty($firmasObservados[0]['firma_src']))
+                    margin:0;
+                    padding:0;
+                ">
+                    @if($firmaReportaSrc)
                         <img
-                            src="{{ $firmasObservados[0]['firma_src'] }}"
+                            src="{{ $firmaReportaSrc }}"
                             style="
-                                max-height:80px;
-                                max-width:100px;
+                                max-height:40px;
+                                max-width:115px;
                                 display:block;
                                 margin:0 auto;
                                 object-fit:contain;
                             "
                         >
                     @endif
+                </div>
         
-                @elseif($cantidadObservados === 2)
-        
-                    <table style="
-                        width:100%;
-                        border-collapse:collapse;
-                        table-layout:fixed;
-                        margin:0;
-                        padding:0;
-                    ">
-                        <tr>
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 2px 0 0;
-                                vertical-align:bottom;
-                                text-align:center;
-                            ">
-                                @if(!empty($firmasObservados[0]['firma_src']))
-                                    <img
-                                        src="{{ $firmasObservados[0]['firma_src'] }}"
-                                        style="
-                                            max-height:80px;
-                                            max-width:100px;
-                                            display:block;
-                                            margin:0 auto;
-                                            object-fit:contain;
-                                        "
-                                    >
-                                @endif
-                            </td>
-        
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 0 0 2px;
-                                vertical-align:bottom;
-                                text-align:center;
-                            ">
-                                @if(!empty($firmasObservados[1]['firma_src']))
-                                    <img
-                                        src="{{ $firmasObservados[1]['firma_src'] }}"
-                                        style="
-                                            max-height:80px;
-                                            max-width:100px;
-                                            display:block;
-                                            margin:0 auto;
-                                            object-fit:contain;
-                                        "
-                                    >
-                                @endif
-                            </td>
-                        </tr>
-                    </table>
-        
-                @elseif($cantidadObservados >= 3)
-        
-                    <table style="
-                        width:100%;
-                        border-collapse:collapse;
-                        table-layout:fixed;
-                        margin:0;
-                        padding:0;
-                    ">
-                        <tr>
-                            <!-- FIRMAS DEL LADO IZQUIERDO -->
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 2px 0 0;
-                                vertical-align:bottom;
-                                text-align:center;
-                            ">
-                                @foreach($observadosIzquierda as $observado)
-                                    <div style="
-                                        height:16px;
-                                        line-height:16px;
-                                        text-align:center;
-                                        margin:0;
-                                        padding:0;
-                                        overflow:hidden;
-                                    ">
-                                        @if(!empty($observado['firma_src']))
-                                            <img
-                                                src="{{ $observado['firma_src'] }}"
-                                                style="
-                                                    max-height:80px;
-                                                    max-width:100px;
-                                                    display:block;
-                                                    margin:0 auto;
-                                                    object-fit:contain;
-                                                "
-                                            >
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </td>
-        
-                            <!-- FIRMAS DEL LADO DERECHO -->
-                            <td style="
-                                width:50%;
-                                border:none;
-                                padding:0 0 0 2px;
-                                vertical-align:bottom;
-                                text-align:center;
-                            ">
-                                @foreach($observadosDerecha as $observado)
-                                    <div style="
-                                        height:16px;
-                                        line-height:16px;
-                                        text-align:center;
-                                        margin:0;
-                                        padding:0;
-                                        overflow:hidden;
-                                    ">
-                                        @if(!empty($observado['firma_src']))
-                                            <img
-                                                src="{{ $observado['firma_src'] }}"
-                                                style="
-                                                    max-height:80px;
-                                                    max-width:100px;
-                                                    display:block;
-                                                    margin:0 auto;
-                                                    object-fit:contain;
-                                                "
-                                            >
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </td>
-                        </tr>
-                    </table>
-        
-                @endif
+                <!-- NOMBRE ABAJO -->
+                <div style="
+                    text-align:center;
+                    font-size:7px;
+                    font-weight:bold;
+                    line-height:9px;
+                    margin:0;
+                    padding:0;
+                ">
+                    {{ data_get($answers, 'nombre_reporta_observacion', '') }}
+                </div>
             </td>
+        
+        
+            <!-- ====================================================== -->
+            <!-- COLUMNAS 7 Y 8: SEPARACIÓN -->
+            <!-- ====================================================== -->
+            <td
+                rowspan="6"
+                colspan="2"
+                style="border:none;"
+            >
+            </td>
+        
+        
+            <!-- ====================================================== -->
+            <!-- OBSERVADOS: COLUMNAS 9 A 13 -->
+            <!-- ====================================================== -->
+            <td
+                rowspan="6"
+                colspan="5"
+                style="
+                    border-top:none;
+                    border-right:none;
+                    border-left:none;
+                    border-bottom:1px solid #000;
+                    text-align:center;
+                    vertical-align:bottom;
+                    padding:0 4px 2px 4px;
+                "
+            >
+        
+                {{-- ================================================== --}}
+                {{-- UN SOLO OBSERVADO: CENTRADO --}}
+                {{-- ================================================== --}}
+                @if($cantidadObservados === 1)
+                
+                    <div style="
+                        width:100%;
+                        text-align:center;
+                        margin:0;
+                        padding:0;
+                    ">
+                        <!-- FIRMA -->
+                        <div style="
+                            height:44px;
+                            text-align:center;
+                            margin:0;
+                            padding:0;
+                        ">
+                            @if(!empty($firmasObservados[0]['firma_src']))
+                                <img
+                                    src="{{ $firmasObservados[0]['firma_src'] }}"
+                                    style="
+                                        max-height:38px;
+                                        max-width:115px;
+                                        display:block;
+                                        margin:0 auto;
+                                        object-fit:contain;
+                                    "
+                                >
+                            @endif
+                        </div>
+                
+                        <!-- NOMBRE -->
+                        <div style="
+                            font-size:6px;
+                            font-weight:bold;
+                            line-height:9px;
+                            text-align:center;
+                            margin:0;
+                            padding:0;
+                        ">
+                            {{ $firmasObservados[0]['nombre'] ?: '—' }}
+                        </div>
+                    </div>
+                
+                
+                {{-- ================================================== --}}
+                {{-- DOS OBSERVADOS: IZQUIERDA Y DERECHA --}}
+                {{-- ================================================== --}}
+                @elseif($cantidadObservados === 2)
+                
+                    <table style="
+                        width:100%;
+                        border-collapse:collapse;
+                        table-layout:fixed;
+                        margin:0;
+                        padding:0;
+                    ">
+                        <tr>
+                
+                            <!-- OBSERVADO 1 -->
+                            <td style="
+                                width:50%;
+                                border:none;
+                                padding:0 6px 0 0;
+                                text-align:center;
+                                vertical-align:bottom;
+                            ">
+                                <div style="height:44px; text-align:center;">
+                                    @if(!empty($firmasObservados[0]['firma_src']))
+                                        <img
+                                            src="{{ $firmasObservados[0]['firma_src'] }}"
+                                            style="
+                                                max-height:38px;
+                                                max-width:90px;
+                                                display:block;
+                                                margin:0 auto;
+                                                object-fit:contain;
+                                            "
+                                        >
+                                    @endif
+                                </div>
+                
+                                <div style="
+                                    font-size:6px;
+                                    font-weight:bold;
+                                    line-height:9px;
+                                    text-align:center;
+                                ">
+                                    {{ $firmasObservados[0]['nombre'] ?: '—' }}
+                                </div>
+                            </td>
+                
+                            <!-- OBSERVADO 2 -->
+                            <td style="
+                                width:50%;
+                                border:none;
+                                padding:0 0 0 6px;
+                                text-align:center;
+                                vertical-align:bottom;
+                            ">
+                                <div style="height:44px; text-align:center;">
+                                    @if(!empty($firmasObservados[1]['firma_src']))
+                                        <img
+                                            src="{{ $firmasObservados[1]['firma_src'] }}"
+                                            style="
+                                                max-height:38px;
+                                                max-width:90px;
+                                                display:block;
+                                                margin:0 auto;
+                                                object-fit:contain;
+                                            "
+                                        >
+                                    @endif
+                                </div>
+                
+                                <div style="
+                                    font-size:6px;
+                                    font-weight:bold;
+                                    line-height:9px;
+                                    text-align:center;
+                                ">
+                                    {{ $firmasObservados[1]['nombre'] ?: '—' }}
+                                </div>
+                            </td>
+                
+                        </tr>
+                    </table>
+                
+                
+                {{-- ================================================== --}}
+                {{-- TRES OBSERVADOS: IZQUIERDA / CENTRO / DERECHA --}}
+                {{-- ================================================== --}}
+                @elseif($cantidadObservados === 3)
+                
+                    <table style="
+                        width:100%;
+                        border-collapse:collapse;
+                        table-layout:fixed;
+                        margin:0;
+                        padding:0;
+                    ">
+                        <tr>
+                
+                            @foreach($firmasObservados as $observado)
+                                <td style="
+                                    width:33.33%;
+                                    border:none;
+                                    padding:0 3px;
+                                    text-align:center;
+                                    vertical-align:bottom;
+                                ">
+                
+                                    <!-- FIRMA -->
+                                    <div style="
+                                        height:44px;
+                                        text-align:center;
+                                        margin:0;
+                                        padding:0;
+                                    ">
+                                        @if(!empty($observado['firma_src']))
+                                            <img
+                                                src="{{ $observado['firma_src'] }}"
+                                                style="
+                                                    max-height:38px;
+                                                    max-width:78px;
+                                                    display:block;
+                                                    margin:0 auto;
+                                                    object-fit:contain;
+                                                "
+                                            >
+                                        @endif
+                                    </div>
+                
+                                    <!-- NOMBRE -->
+                                    <div style="
+                                        font-size:6px;
+                                        font-weight:bold;
+                                        line-height:8px;
+                                        text-align:center;
+                                        margin:0;
+                                        padding:0;
+                                    ">
+                                        {{ $observado['nombre'] ?: '—' }}
+                                    </div>
+                
+                                </td>
+                            @endforeach
+                
+                        </tr>
+                    </table>
+                
+                
+                {{-- ================================================== --}}
+                {{-- CUATRO O MÁS: TRES COLUMNAS --}}
+                {{-- ================================================== --}}
+                @elseif($cantidadObservados >= 4)
+                
+                    <table style="
+                        width:100%;
+                        border-collapse:collapse;
+                        table-layout:fixed;
+                        margin:0;
+                        padding:0;
+                    ">
+                        <tr>
+                
+                            <!-- ================================ -->
+                            <!-- IZQUIERDA: 1, 4, 7, 10... -->
+                            <!-- ================================ -->
+                            <td style="
+                                width:33.33%;
+                                border:none;
+                                padding:0 3px 0 0;
+                                vertical-align:bottom;
+                                text-align:center;
+                            ">
+                
+                                @foreach($observadosIzquierda as $observado)
+                
+                                    <div style="
+                                        margin:0;
+                                        padding:0;
+                                        text-align:center;
+                                    ">
+                
+                                        <!-- FIRMA -->
+                                        <div style="
+                                            height:{{ $altoFirmaObservado }}px;
+                                            text-align:center;
+                                            margin:0;
+                                            padding:0;
+                                            overflow:hidden;
+                                        ">
+                                            @if(!empty($observado['firma_src']))
+                                                <img
+                                                    src="{{ $observado['firma_src'] }}"
+                                                    style="
+                                                        max-height:{{ $altoFirmaObservado }}px;
+                                                        max-width:76px;
+                                                        display:block;
+                                                        margin:0 auto;
+                                                        object-fit:contain;
+                                                    "
+                                                >
+                                            @endif
+                                        </div>
+                
+                                        <!-- NOMBRE -->
+                                        <div style="
+                                            min-height:8px;
+                                            line-height:8px;
+                                            font-size:6px;
+                                            font-weight:bold;
+                                            text-align:center;
+                                            margin:0 0 2px 0;
+                                            padding:0;
+                                        ">
+                                            {{ $observado['nombre'] ?: '—' }}
+                                        </div>
+                
+                                    </div>
+                
+                                @endforeach
+                
+                            </td>
+                
+                
+                            <!-- ================================ -->
+                            <!-- CENTRO: 2, 5, 8, 11... -->
+                            <!-- ================================ -->
+                            <td style="
+                                width:33.33%;
+                                border:none;
+                                padding:0 3px;
+                                vertical-align:bottom;
+                                text-align:center;
+                            ">
+                
+                                @foreach($observadosCentro as $observado)
+                
+                                    <div style="
+                                        margin:0;
+                                        padding:0;
+                                        text-align:center;
+                                    ">
+                
+                                        <!-- FIRMA -->
+                                        <div style="
+                                            height:{{ $altoFirmaObservado }}px;
+                                            text-align:center;
+                                            margin:0;
+                                            padding:0;
+                                            overflow:hidden;
+                                        ">
+                                            @if(!empty($observado['firma_src']))
+                                                <img
+                                                    src="{{ $observado['firma_src'] }}"
+                                                    style="
+                                                        max-height:{{ $altoFirmaObservado }}px;
+                                                        max-width:76px;
+                                                        display:block;
+                                                        margin:0 auto;
+                                                        object-fit:contain;
+                                                    "
+                                                >
+                                            @endif
+                                        </div>
+                
+                                        <!-- NOMBRE -->
+                                        <div style="
+                                            min-height:8px;
+                                            line-height:8px;
+                                            font-size:6px;
+                                            font-weight:bold;
+                                            text-align:center;
+                                            margin:0 0 2px 0;
+                                            padding:0;
+                                        ">
+                                            {{ $observado['nombre'] ?: '—' }}
+                                        </div>
+                
+                                    </div>
+                
+                                @endforeach
+                
+                            </td>
+                
+                
+                            <!-- ================================ -->
+                            <!-- DERECHA: 3, 6, 9, 12... -->
+                            <!-- ================================ -->
+                            <td style="
+                                width:33.33%;
+                                border:none;
+                                padding:0 0 0 3px;
+                                vertical-align:bottom;
+                                text-align:center;
+                            ">
+                
+                                @foreach($observadosDerecha as $observado)
+                
+                                    <div style="
+                                        margin:0;
+                                        padding:0;
+                                        text-align:center;
+                                    ">
+                
+                                        <!-- FIRMA -->
+                                        <div style="
+                                            height:{{ $altoFirmaObservado }}px;
+                                            text-align:center;
+                                            margin:0;
+                                            padding:0;
+                                            overflow:hidden;
+                                        ">
+                                            @if(!empty($observado['firma_src']))
+                                                <img
+                                                    src="{{ $observado['firma_src'] }}"
+                                                    style="
+                                                        max-height:{{ $altoFirmaObservado }}px;
+                                                        max-width:76px;
+                                                        display:block;
+                                                        margin:0 auto;
+                                                        object-fit:contain;
+                                                    "
+                                                >
+                                            @endif
+                                        </div>
+                
+                                        <!-- NOMBRE -->
+                                        <div style="
+                                            min-height:8px;
+                                            line-height:8px;
+                                            font-size:6px;
+                                            font-weight:bold;
+                                            text-align:center;
+                                            margin:0 0 2px 0;
+                                            padding:0;
+                                        ">
+                                            {{ $observado['nombre'] ?: '—' }}
+                                        </div>
+                
+                                    </div>
+                
+                                @endforeach
+                
+                            </td>
+                
+                        </tr>
+                    </table>
+                
+                
+                {{-- ================================================== --}}
+                {{-- REGISTROS ANTIGUOS --}}
+                {{-- ================================================== --}}
+                @else
+                
+                    <div style="
+                        text-align:center;
+                        font-size:6px;
+                        font-weight:bold;
+                    ">
+                        {{ $nombreObservadoRaw }}
+                    </div>
+                
+                @endif
+        
+            </td>
+        
+        </tr>
+        
+        
+        <!-- FILA 31 -->
+        <tr>
+        </tr>
+        
+        <!-- FILA 32 -->
+        <tr>
+        </tr>
+        
+        <!-- FILA 33 -->
+        <tr>
         </tr>
         
         <!-- FILA 34 -->
@@ -1759,9 +2109,10 @@
         <!-- FILA 35 -->
         <tr>
         </tr>
-
+        
         <!-- FILA 36 -->
         <tr>
+        
             <!-- Columnas 2 a 6 -->
             <td
                 colspan="5"
@@ -1773,26 +2124,56 @@
                     vertical-align:top;
                 "
             >
-                <div
-                    style="
-                        position:relative;
-                        top:0;
-                        text-align:center;
-                    "
-                >
+                <div style="
+                    position:relative;
+                    top:0;
+                    text-align:center;
+                ">
+                    NOMBRE Y FIRMA DE QUIEN REPORTA OBSERVACIÓN
+                </div>
+            </td>
+        
+            <!-- Columnas 7 y 8 -->
+            <td
+                colspan="2"
+                style="border:none;"
+            >
+            </td>
+        
+            <!-- Columnas 9 a 13 -->
+            <td
+                colspan="5"
+                style="
+                    border:none;
+                    text-align:center;
+                    font-size:7px;
+                    padding:0;
+                    vertical-align:top;
+                "
+            >
+                <div style="
+                    position:relative;
+                    top:0;
+                    text-align:center;
+                ">
                     NOMBRE Y FIRMA DEL OBSERVADO
                 </div>
             </td>
+        
         </tr>
 
         <!-- FILA 37 -->
         <tr>
-            <!-- Columnas 2 a 6 -->
-            <td colspan="5" style="border-top:none; border-right:none; border-left:none; border-bottom:1px solid #000;">
-            </td>
-        
-            <!-- Columnas 9 a 13 -->
-            <td colspan="5" style="border-top:none; border-right:none; border-left:none; border-bottom:1px solid #000;">
+            <!-- Columnas 2 a 13 -->
+            <td
+                colspan="12"
+                style="
+                    border-top:none;
+                    border-right:none;
+                    border-left:none;
+                    border-bottom:1px solid #000;
+                "
+            >
             </td>
         </tr>
 
@@ -1800,6 +2181,141 @@
     </div>
 
 </div>
+
+@if(count($paginasEvidencias) > 0)
+
+    @foreach($paginasEvidencias as $indicePagina => $grupoEvidencias)
+
+        @php
+            /*
+             * La página 1 corresponde al formulario,
+             * por eso las evidencias comienzan en la página 2.
+             */
+            $paginaActual = $indicePagina + 2;
+
+            /*
+             * Se rellenan las posiciones faltantes para conservar
+             * siempre la cuadrícula de 2 x 2.
+             */
+            $grupoEvidencias = array_pad(
+                $grupoEvidencias,
+                4,
+                null
+            );
+        @endphp
+
+        <div class="sheet evidence-page">
+
+            <!-- MISMO ENCABEZADO DE LA BOLETA -->
+            <table class="header-table">
+                <tr style="height:0; line-height:0;">
+                    <td style="width:25%; padding:0; border:none; height:0;"></td>
+                    <td style="width:45%; padding:0; border:none; height:0;"></td>
+                    <td style="width:30%; padding:0; border:none; height:0;"></td>
+                </tr>
+
+                <!-- FILA 1 -->
+                <tr>
+                    <td rowspan="4" class="logo-cell">
+                        @if($logoSrc)
+                            <img src="{{ $logoSrc }}">
+                        @endif
+                    </td>
+
+                    <td rowspan="2" class="center-cell">
+                        VULCANIZACIÓN Y SERVICIOS INDUSTRIALES S.A. DE C.V.
+                    </td>
+
+                    <td class="right-cell">
+                        CÓDIGO: SST-PGI-TA-01-FO-01
+                    </td>
+                </tr>
+
+                <!-- FILA 2 -->
+                <tr>
+                    <td class="right-cell">
+                        FECHA DE EMISIÓN: 01/08/2026
+                    </td>
+                </tr>
+
+                <!-- FILA 3 -->
+                <tr>
+                    <td class="center-cell">
+                        SISTEMA DE GESTIÓN INTEGRAL
+                    </td>
+
+                    <td class="right-cell">
+                        NÚMERO DE REVISIÓN: 01
+                    </td>
+                </tr>
+
+                <!-- FILA 4 -->
+                <tr>
+                    <td class="center-cell">
+                        BOLETA DE OBSERVACIONES
+                    </td>
+
+                    <td class="right-cell">
+                        PÁGINA:
+                        {{ $numeroPagina($paginaActual) }}
+                        DE
+                        {{ $numeroPagina($totalPaginas) }}
+                    </td>
+                </tr>
+            </table>
+
+            <!-- 4 EVIDENCIAS POR HOJA: 2 ARRIBA Y 2 ABAJO -->
+            <table class="evidence-page-table">
+
+                <!-- FILA SUPERIOR -->
+                <tr>
+                    <td>
+                        @if(!empty($grupoEvidencias[0]['src']))
+                            <img
+                                src="{{ $grupoEvidencias[0]['src'] }}"
+                                class="evidence-page-image"
+                            >
+                        @endif
+                    </td>
+
+                    <td>
+                        @if(!empty($grupoEvidencias[1]['src']))
+                            <img
+                                src="{{ $grupoEvidencias[1]['src'] }}"
+                                class="evidence-page-image"
+                            >
+                        @endif
+                    </td>
+                </tr>
+
+                <!-- FILA INFERIOR -->
+                <tr>
+                    <td>
+                        @if(!empty($grupoEvidencias[2]['src']))
+                            <img
+                                src="{{ $grupoEvidencias[2]['src'] }}"
+                                class="evidence-page-image"
+                            >
+                        @endif
+                    </td>
+
+                    <td>
+                        @if(!empty($grupoEvidencias[3]['src']))
+                            <img
+                                src="{{ $grupoEvidencias[3]['src'] }}"
+                                class="evidence-page-image"
+                            >
+                        @endif
+                    </td>
+                </tr>
+
+            </table>
+
+        </div>
+
+    @endforeach
+
+@endif
 
 </body>
 </html>

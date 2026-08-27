@@ -52,12 +52,12 @@ class SST_PGI_TA_01_FO_01_Boleta_de_Observaciones implements FormDefinition
                 [
                     'id' => 'header_line_5',
                     'type' => 'static_text',
-                    'text' => 'Fecha de Emisión: 06/06/2025',
+                    'text' => 'Fecha de Emisión: 01/08/2026',
                 ],
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 00',
+                    'text' => 'Número de Revisión: 01',
                 ],
                 [
                     'id' => 'datos_generales',
@@ -112,6 +112,7 @@ class SST_PGI_TA_01_FO_01_Boleta_de_Observaciones implements FormDefinition
                         'Acto Inseguro',
                         'Condición Peligrosa',
                         'Desviación',
+                        'Incidente',
                     ],
                 ],
                 [
@@ -164,13 +165,13 @@ class SST_PGI_TA_01_FO_01_Boleta_de_Observaciones implements FormDefinition
                             'No Desbloquear Equipos de los Clientes',
                             'Otros, especifique',
                         ],
+                        'Incidente' => [
+                            'Accidente con posible Incapacidad',
+                            'Incidente con Daños a la Propiedad',
+                            'Incidentes "Near Miss"',
+                            'Otros Especifique',
+                        ],
                     ],
-                ],
-                [
-                    'id' => 'descripcion_falta_cometida',
-                    'label' => 'Descripción de la Falta Cometida',
-                    'type' => 'textarea',
-                    'required' => true,
                 ],
                 [
                     'id' => 'evidencia_fotografica',

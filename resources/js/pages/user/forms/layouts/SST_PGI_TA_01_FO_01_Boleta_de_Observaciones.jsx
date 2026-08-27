@@ -126,10 +126,7 @@ export default function SST_PGI_TA_01_FO_01_Boleta_de_Observaciones({
       return;
     }
 
-    if (
-      id === "falta_cometida_seleccionada" ||
-      id === "descripcion_falta_cometida"
-    ) {
+    if (id === "falta_cometida_seleccionada") {
       setFaltaCometidaOpen(true);
       return;
     }
@@ -1217,7 +1214,6 @@ export default function SST_PGI_TA_01_FO_01_Boleta_de_Observaciones({
   const tipoObservacion = getField("tipo_observacion");
   const descripcionObservacion = getField("descripcion_observacion");
   const faltaCometidaSeleccionada = getField("falta_cometida_seleccionada");
-  const descripcionFaltaCometida = getField("descripcion_falta_cometida");
   const evidenciaFotografica = getField("evidencia_fotografica");
   const accionesPreventivasCorrectivas = getField("acciones_preventivas_correctivas");
   const nombreReportaObservacion = getField("nombre_reporta_observacion");
@@ -1227,40 +1223,8 @@ export default function SST_PGI_TA_01_FO_01_Boleta_de_Observaciones({
 
   const tipoObservacionSeleccionado = answers.tipo_observacion || "";
 
-  const opcionesFaltaPorTipo = {
-    "Acto Inseguro": [
-      "Bromas o Distracciones en Área de Trabajo",
-      "No Portar EPP Específico por Actividad",
-      "Trabajar con Equipo en Movimiento",
-      "Uso de Herramientas en Mal Estado",
-      "Exceso de Velocidad o Movimiento Inapropiado",
-      "Trabajar en Alturas sin Medidas de Seguridad",
-      "Uso Inadecuado de EPP",
-      "No Realizar Bloqueos y Etiquetados",
-      "Daño a la Maquinaria",
-      "Daño a las Instalaciones",
-      "Otros, especifique",
-    ],
-    "Condición Peligrosa": [
-      "Áreas sin Delimitacion o Señalización Adecuada",
-      "Equipos o Maquinaria con Matenimiento Deficiente",
-      "Instalaciones Eléctricas Expuestas o en Mal Estado",
-      "Piso Resbaladizo o con Obstaculos",
-      "Iluminación Insuficiente",
-      "Almacenamiento Inadecuado de Materiales",
-      "Falta de Señalización de Emergencia o Rutas de Evacuación",
-      "Otros, especifique",
-    ],
-    "Desviación": [
-      "No Aplicar Procedimientos de Seguridad",
-      "No Aplicar Procedimientos Operativos",
-      "No Portar Credenciales o documentos de Acceso",
-      "No Traer Tarjeta y Candado P/Bloqueo",
-      "No Informar Situaciones Anormales o Riesgos Detectados",
-      "No Desbloquear Equipos de los Clientes",
-      "Otros, especifique",
-    ],
-  };
+  const opcionesFaltaPorTipo =
+  faltaCometidaSeleccionada?.options_by_value || {};
 
   const opcionesFalta =
     opcionesFaltaPorTipo[tipoObservacionSeleccionado] || [];
@@ -1818,12 +1782,6 @@ export default function SST_PGI_TA_01_FO_01_Boleta_de_Observaciones({
                   <>
                     {faltaCometidaDinamica
                       ? renderOuterField(faltaCometidaDinamica)
-                      : null}
-                    {faltaCometidaDinamica
-                      ? renderDivider("falta_cometida_seleccionada_divider")
-                      : null}
-                    {descripcionFaltaCometida
-                      ? renderOuterField(descripcionFaltaCometida)
                       : null}
                   </>
                 )
