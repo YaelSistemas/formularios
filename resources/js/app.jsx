@@ -353,6 +353,7 @@ function RequireModulePermission({
   );
 }
 
+
 function AdminIndexRedirect() {
   const user = getStoredUser();
 
@@ -635,6 +636,13 @@ function App() {
       visible = false,
       reason = "background",
       syncPending = false,
+    
+      // 0 = bootstrap completo.
+      // 2 = máximo 2 registros recientes por formulario.
+      recentPerForm = 0,
+    
+      // Solo el bootstrap completo debe guardar el meta.
+      saveMeta = true,
     } = {}) {
       /*
        * Si ya hay una revisión en proceso,
@@ -711,18 +719,29 @@ function App() {
 
               recordsDone: 0,
 
-              recordsTotal: Number(
-                check?.remoteMeta
-                  ?.submissions_count ||
-                  0
-              ),
-
+              recordsTotal:
+                Number(recentPerForm) > 0
+                  ? Number(
+                      check?.remoteMeta
+                        ?.forms_count || 0
+                    ) * Number(recentPerForm)
+                  : Number(
+                      check?.remoteMeta
+                        ?.submissions_count || 0
+                    ),
+              
               pdfsDone: 0,
-
-              pdfsTotal: Number(
-                check?.remoteMeta
-                  ?.pdfs_count || 0
-              ),
+              
+              pdfsTotal:
+                Number(recentPerForm) > 0
+                  ? Number(
+                      check?.remoteMeta
+                        ?.forms_count || 0
+                    ) * Number(recentPerForm)
+                  : Number(
+                      check?.remoteMeta
+                        ?.pdfs_count || 0
+                    ),
 
               message:
                 "Preparando datos offline...",
@@ -735,20 +754,35 @@ function App() {
             await runOfflineBootstrap({
               userId,
               token,
-
+          
               /*
                * Reutilizamos el meta que ya consultamos
                * para no hacer una petición duplicada.
                */
               remoteMeta:
                 check.remoteMeta,
-
+          
               reason,
-
+          
               mode: visible
                 ? "visible"
                 : "silent",
-
+          
+              /*
+               * Bootstrap rápido:
+               * recentPerForm = 2
+               *
+               * Bootstrap completo:
+               * recentPerForm = 0
+               */
+              recentPerForm,
+          
+              /*
+               * El bootstrap rápido no guarda el meta.
+               * El completo sí.
+               */
+              saveMeta,
+          
               /*
                * En modo silencioso no enviamos onProgress,
                * por lo tanto no se altera la interfaz.
@@ -758,7 +792,7 @@ function App() {
                     if (cancelled) {
                       return;
                     }
-
+          
                     setBootState({
                       checking: false,
                       running: true,
@@ -827,25 +861,97 @@ function App() {
     
       const session =
         getOnlineSession();
-
+    
       if (!session) {
         return;
       }
-
+    
       const storedReason =
         consumeOfflineBootstrapReason();
-
+    
       const isLogin =
         storedReason === "login";
-
-      await refreshOfflineData({
-        visible: isLogin,
-
-        reason: isLogin
-          ? "login"
-          : "reload",
-
-        syncPending: true,
+    
+      /*
+       * Si NO viene de un login manual,
+       * conservamos el comportamiento normal:
+       *
+       * - recarga
+       * - reapertura
+       * - navegación normal
+       *
+       * Todo se actualiza silenciosamente.
+       */
+      if (!isLogin) {
+        await refreshOfflineData({
+          visible: false,
+          reason: "reload",
+          syncPending: true,
+    
+          recentPerForm: 0,
+          saveMeta: true,
+        });
+    
+        return;
+      }
+    
+      /*
+       * ==========================================================
+       * ETAPA 1 - PREPARACIÓN RÁPIDA Y VISIBLE
+       * ==========================================================
+       *
+       * Descargamos:
+       *
+       * - Todos los formularios asignados.
+       * - Máximo 2 registros recientes por formulario.
+       * - Los PDFs correspondientes a esos registros.
+       *
+       * Todavía NO guardamos el meta como completo.
+       */
+      const quickResult =
+        await refreshOfflineData({
+          visible: true,
+          reason: "login_quick",
+          syncPending: true,
+    
+          recentPerForm: 2,
+          saveMeta: false,
+        });
+    
+      /*
+       * Si no había cambios, no existe nada más
+       * que descargar.
+       */
+      if (
+        !quickResult?.ok ||
+        quickResult?.skipped
+      ) {
+        return;
+      }
+    
+      /*
+       * ==========================================================
+       * ETAPA 2 - PREPARACIÓN COMPLETA EN SEGUNDO PLANO
+       * ==========================================================
+       *
+       * No usamos await deliberadamente.
+       *
+       * La pantalla de preparación ya se cerró y el usuario
+       * puede utilizar la aplicación mientras se descargan
+       * silenciosamente todos los registros y PDFs restantes.
+       */
+      refreshOfflineData({
+        visible: false,
+        reason: "login_background",
+        syncPending: false,
+    
+        recentPerForm: 0,
+        saveMeta: true,
+      }).catch((error) => {
+        console.error(
+          "No se pudo completar la preparación offline en segundo plano:",
+          error
+        );
       });
     }
 
@@ -1035,6 +1141,7 @@ function App() {
             path="forms"
             element={<FormsIndex />}
           />
+
         </Route>
 
         {/* Admin con layout + subrutas */}
@@ -1131,6 +1238,7 @@ function App() {
               </RequireModulePermission>
             }
           />
+
         </Route>
 
         {/* Fallback */}

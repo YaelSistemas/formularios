@@ -243,6 +243,14 @@ async function executeOfflineBootstrap({
   remoteMeta = null,
   reason = "manual",
   mode = "silent",
+
+  // Si es mayor a 0, solicita únicamente esa cantidad
+  // de registros recientes por formulario.
+  recentPerForm = 0,
+
+  // El bootstrap rápido NO debe guardar el meta
+  // como si la descarga completa ya hubiera terminado.
+  saveMeta = true,
 }) {
   const resolvedUserId =
     resolveUserId(userId);
@@ -271,8 +279,20 @@ async function executeOfflineBootstrap({
 
   const meta = normalizeMeta(metaRaw);
 
+  const normalizedRecentPerForm = Math.max(
+    0,
+    Number(recentPerForm || 0)
+  );
+  
+  const bootstrapUrl =
+    normalizedRecentPerForm > 0
+      ? `/offline/bootstrap?recent_per_form=${encodeURIComponent(
+          normalizedRecentPerForm
+        )}`
+      : "/offline/bootstrap";
+  
   const boot = await apiGet(
-    "/offline/bootstrap"
+    bootstrapUrl
   );
 
   const forms = Array.isArray(boot?.forms)
@@ -435,10 +455,19 @@ async function executeOfflineBootstrap({
   |--------------------------------------------------------------------------
   */
 
-  setStoredMeta(
-    resolvedUserId,
-    meta
-  );
+  /*
+   * El meta únicamente se guarda cuando se terminó
+   * una preparación COMPLETA.
+   *
+   * El bootstrap rápido no debe marcar los datos
+   * como completamente descargados.
+   */
+  if (saveMeta) {
+    setStoredMeta(
+      resolvedUserId,
+      meta
+    );
+  }
 
   onProgress?.({
     stage: "done",
@@ -475,6 +504,13 @@ async function executeOfflineBootstrap({
     meta,
     reason,
     mode,
+  
+    recentPerForm:
+      normalizedRecentPerForm,
+  
+    metaSaved:
+      Boolean(saveMeta),
+  
     formsTotal,
     recordsTotal,
     pdfsTotal,

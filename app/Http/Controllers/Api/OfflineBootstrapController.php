@@ -185,26 +185,67 @@ class OfflineBootstrapController extends Controller
     public function bootstrap(Request $request)
     {
         $user = $request->user();
-
+    
         if (!$user) {
             return response()->json([
                 'message' => 'No autorizado',
             ], 401);
         }
-
+    
         $isAdmin = $user->hasRole(
             'Administrador'
         );
-
+    
+        /*
+        |--------------------------------------------------------------------------
+        | Cantidad de registros por formulario
+        |--------------------------------------------------------------------------
+        |
+        | Sin recent_per_form:
+        | - Mantiene el comportamiento actual.
+        | - Máximo 100 registros por formulario.
+        |
+        | Con recent_per_form=2:
+        | - Devuelve únicamente los 2 registros
+        |   más recientes de cada formulario.
+        |
+        */
+    
+        $recentPerForm = (int) $request->query(
+            'recent_per_form',
+            0
+        );
+    
+        /*
+         * Evitamos valores negativos o exagerados
+         * enviados desde la petición.
+         */
+        if ($recentPerForm < 0) {
+            $recentPerForm = 0;
+        }
+    
+        if ($recentPerForm > 20) {
+            $recentPerForm = 20;
+        }
+    
+        /*
+         * Si no se solicita modo rápido,
+         * conservamos exactamente el límite
+         * que ya tenía el sistema.
+         */
+        $recordsLimit = $recentPerForm > 0
+            ? $recentPerForm
+            : 100;
+    
         /*
         |--------------------------------------------------------------------------
         | Formularios accesibles
         |--------------------------------------------------------------------------
         */
-
+    
         $formsQuery = Form::query()
             ->where('status', 'PUBLICADO');
-
+    
         if (!$isAdmin) {
             $formsQuery->whereHas(
                 'assignedUsers',
@@ -216,17 +257,17 @@ class OfflineBootstrapController extends Controller
                 }
             );
         }
-
+    
         $forms = $formsQuery->get();
-
+    
         /*
         |--------------------------------------------------------------------------
         | Registros visibles agrupados por formulario
         |--------------------------------------------------------------------------
         */
-
+    
         $submissionsByForm = [];
-
+    
         foreach ($forms as $form) {
             $query = FormSubmission::query()
                 ->with([
@@ -237,11 +278,11 @@ class OfflineBootstrapController extends Controller
                     $form->id
                 )
                 ->visibleTo($user);
-
+    
             $submissions = $query
                 ->orderByDesc('consecutive')
                 ->orderByDesc('id')
-                ->limit(100)
+                ->limit($recordsLimit)
                 ->get([
                     'id',
                     'form_id',
@@ -254,36 +295,36 @@ class OfflineBootstrapController extends Controller
                     return [
                         'id' =>
                             $submission->id,
-
+    
                         'form_id' =>
                             $submission->form_id,
-
+    
                         'consecutive' =>
                             $submission->consecutive,
-
+    
                         'user_id' =>
                             $submission->user_id,
-
+    
                         'user_name' =>
                             $submission->user?->name,
-
+    
                         'answers' =>
                             $submission->answers,
-
+    
                         'created_at' =>
                             $submission->created_at,
                     ];
                 })
                 ->values();
-
+    
             $submissionsByForm[
                 $form->id
             ] = $submissions;
         }
-
+    
         return response()->json([
             'forms' => $forms,
-
+    
             'submissions_by_form' =>
                 $submissionsByForm,
         ]);

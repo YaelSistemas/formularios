@@ -559,7 +559,7 @@ export default function Login() {
                 marginBottom: 0,
               }}
             >
-              Nombre de Usuario o Correo
+              Usuario
             </label>
           
             <button
@@ -567,7 +567,7 @@ export default function Login() {
               onClick={() =>
                 setShowUserHelp((current) => !current)
               }
-              aria-label="Mostrar ayuda para el correo o nombre de usuario"
+              aria-label="Mostrar ayuda para el usuario"
               aria-expanded={showUserHelp}
               title="Ayuda"
               style={styles.helpButton}
@@ -578,11 +578,22 @@ export default function Login() {
           
           {showUserHelp ? (
             <div style={styles.helpText}>
-              Ingresa tu nombre completo,
-              comenzando por tus nombres y después tus apellidos,
-              respetando los espacios.
+              Ingresa tu número de empleado comenzando con las siglas
+              correspondientes a tu empresa.
               <br />
-              <strong>Ejemplo:</strong> Angel Fernando Sanchez Martinez
+              <br />
+              <strong>Siglas disponibles:</strong>
+              <br />
+              VSI - Vysisa
+              <br />
+              TTI - Tip Top
+              <br />
+              VSU - Vysureste
+              <br />
+              RPS - Reprosisa
+              <br />
+              <br />
+              <strong>Ejemplo:</strong> VSI09999 o TTI09999
             </div>
           ) : null}
           
@@ -595,7 +606,7 @@ export default function Login() {
               setEmail(event.target.value)
             }
             autoComplete="username"
-            placeholder="Ingresa tu Nombre de Usuario"
+            placeholder="Ingresa tu usuario: VSI09999"
             required
             style={styles.input}
           />
@@ -633,11 +644,9 @@ export default function Login() {
           
           {showPasswordHelp ? (
             <div style={styles.helpText}>
-              Ingresa tu número de empleado sin considerar los
-              ceros al inicio.
+              Ingresa tu CURP.
               <br />
-              <strong>Ejemplo:</strong> Si tu número de empleado es
-              000123, escribe 123.
+              <strong>Ejemplo:</strong> ABCD010101HDFXXX01
             </div>
           ) : null}
           
@@ -650,7 +659,7 @@ export default function Login() {
               setPassword(event.target.value)
             }
             autoComplete="current-password"
-            placeholder="Ingresa tu contraseña"
+            placeholder="Ingresa tu contraseña: ABCD010101HDFXXX01"
             required
             style={styles.input}
           />
