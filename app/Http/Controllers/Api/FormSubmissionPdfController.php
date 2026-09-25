@@ -142,6 +142,9 @@ class FormSubmissionPdfController extends Controller
 
             'sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo'
                 => 'pdf.forms.SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo',
+
+            'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
+                => 'pdf.forms.SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas',
       
             default => 'pdf.forms.generic_submission',
         };

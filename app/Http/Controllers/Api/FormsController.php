@@ -385,7 +385,14 @@ class FormsController extends Controller
                     'type'     => $type,
                     'required' => (bool) ($f['required'] ?? false),
                 ];
-
+                
+                if (
+                    in_array($type, ['select', 'list'], true) &&
+                    array_key_exists('multiple', $f)
+                ) {
+                    $field['multiple'] = (bool) $f['multiple'];
+                }
+                
                 if (in_array($type, ['select', 'radio'], true)) {
                     /*
                      * Opciones normales.
@@ -493,7 +500,16 @@ class FormsController extends Controller
                             'type' => $colType,
                             'required' => (bool) ($col['required'] ?? false),
                         ];
-
+                        
+                        if ($colType === 'file') {
+                            $normalizedCol['multiple'] = (bool) ($col['multiple'] ?? false);
+                            $normalizedCol['accept'] = (string) ($col['accept'] ?? '');
+                        
+                            if (!empty($col['save_path'])) {
+                                $normalizedCol['save_path'] = (string) $col['save_path'];
+                            }
+                        }
+                        
                         if (in_array($colType, ['select', 'radio'], true)) {
                             $colOpts = $col['options'] ?? [];
                             if (!is_array($colOpts)) {

@@ -497,20 +497,85 @@ class FormSubmissionsController extends Controller
             // choice
             if (in_array($type, $choiceTypes, true)) {
                 $opts = $f['options'] ?? [];
+            
                 if (!is_array($opts)) {
                     $opts = [];
                 }
-
+            
+                $multiple = (bool) ($f['multiple'] ?? false);
+            
+                /*
+                 * SELECT / LIST MÚLTIPLE
+                 */
+                if ($multiple) {
+                    // Compatibilidad por si algún registro anterior
+                    // tenía un solo valor en lugar de arreglo.
+                    if (!is_array($val)) {
+                        if ($val === null || $val === '') {
+                            $val = [];
+                        } else {
+                            $val = [$val];
+                        }
+                    }
+            
+                    $values = array_values(array_filter(
+                        array_map(function ($item) {
+                            if (is_string($item) || is_numeric($item)) {
+                                return trim((string) $item);
+                            }
+            
+                            return '';
+                        }, $val),
+                        fn ($item) => $item !== ''
+                    ));
+            
+                    if ($required && count($values) < 1) {
+                        return response()->json([
+                            'message' => "Falta responder: {$label}"
+                        ], 422);
+                    }
+            
+                    if (count($opts) > 0) {
+                        foreach ($values as $selectedValue) {
+                            if (!in_array($selectedValue, $opts, true)) {
+                                return response()->json([
+                                    'message' => "El campo {$label} tiene una opción inválida."
+                                ], 422);
+                            }
+                        }
+                    }
+            
+                    $cleanAnswers[$id] = $values;
+                    continue;
+                }
+            
+                /*
+                 * SELECT / RADIO / LIST NORMAL
+                 */
+                if (is_array($val)) {
+                    return response()->json([
+                        'message' => "El campo {$label} no acepta múltiples opciones."
+                    ], 422);
+                }
+            
                 $valStr = trim((string) $val);
-
+            
                 if ($required && $valStr === '') {
-                    return response()->json(['message' => "Falta responder: {$label}"], 422);
+                    return response()->json([
+                        'message' => "Falta responder: {$label}"
+                    ], 422);
                 }
-
-                if ($valStr !== '' && count($opts) > 0 && !in_array($valStr, $opts, true)) {
-                    return response()->json(['message' => "El campo {$label} tiene una opción inválida."], 422);
+            
+                if (
+                    $valStr !== '' &&
+                    count($opts) > 0 &&
+                    !in_array($valStr, $opts, true)
+                ) {
+                    return response()->json([
+                        'message' => "El campo {$label} tiene una opción inválida."
+                    ], 422);
                 }
-
+            
                 $cleanAnswers[$id] = $valStr;
                 continue;
             }
@@ -599,6 +664,85 @@ class FormSubmissionsController extends Controller
                         }
                     }
 
+                    /*
+                     * SGI-POP-FO-05 Reporte de Mantenimiento de Prensas
+                     * Guarda físicamente las evidencias fotográficas
+                     * capturadas dentro de cada fila de la tabla.
+                     */
+                    if (
+                        $formCodeKey === 'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
+                        && $id === 'tabla_mantenimiento_prensas'
+                    ) {
+                        $evidencias = $cleanRow['evidencia_fotografica'] ?? [];
+                    
+                        /*
+                         * Normalizar a arreglo para soportar una o varias evidencias.
+                         */
+                        if (!is_array($evidencias)) {
+                            $evidencias = $evidencias ? [$evidencias] : [];
+                        }
+                    
+                        /*
+                         * Si por algún motivo llega un solo objeto asociativo
+                         * en lugar de una lista de objetos, también lo soportamos.
+                         */
+                        if (
+                            !empty($evidencias) &&
+                            (
+                                array_key_exists('data', $evidencias) ||
+                                array_key_exists('path', $evidencias)
+                            )
+                        ) {
+                            $evidencias = [$evidencias];
+                        }
+                    
+                        $storedFiles = [];
+                    
+                        foreach ($evidencias as $file) {
+                            /*
+                             * Archivo que ya estaba guardado físicamente.
+                             * Se conserva al editar el registro.
+                             */
+                            if (
+                                is_array($file) &&
+                                !empty($file['path']) &&
+                                empty($file['data'])
+                            ) {
+                                $storedFiles[] = $file;
+                                continue;
+                            }
+                    
+                            /*
+                             * Evidencia nueva enviada como Base64.
+                             */
+                            if (
+                                is_array($file) &&
+                                !empty($file['data']) &&
+                                is_string($file['data']) &&
+                                str_starts_with($file['data'], 'data:')
+                            ) {
+                                $storedFile =
+                                    $this->storeEvidenceForReporteMantenimientoPrensas(
+                                        $file,
+                                        $userId,
+                                        'evidencia_fotografica'
+                                    );
+                    
+                                if (!$storedFile) {
+                                    return response()->json([
+                                        'message' =>
+                                            'Solo se permiten imágenes válidas en Evidencia fotográfica.'
+                                    ], 422);
+                                }
+                    
+                                $storedFiles[] = $storedFile;
+                            }
+                        }
+                    
+                        $cleanRow['evidencia_fotografica'] =
+                            array_values($storedFiles);
+                    }
+                    
                     $normalizedRows[] = $cleanRow;
                 }
 
@@ -916,6 +1060,10 @@ class FormSubmissionsController extends Controller
                             $storedPath = $this->storeSignatureForChecklistDetectoresHumo($v, $userId, $id);
                         }
 
+                        if ($formCodeKey === 'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas') {
+                            $storedPath = $this->storeSignatureForReporteMantenimientoPrensas($v, $userId, $id);
+                        }
+
                         if (
                             in_array($formCodeKey, [
                                 'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil',
@@ -948,6 +1096,7 @@ class FormSubmissionsController extends Controller
                                 'sgi_pop_fo_01_checklist_de_prensas_para_pasamanos',
                                 'sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia',
                                 'sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo',
+                                'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas',
                             ], true)
                         ) {
                             if (!$storedPath) {
@@ -1925,6 +2074,100 @@ class FormSubmissionsController extends Controller
         ];
     }
 
+    private function storeEvidenceForReporteMantenimientoPrensas(
+        array $file,
+        ?int $userId,
+        string $fieldId
+    ): ?array {
+        $dataUrl = $file['data'] ?? '';
+    
+        if (
+            !is_string($dataUrl) ||
+            !preg_match('/^data:(.*?);base64,/', $dataUrl, $matches)
+        ) {
+            return null;
+        }
+    
+        $mime = strtolower(
+            trim($matches[1] ?? 'application/octet-stream')
+        );
+    
+        $allowedMimes = [
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'image/gif',
+            'image/bmp',
+            'image/heic',
+            'image/heif',
+        ];
+    
+        if (!in_array($mime, $allowedMimes, true)) {
+            return null;
+        }
+    
+        $base64 = preg_replace(
+            '/^data:.*?;base64,/',
+            '',
+            $dataUrl
+        );
+    
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $extensionMap = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+            'image/gif'  => 'gif',
+            'image/bmp'  => 'bmp',
+            'image/heic' => 'heic',
+            'image/heif' => 'heif',
+        ];
+    
+        $extension = $extensionMap[$mime] ?? 'jpg';
+    
+        $originalName =
+            $file['name'] ?? 'evidencia';
+    
+        $directory =
+            'forms/files/' .
+            'SGIPOPFO05_ReporteMantenimientoPrensas/' .
+            'EvidenciaFotografica';
+    
+        $fileName =
+            'evidencia_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            Str::random(8) .
+            '.' .
+            $extension;
+    
+        $relativePath =
+            $directory . '/' . $fileName;
+    
+        Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return [
+            'name' => $originalName,
+            'type' => $mime,
+            'size' => $file['size'] ?? null,
+            'path' => $relativePath,
+        ];
+    }
+
     private function storeSignatureForChecklistEslingasCadenas(string $dataUrl, ?int $userId, string $fieldId): ?string
     {
         if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
@@ -2402,6 +2645,57 @@ class FormSubmissionsController extends Controller
     
             'firma_responsable_area_pasamanos' =>
                 $baseDirectory . '/Responsable_Area_Pasamanos',
+    
+            default => $baseDirectory,
+        };
+    
+        $fileName =
+            'firma_' .
+            $fieldId .
+            '_u' .
+            ($userId ?: 'guest') .
+            '_' .
+            now()->format('Ymd_His') .
+            '_' .
+            \Illuminate\Support\Str::random(8) .
+            '.png';
+    
+        $relativePath = $directory . '/' . $fileName;
+    
+        \Illuminate\Support\Facades\Storage::disk('public')->put(
+            $relativePath,
+            $binary
+        );
+    
+        return $relativePath;
+    }
+
+    private function storeSignatureForReporteMantenimientoPrensas(
+        string $dataUrl,
+        ?int $userId,
+        string $fieldId
+    ): ?string {
+        if (!preg_match('/^data:image\/png;base64,/', $dataUrl)) {
+            return null;
+        }
+    
+        $base64 = preg_replace('/^data:image\/png;base64,/', '', $dataUrl);
+        $base64 = str_replace(' ', '+', $base64);
+    
+        $binary = base64_decode($base64, true);
+    
+        if ($binary === false) {
+            return null;
+        }
+    
+        $baseDirectory = 'forms/signatures/SGIPOPFO05_ReporteMantenimientoPrensas';
+    
+        $directory = match ($fieldId) {
+            'firma_inspecciona_mantenimiento' =>
+                $baseDirectory . '/Inspecciona',
+    
+            'firma_autoriza' =>
+                $baseDirectory . '/Autoriza',
     
             default => $baseDirectory,
         };

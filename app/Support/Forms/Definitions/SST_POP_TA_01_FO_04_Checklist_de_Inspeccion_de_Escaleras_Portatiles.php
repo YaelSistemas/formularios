@@ -64,12 +64,12 @@ class SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles implem
                 [
                     'id' => 'header_line_5',
                     'type' => 'static_text',
-                    'text' => 'Fecha de Emisión: 27/03/2025',
+                    'text' => 'Fecha de Emisión: 11/09/2026',
                 ],
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 03',
+                    'text' => 'Número de Revisión: 04',
                 ],
 
                 [

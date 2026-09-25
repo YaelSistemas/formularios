@@ -51,6 +51,7 @@ const FORM_FOLIO_PREFIXES = Object.freeze({
   sgi_pop_fo_01_checklist_de_prensas_para_pasamanos: "PP",
   sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia: "ILV",
   sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo: "DH",
+  sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas: "RMP",
 });
 
 function Card({ children, style }) {

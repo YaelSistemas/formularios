@@ -125,6 +125,36 @@
             height: 1px;
         }
 
+        .estado-vertical {
+            border: 1px solid #000;
+            height: 80px;
+            padding: 0;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .estado-vertical-contenedor {
+            position: relative;
+            width: 12px;
+            height: 80px;
+            margin: 0 auto;
+        }
+
+        .estado-vertical-texto {
+            position: absolute;
+            left: -34px;
+            top: 34px;
+            width: 80px;
+            height: 12px;
+            line-height: 12px;
+            font-size: 6px;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+            transform: rotate(270deg);
+            transform-origin: 50% 50%;
+        }
+
         .page-break {
             page-break-after: always;
         }
@@ -188,6 +218,16 @@
             $paginas = collect([collect([])]);
         }
 
+
+        // Opciones en el mismo orden que las columnas del PDF.
+        $normalizarEstado = function ($valor) {
+            $valor = strtolower(\Illuminate\Support\Str::ascii(trim((string) $valor)));
+            $valor = preg_replace('/\s+/', ' ', $valor);
+            return in_array($valor, ['n/a', 'na', 'no aplica', '(n/a) no aplica'], true)
+                ? 'no aplica'
+                : $valor;
+        };
+
         $totalPaginas = $paginas->count();
     @endphp
 
@@ -224,7 +264,7 @@
                 </td>
 
                 <td class="right-cell">
-                    FECHA DE EMISIÓN: 27/03/2025
+                    FECHA DE EMISIÓN: 11/09/2026
                 </td>
             </tr>
 
@@ -234,7 +274,7 @@
                 </td>
             
                 <td class="right-cell">
-                    NÚMERO DE REVISIÓN: 03
+                    NÚMERO DE REVISIÓN: 04
                 </td>
             </tr>
             
@@ -384,8 +424,8 @@
             font-size: 5.5px;
         ">
             <colgroup>
-                @for ($i = 1; $i <= 32; $i++)
-                    <col style="width: 3.125%;">
+                @for ($i = 1; $i <= 36; $i++)
+                    <col style="width: {{ 100 / 36 }}%;">
                 @endfor
             </colgroup>
         
@@ -403,7 +443,7 @@
                     Tipo de Escalera:
                 </td>
         
-                <td colspan="28" style="
+                <td colspan="32" style="
                     border:1px solid #000;
                     background:#f3f4f6;
                     font-weight:bold;
@@ -456,43 +496,35 @@
                 <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Etiquetas: Faltante o No Legible</td>
                 <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Seguros de Peldaños: Suelto, Roto o Faltante</td>
                 <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">La Escalera está Libre de Grietas</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Cuerda/Polea: Gastado, Raído o Faltante</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Los Brazos de Unión están en Buenas Condiciones</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Los Seguros están en Buenas Condiciones</td>
-                <td colspan="2" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">La Polea está en Buenas Condiciones</td>
+                <td colspan="3" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Cuerda/Polea: Gastado, Raído o Faltante</td>
+                <td colspan="3" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Los Brazos de Unión están en Buenas Condiciones</td>
+                <td colspan="3" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">Los Seguros están en Buenas Condiciones</td>
+                <td colspan="3" style="border:1px solid #000; text-align:center; vertical-align:middle; padding:4px 2px; font-weight:bold; font-size:5px; line-height:1.15;">La Polea está en Buenas Condiciones</td>
             </tr>
         
-            <!-- FILA 3 (Subtítulos con alto expandido emulando 3 filas) -->
+            <!-- FILA 3: ENCABEZADOS GIRADOS A 270 GRADOS -->
             <tr>
                 @for ($i = 0; $i < 14; $i++)
-                    <td style="
-                        border: 1px solid #000; 
-                        background:#f3f4f6;
-                        text-align: center; 
-                        vertical-align: middle; 
-                        padding: 2px; 
-                        font-weight: bold;
-                        height: 45px;
-                        line-height: 1.1;
-                        font-size:5px;
-                    ">
-                        Necesita<br>Reparación
+                    <td class="estado-vertical" style="background:#f3f4f6;">
+                        <div class="estado-vertical-contenedor">
+                            <div class="estado-vertical-texto">Necesita reparación</div>
+                        </div>
                     </td>
-                    <td style="
-                        border: 1px solid #000; 
-                        text-align: center; 
-                        vertical-align: middle; 
-                        padding: 2px; 
-                        font-weight: bold;
-                        height: 45px;
-                        line-height: 1.1;
-                        font-size:5px;
-                    ">
-                        Buen<br>Estado
+                    <td class="estado-vertical">
+                        <div class="estado-vertical-contenedor">
+                            <div class="estado-vertical-texto">Buen estado</div>
+                        </div>
                     </td>
+                    @if ($i >= 10)
+                        <td class="estado-vertical" style="background:#f3f4f6;">
+                            <div class="estado-vertical-contenedor">
+                                <div class="estado-vertical-texto">No aplica</div>
+                            </div>
+                        </td>
+                    @endif
                 @endfor
             </tr>
-        
+
             <!-- FILAS DE DATOS DENTRO DEL LOOP -->
             @for ($i = 0; $i < $registrosPorPagina; $i++)
                 @php
@@ -510,62 +542,90 @@
                         {{ data_get($row, 'numero_identificacion_escalera') }}
                     </td>
             
-                    <!-- RESPUESTAS POR CRITERIO (28 columnas restantes) -->
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'zapatas_patas_estado') }}
-                    </td>
+                    <!-- RESPUESTAS POR CRITERIO (32 columnas restantes) -->
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'zapatas_patas_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'rieles_planos_verticales_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'rieles_planos_verticales_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'escalones_peldanos_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'escalones_peldanos_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'tope_superior_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'tope_superior_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'ferreteria_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'ferreteria_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'limpieza_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'limpieza_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'general_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'general_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'etiquetas_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'etiquetas_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'seguros_peldanos_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'seguros_peldanos_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'escalera_libre_grietas_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'escalera_libre_grietas_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'cuerda_polea_estado') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado', 'No aplica'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'cuerda_polea_estado', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'brazos_union_buenas_condiciones') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado', 'No aplica'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'brazos_union_buenas_condiciones', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'seguros_buenas_condiciones') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado', 'No aplica'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'seguros_buenas_condiciones', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
             
-                    <td colspan="2" style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px;">
-                        {{ data_get($row, 'polea_buenas_condiciones') }}
-                    </td>
+                    @foreach (['Necesita reparación', 'Buen estado', 'No aplica'] as $opcionEstado)
+                        <td style="border:1px solid #000; height:22px; text-align:center; vertical-align:middle; padding:3px 2px; font-family:DejaVu Sans, sans-serif; font-size:9px; font-weight:bold;">
+                            {{ $normalizarEstado(data_get($row, 'polea_buenas_condiciones', '')) === $normalizarEstado($opcionEstado) ? '✔' : '' }}
+                        </td>
+                    @endforeach
                 </tr>
             @endfor
         </table>

@@ -30,6 +30,7 @@ import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "../user/forms/
 import SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos from "../user/forms/layouts/SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos";
 import SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia from "../user/forms/layouts/SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia";
 import SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo from "../user/forms/layouts/SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo";
+import SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas from "../user/forms/layouts/SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas";
 
 export default function AdminForms() {
   const [err, setErr] = useState("");
@@ -932,23 +933,33 @@ export default function AdminForms() {
 
   const buildPreviewAnswers = (fields = []) => {
     const result = {};
-
+  
     fields.forEach((f) => {
       if (!f?.id) return;
-
+  
+      if (
+        (f.type === "select" || f.type === "list") &&
+        f.multiple
+      ) {
+        result[f.id] = [];
+        return;
+      }
+  
       switch (f.type) {
         case "checkbox":
           result[f.id] = false;
           break;
+  
         case "table":
           result[f.id] = [];
           break;
+  
         default:
           result[f.id] = "";
           break;
       }
     });
-
+  
     return result;
   };
 
@@ -1334,6 +1345,9 @@ export default function AdminForms() {
 
     sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo:
       SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo,
+    
+    sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas:
+      SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas,
   };
 
   const FormVisualPreview = ({ form, onBack }) => {

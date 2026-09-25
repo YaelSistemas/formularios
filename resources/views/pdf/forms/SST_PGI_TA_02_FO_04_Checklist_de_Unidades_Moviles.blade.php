@@ -424,6 +424,20 @@
             </tr>
         </table>
 
+        @php
+            $normalizarCondicion = function ($valor) {
+                return strtolower(
+                    \Illuminate\Support\Str::ascii(
+                        trim((string) $valor)
+                    )
+                );
+            };
+        
+            $condicionMarcada = function ($valor, $opcion) use ($normalizarCondicion) {
+                return $normalizarCondicion($valor) === $normalizarCondicion($opcion);
+            };
+        @endphp
+
         <!-- CONTENEDOR TABLAS -->
         <div style="
             width:100%;
@@ -509,14 +523,48 @@
                                 {{ $row['label'] }}
                             </td>
             
-                            <td colspan="4" style="
+                            <td style="
                                 border:1px solid #000;
                                 height:14px;
                                 text-align:center;
                                 vertical-align:middle;
-                                font-size:7px;
+                                font-size:8px;
+                                font-weight:bold;
                             ">
-                                {{ $row['value'] }}
+                                {{ $condicionMarcada($row['value'], 'Buena') ? '✔' : '' }}
+                            </td>
+                            
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Mala') ? '✔' : '' }}
+                            </td>
+                            
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Reposición') ? '✔' : '' }}
+                            </td>
+                            
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Reparación') ? '✔' : '' }}
                             </td>
                         </tr>
                     @endforeach
@@ -719,19 +767,52 @@
                             ">
                                 {{ $row['label'] }}
                             </td>
-        
-                            <td colspan="4" style="
+                    
+                            <td style="
                                 border:1px solid #000;
                                 height:14px;
                                 text-align:center;
                                 vertical-align:middle;
-                                font-size:7px;
+                                font-size:8px;
+                                font-weight:bold;
                             ">
-                                {{ $row['value'] }}
+                                {{ $condicionMarcada($row['value'], 'Buena') ? '✔' : '' }}
+                            </td>
+                    
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Mala') ? '✔' : '' }}
+                            </td>
+                    
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Reposición') ? '✔' : '' }}
+                            </td>
+                    
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Reparación') ? '✔' : '' }}
                             </td>
                         </tr>
                     @endforeach
-        
                 </table>
         
             </div>
@@ -933,15 +1014,49 @@
                             ">
                                 {{ $row['label'] }}
                             </td>
-        
-                            <td colspan="4" style="
+                    
+                            <td style="
                                 border:1px solid #000;
                                 height:14px;
                                 text-align:center;
                                 vertical-align:middle;
-                                font-size:7px;
+                                font-size:8px;
+                                font-weight:bold;
                             ">
-                                {{ $row['value'] }}
+                                {{ $condicionMarcada($row['value'], 'Buena') ? '✔' : '' }}
+                            </td>
+                    
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Mala') ? '✔' : '' }}
+                            </td>
+                    
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Reposición') ? '✔' : '' }}
+                            </td>
+                    
+                            <td style="
+                                border:1px solid #000;
+                                height:14px;
+                                text-align:center;
+                                vertical-align:middle;
+                                font-size:8px;
+                                font-weight:bold;
+                            ">
+                                {{ $condicionMarcada($row['value'], 'Reparación') ? '✔' : '' }}
                             </td>
                         </tr>
                     @endforeach
@@ -1005,13 +1120,24 @@
                         </td>
                     
                         <!-- CONDICIÓN -->
-                        <td colspan="4" style="
-                            border:1px solid #000;
-                            height:14px;
-                            text-align:center;
-                            vertical-align:middle;
-                        ">
-                            {{ data_get($answers, 'condicion_extintor', '') }}
+                        @php
+                            $condicionExtintor = data_get($answers, 'condicion_extintor', '');
+                        @endphp
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionExtintor, 'Buena') ? '✔' : '' }}
+                        </td>
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionExtintor, 'Mala') ? '✔' : '' }}
+                        </td>
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionExtintor, 'Reposición') ? '✔' : '' }}
+                        </td>
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionExtintor, 'Reparación') ? '✔' : '' }}
                         </td>
                     </tr>
                 </table>
@@ -1271,8 +1397,24 @@
                             {{ data_get($answers, 'vigencia_tarjeta_efecticar', '') }}
                         </td>
             
-                        <td colspan="4" style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle;">
-                            {{ data_get($answers, 'condicion_tarjeta_efecticar', '') }}
+                        @php
+                            $condicionEfecticar = data_get($answers, 'condicion_tarjeta_efecticar', '');
+                        @endphp
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionEfecticar, 'Buena') ? '✔' : '' }}
+                        </td>
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionEfecticar, 'Mala') ? '✔' : '' }}
+                        </td>
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionEfecticar, 'Reposición') ? '✔' : '' }}
+                        </td>
+                        
+                        <td style="border:1px solid #000; height:14px; text-align:center; vertical-align:middle; font-size:10px; font-weight:bold;">
+                            {{ $condicionMarcada($condicionEfecticar, 'Reparación') ? '✔' : '' }}
                         </td>
                     </tr>
                 </table>
@@ -1373,23 +1515,11 @@
                         </td>
                     </tr>
             
-                    <!-- FILA 7 -->
-                    <tr>
-                        <td style="
-                            border-top:1px solid #000;
-                            border-bottom:1px solid #000;
-                            border-left:none;
-                            border-right:none;
-                            height:14px;
-                        ">
-                        </td>
-                    </tr>
-            
-                    <!-- FILA 8 -->
+                    <!-- OBSERVACIONES: ESPACIO DE LAS FILAS 7 Y 8 -->
                     <tr>
                         <td style="
                             border:1px solid #000;
-                            height:16px;
+                            height:34px;
                             text-align:center;
                             vertical-align:middle;
                             padding:0 4px;
@@ -1411,7 +1541,7 @@
         ">
             <tr>
                 <td style="
-                    height:18px;
+                    height:15px;
                     text-align:center;
                     vertical-align:middle;
                     font-weight:bold;
@@ -1436,7 +1566,7 @@
                 <!-- NOTAS -->
                 <td style="
                     border:1px solid #000;
-                    height:40px;
+                    height:30px;
                     width:10%;
                     text-align:center;
                     vertical-align:middle;
@@ -1448,7 +1578,7 @@
                 <!-- DATO -->
                 <td style="
                     border:1px solid #000;
-                    height:40px;
+                    height:30px;
                     width:90%;
                     text-align:center;
                     vertical-align:middle;

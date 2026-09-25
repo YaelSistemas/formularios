@@ -34,6 +34,7 @@ import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "./forms/layout
 import SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos from "./forms/layouts/SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos";
 import SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia from "./forms/layouts/SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia";
 import SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo from "./forms/layouts/SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo";
+import SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas from "./forms/layouts/SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -161,17 +162,25 @@ export default function FormFill({
         init[f.id] = "";
         continue;
       }
-
+      
+      if (
+        (f.type === "select" || f.type === "list") &&
+        f.multiple
+      ) {
+        init[f.id] = [];
+        continue;
+      }
+      
       if (f.type === "checkbox") {
         init[f.id] = false;
         continue;
       }
-
+      
       if (f.type === "table") {
         init[f.id] = [];
         continue;
       }
-
+      
       init[f.id] = "";
     }
 
@@ -204,47 +213,89 @@ export default function FormFill({
       window.removeEventListener("offline", onOffline);
     };
   }, []);
-
+  
   const setVal = (id, value) => {
     if (readOnly) return;
-    setAnswers((prev) => ({ ...prev, [id]: value }));
+  
+    setAnswers((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
   };
-
+  
   const validate = () => {
     for (const f of fields) {
       if (!f?.id) continue;
-
+  
       if (NON_INPUT_TYPES.has(f.type)) continue;
-
+  
       if (f.type === "table") {
-        const rows = Array.isArray(answers[f.id]) ? answers[f.id] : [];
+        const rows = Array.isArray(answers[f.id])
+          ? answers[f.id]
+          : [];
+  
         if (f.required && rows.length < 1) {
           return `Falta responder: ${f.label}`;
         }
+  
         continue;
       }
-
+  
+      const v = answers[f.id];
+  
       if (f.required) {
-        const v = answers[f.id];
-
         if (f.type === "checkbox") {
-          if (!v) return `Falta responder: ${f.label}`;
+          if (!v) {
+            return `Falta responder: ${f.label}`;
+          }
+  
           continue;
         }
-
-        if (v === null || v === undefined || String(v).trim() === "") {
+  
+        if (f.multiple) {
+          const values = Array.isArray(v) ? v : [];
+  
+          if (values.length < 1) {
+            return `Falta responder: ${f.label}`;
+          }
+        } else if (
+          v === null ||
+          v === undefined ||
+          String(v).trim() === ""
+        ) {
           return `Falta responder: ${f.label}`;
         }
       }
-
-      if (f.type === "select" || f.type === "list" || f.type === "radio") {
-        const opts = Array.isArray(f.options) ? f.options : [];
-        if (f.required && opts.length >= 1 && !opts.includes(answers[f.id])) {
+  
+      if (
+        f.type === "select" ||
+        f.type === "list" ||
+        f.type === "radio"
+      ) {
+        const opts = Array.isArray(f.options)
+          ? f.options
+          : [];
+  
+        if (f.multiple) {
+          const values = Array.isArray(v) ? v : [];
+  
+          const invalidValue = values.find(
+            (value) => !opts.includes(value)
+          );
+  
+          if (invalidValue !== undefined) {
+            return `Selecciona opciones válidas para: ${f.label}`;
+          }
+        } else if (
+          f.required &&
+          opts.length >= 1 &&
+          !opts.includes(v)
+        ) {
           return `Selecciona una opción válida para: ${f.label}`;
         }
       }
     }
-
+  
     return null;
   };
 
@@ -674,6 +725,13 @@ export default function FormFill({
           case "checklist_de_detectores_de_humo":
             return (
               <SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo
+                {...sharedProps}
+              />
+            );
+
+          case "reporte_de_mantenimiento_de_prensas":
+            return (
+              <SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas
                 {...sharedProps}
               />
             );
