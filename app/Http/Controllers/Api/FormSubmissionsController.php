@@ -368,38 +368,58 @@ class FormSubmissionsController extends Controller
     }
 
     /**
-     * Obtiene el primer consecutivo libre por formulario.
-     * Ejemplo:
-     * existentes = [1,2,3,5,6] => devuelve 4
-     * existentes = [2,3] => devuelve 1
-     * existentes = [] => devuelve 1
+     * Obtiene el siguiente consecutivo permanente por formulario.
+     *
+     * - Nunca reutiliza un consecutivo ya asignado.
+     * - Si se elimina el último registro, el contador no retrocede.
+     * - Los registros creados offline reciben el siguiente consecutivo
+     *   cuando se sincronizan con el servidor.
+     *
+     * Debe ejecutarse dentro de una transacción para que lockForUpdate()
+     * impida que dos solicitudes simultáneas reciban el mismo número.
      */
     private function getNextAvailableConsecutive(int $formId): int
     {
-        $usedNumbers = FormSubmission::where('form_id', $formId)
-            ->whereNotNull('consecutive')
-            ->orderBy('consecutive')
+        /*
+         * Bloqueamos la fila del formulario durante esta transacción.
+         * Así, solicitudes simultáneas para el mismo formulario esperan
+         * su turno y cada una recibe un consecutivo distinto.
+         */
+        $lockedForm = Form::query()
+            ->whereKey($formId)
             ->lockForUpdate()
-            ->pluck('consecutive')
-            ->map(fn ($n) => (int) $n)
-            ->values()
-            ->all();
+            ->firstOrFail();
 
-        $next = 1;
+        $lastConsecutive = (int) (
+            $lockedForm->last_consecutive ?? 0
+        );
 
-        foreach ($usedNumbers as $number) {
-            if ($number < $next) {
-                continue;
-            }
+        /*
+         * Protección adicional:
+         * si por datos existentes hubiera un consecutive mayor que el
+         * contador guardado, nunca retrocedemos.
+         */
+        $maxExistingConsecutive = (int) (
+            FormSubmission::query()
+                ->where('form_id', $formId)
+                ->whereNotNull('consecutive')
+                ->max('consecutive') ?? 0
+        );
 
-            if ($number > $next) {
-                return $next;
-            }
+        $nextConsecutive = max(
+            $lastConsecutive,
+            $maxExistingConsecutive
+        ) + 1;
 
-            $next++;
-        }
+        /*
+         * Guardamos el último consecutivo entregado.
+         * Aunque después se elimine el FormSubmission, este valor
+         * permanece y ese número no vuelve a utilizarse.
+         */
+        $lockedForm->last_consecutive = $nextConsecutive;
+        $lockedForm->save();
 
-        return $next;
+        return $nextConsecutive;
     }
 
     /**
