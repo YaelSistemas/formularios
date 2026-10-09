@@ -34,6 +34,24 @@ class SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas implements FormDefinitio
             'Otros',
         ];
 
+        /*
+         * El Tipo de mantenimiento ya se captura como campo independiente.
+         *
+         * Se conserva también dentro del row_schema únicamente como dato
+         * interno de compatibilidad para que cada fila siga guardando
+         * tipo_mantenimiento y no se afecte el PDF actual.
+         *
+         * El layout NO lo muestra dentro de la tabla.
+         *
+         * acciones_realizadas se maneja en el layout como un arreglo:
+         *
+         * [
+         *     [
+         *         'accion' => 'Texto libre obligatorio',
+         *         'evidencia_fotografica' => [...], // opcional
+         *     ],
+         * ]
+         */
         $rowSchema = [
             [
                 'id' => 'tipo_mantenimiento',
@@ -53,17 +71,6 @@ class SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas implements FormDefinitio
                 'label' => 'Acciones realizadas',
                 'type' => 'textarea',
                 'required' => true,
-            ],
-            [
-                'id' => 'evidencia_fotografica',
-                'label' => 'Evidencia fotográfica',
-                'type' => 'file',
-                'required' => false,
-                'multiple' => true,
-                'accept' => 'image/*',
-                // Verificar que el guardado de archivos dentro de row_schema
-                // respete esta ruta al integrar el formulario.
-                'save_path' => 'forms/files/SGIPOPFO05_ReporteMantenimientoPrensas/EvidenciaFotografica',
             ],
         ];
 
@@ -100,12 +107,12 @@ class SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas implements FormDefinitio
                 [
                     'id' => 'header_line_5',
                     'type' => 'static_text',
-                    'text' => 'Fecha de Emisión: 11/09/2026',
+                    'text' => 'Fecha de Emisión: 28/09/2026',
                 ],
                 [
                     'id' => 'header_line_6',
                     'type' => 'static_text',
-                    'text' => 'Número de Revisión: 01',
+                    'text' => 'Número de Revisión: 02',
                 ],
                 [
                     'id' => 'numero_reporte',
@@ -119,33 +126,52 @@ class SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas implements FormDefinitio
                     'type' => 'select',
                     'required' => true,
                     'options' => [
-                        'Apaxco', 'Aztecas', 'Cedis Pachuca',
-                        'Cedis Pachuca Calidad/PTS', 'Cedis Pachuca Tip Top',
-                        'Colima', 'Huichapan', 'Monterrey', 'Morelos',
-                        'Orizaba', 'Peñasquito', 'San Luis Potosi', 'Tamuin',
-                        'Tepeaca', 'Torreon', 'Vysisa Sureste (Merida)',
-                        'Xoxtla', 'Zacatecas',
+                        'Apaxco',
+                        'Aztecas',
+                        'Cedis Pachuca',
+                        'Cedis Pachuca Calidad/PTS',
+                        'Cedis Pachuca Tip Top',
+                        'Colima',
+                        'Huichapan',
+                        'Monterrey',
+                        'Morelos',
+                        'Orizaba',
+                        'Peñasquito',
+                        'San Luis Potosi',
+                        'Tamuin',
+                        'Tepeaca',
+                        'Torreon',
+                        'Vysisa Sureste (Merida)',
+                        'Xoxtla',
+                        'Zacatecas',
                     ],
                 ],
                 [
                     'id' => 'codigo',
                     'label' => 'Código',
                     'type' => 'text',
-                    'required' => false,
+                    'required' => true,
                 ],
                 [
                     'id' => 'tipo_prensa',
                     'label' => 'Tipo de prensa',
                     'type' => 'radio',
                     'required' => false,
-                    'options' => ['H49', 'T79', 'E99', '1179', '1379', '1477', '1699', '1879'],
+                    'options' => [
+                        'Caja',
+                        'Rieles',
+                    ],
                 ],
                 [
                     'id' => 'tipo_voltaje',
                     'label' => 'Tipo de voltaje',
                     'type' => 'radio',
                     'required' => false,
-                    'options' => ['220 VOLTS', '110 VOLTS'],
+                    'options' => [
+                        '440 VOLTS',
+                        '220 VOLTS',
+                        '110 VOLTS',
+                    ],
                 ],
                 [
                     'id' => 'numero_serie',
@@ -158,8 +184,8 @@ class SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas implements FormDefinitio
                     'label' => 'Acciones',
                     'type' => 'select',
                     'required' => true,
-                    // El layout debe manejar este valor como un arreglo
-                    // y la validación debe exigir al menos una selección.
+                    // El layout maneja este valor como un arreglo
+                    // y la validación exige al menos una selección.
                     'multiple' => true,
                     'options' => $accionesOptions,
                 ],
@@ -168,9 +194,18 @@ class SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas implements FormDefinitio
                     'label' => 'Especifique otra',
                     'type' => 'textarea',
                     // Obligatorio SOLO si acciones contiene "Otros".
-                    // Implementar esta regla en el layout y en el servidor;
-                    // required=false evita exigirlo incondicionalmente.
                     'required' => false,
+                ],
+                [
+                    'id' => 'tipo_mantenimiento',
+                    'label' => 'Tipo de mantenimiento',
+                    'type' => 'radio',
+                    'required' => true,
+                    'options' => [
+                        'Preventivo',
+                        'Correctivo',
+                        'Correctivo Preventivo',
+                    ],
                 ],
                 [
                     'id' => 'tabla_mantenimiento_prensas',
@@ -178,10 +213,8 @@ class SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas implements FormDefinitio
                     'type' => 'table',
                     'required' => true,
                     'columns' => [
-                        'Tipo de mantenimiento',
                         'Problema actual',
                         'Acciones realizadas',
-                        'Evidencia fotográfica',
                     ],
                     'row_schema' => $rowSchema,
                 ],

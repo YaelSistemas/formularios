@@ -143,12 +143,24 @@ class FormSubmissionsController extends Controller
              * El historial de creación también conserva la fecha
              * real en la que se hizo la captura offline.
              */
+            $historySnapshot = $cleanAnswers;
+
+            if (
+                data_get($form->payload, '_code_key') ===
+                'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
+            ) {
+                $historySnapshot =
+                    $this->sanitizeReporteMantenimientoHistoryValue(
+                        $historySnapshot
+                    );
+            }
+
             $history = new FormSubmissionHistory([
                 'form_submission_id' => $submission->id,
                 'form_id' => $form->id,
                 'user_id' => $user?->id,
                 'action' => 'created',
-                'snapshot' => $cleanAnswers,
+                'snapshot' => $historySnapshot,
                 'changes' => null,
             ]);
     
@@ -275,20 +287,61 @@ class FormSubmissionsController extends Controller
             newAnswers: $cleanAnswers
         );
     
-        $submission->answers = $cleanAnswers;
-        $submission->save();
-    
-        if (!empty($changes)) {
-            FormSubmissionHistory::create([
-                'form_submission_id' => $submission->id,
-                'form_id' => $form->id,
-                'user_id' => $user?->id,
-                'action' => 'updated',
-                'snapshot' => $cleanAnswers,
-                'changes' => $changes,
-            ]);
+        $historySnapshot = $cleanAnswers;
+        $historyChanges = $changes;
+
+        /*
+         * Registros anteriores de este formulario pudieron quedar con
+         * imágenes Base64 dentro de answers. Ese contenido también puede
+         * aparecer en old_value al construir el historial.
+         *
+         * Para SGI-POP-FO-05 quitamos el Base64 únicamente del historial.
+         */
+        if (
+            data_get($form->payload, '_code_key') ===
+            'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
+        ) {
+            $historySnapshot =
+                $this->sanitizeReporteMantenimientoHistoryValue(
+                    $historySnapshot
+                );
+
+            $historyChanges =
+                $this->sanitizeReporteMantenimientoHistoryValue(
+                    $historyChanges
+                );
         }
-    
+
+        /*
+         * Registro e historial se guardan juntos.
+         * Si algo falla en el historial, el registro también se revierte.
+         */
+        $submission = DB::transaction(function () use (
+            $submission,
+            $form,
+            $user,
+            $cleanAnswers,
+            $changes,
+            $historySnapshot,
+            $historyChanges
+        ) {
+            $submission->answers = $cleanAnswers;
+            $submission->save();
+
+            if (!empty($changes)) {
+                FormSubmissionHistory::create([
+                    'form_submission_id' => $submission->id,
+                    'form_id' => $form->id,
+                    'user_id' => $user?->id,
+                    'action' => 'updated',
+                    'snapshot' => $historySnapshot,
+                    'changes' => $historyChanges,
+                ]);
+            }
+
+            return $submission->fresh();
+        });
+
         return response()->json([
             'ok' => true,
             'message' => 'Registro actualizado correctamente.',
@@ -666,83 +719,187 @@ class FormSubmissionsController extends Controller
 
                     /*
                      * SGI-POP-FO-05 Reporte de Mantenimiento de Prensas
-                     * Guarda físicamente las evidencias fotográficas
-                     * capturadas dentro de cada fila de la tabla.
+                     *
+                     * La estructura actual guarda una o varias acciones dentro de:
+                     *
+                     * acciones_realizadas => [
+                     *     [
+                     *         'accion' => 'Texto de la acción',
+                     *         'evidencia_fotografica' => [...]
+                     *     ]
+                     * ]
+                     *
+                     * Cada evidencia nueva llega como Base64. Aquí se guarda
+                     * físicamente y en la respuesta solo se conserva la ruta.
+                     * Esto evita guardar imágenes Base64 dentro de MySQL.
                      */
                     if (
                         $formCodeKey === 'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
                         && $id === 'tabla_mantenimiento_prensas'
                     ) {
-                        $evidencias = $cleanRow['evidencia_fotografica'] ?? [];
-                    
+                        $accionesRealizadas = $cleanRow['acciones_realizadas'] ?? [];
+
                         /*
-                         * Normalizar a arreglo para soportar una o varias evidencias.
+                         * Compatibilidad con registros anteriores:
+                         * antes acciones_realizadas era un solo texto.
                          */
-                        if (!is_array($evidencias)) {
-                            $evidencias = $evidencias ? [$evidencias] : [];
+                        if (is_string($accionesRealizadas)) {
+                            $textoAccionAnterior = trim($accionesRealizadas);
+
+                            $accionesRealizadas = $textoAccionAnterior !== ''
+                                ? [[
+                                    'accion' => $textoAccionAnterior,
+                                    'evidencia_fotografica' => [],
+                                ]]
+                                : [];
                         }
-                    
+
                         /*
-                         * Si por algún motivo llega un solo objeto asociativo
-                         * en lugar de una lista de objetos, también lo soportamos.
+                         * Si llega una sola acción como objeto asociativo,
+                         * convertirla en una lista de acciones.
                          */
                         if (
-                            !empty($evidencias) &&
-                            (
-                                array_key_exists('data', $evidencias) ||
-                                array_key_exists('path', $evidencias)
+                            is_array($accionesRealizadas)
+                            && !empty($accionesRealizadas)
+                            && (
+                                array_key_exists('accion', $accionesRealizadas)
+                                || array_key_exists('evidencia_fotografica', $accionesRealizadas)
                             )
                         ) {
-                            $evidencias = [$evidencias];
+                            $accionesRealizadas = [$accionesRealizadas];
                         }
-                    
-                        $storedFiles = [];
-                    
-                        foreach ($evidencias as $file) {
+
+                        if (!is_array($accionesRealizadas)) {
+                            $accionesRealizadas = [];
+                        }
+
+                        if (count($accionesRealizadas) < 1) {
+                            return response()->json([
+                                'message' => 'Debes agregar al menos una Acción realizada.'
+                            ], 422);
+                        }
+
+                        $accionesNormalizadas = [];
+
+                        foreach ($accionesRealizadas as $indiceAccion => $accionItem) {
                             /*
-                             * Archivo que ya estaba guardado físicamente.
-                             * Se conserva al editar el registro.
+                             * Compatibilidad adicional por si una acción
+                             * anterior llega directamente como texto.
                              */
-                            if (
-                                is_array($file) &&
-                                !empty($file['path']) &&
-                                empty($file['data'])
-                            ) {
-                                $storedFiles[] = $file;
-                                continue;
+                            if (is_string($accionItem)) {
+                                $accionItem = [
+                                    'accion' => trim($accionItem),
+                                    'evidencia_fotografica' => [],
+                                ];
                             }
-                    
+
+                            if (!is_array($accionItem)) {
+                                return response()->json([
+                                    'message' =>
+                                        'La Acción realizada ' .
+                                        ($indiceAccion + 1) .
+                                        ' no tiene un formato válido.'
+                                ], 422);
+                            }
+
+                            $textoAccion = trim((string) (
+                                $accionItem['accion']
+                                ?? $accionItem['texto']
+                                ?? $accionItem['accion_realizada']
+                                ?? ''
+                            ));
+
+                            if ($textoAccion === '') {
+                                return response()->json([
+                                    'message' =>
+                                        'Falta responder: Acción realizada ' .
+                                        ($indiceAccion + 1)
+                                ], 422);
+                            }
+
+                            $evidencias =
+                                $accionItem['evidencia_fotografica'] ?? [];
+
+                            if (!is_array($evidencias)) {
+                                $evidencias =
+                                    $evidencias ? [$evidencias] : [];
+                            }
+
                             /*
-                             * Evidencia nueva enviada como Base64.
+                             * Soportar un solo objeto de evidencia en lugar
+                             * de una lista de evidencias.
                              */
                             if (
-                                is_array($file) &&
-                                !empty($file['data']) &&
-                                is_string($file['data']) &&
-                                str_starts_with($file['data'], 'data:')
+                                !empty($evidencias)
+                                && (
+                                    array_key_exists('data', $evidencias)
+                                    || array_key_exists('path', $evidencias)
+                                )
                             ) {
-                                $storedFile =
-                                    $this->storeEvidenceForReporteMantenimientoPrensas(
-                                        $file,
-                                        $userId,
-                                        'evidencia_fotografica'
-                                    );
-                    
-                                if (!$storedFile) {
-                                    return response()->json([
-                                        'message' =>
-                                            'Solo se permiten imágenes válidas en Evidencia fotográfica.'
-                                    ], 422);
+                                $evidencias = [$evidencias];
+                            }
+
+                            $storedFiles = [];
+
+                            foreach ($evidencias as $file) {
+                                /*
+                                 * Evidencia ya guardada físicamente.
+                                 */
+                                if (
+                                    is_array($file)
+                                    && !empty($file['path'])
+                                    && empty($file['data'])
+                                ) {
+                                    $storedFiles[] = [
+                                        'name' => $file['name'] ?? basename((string) $file['path']),
+                                        'type' => $file['type'] ?? null,
+                                        'size' => $file['size'] ?? null,
+                                        'path' => $file['path'],
+                                    ];
+
+                                    continue;
                                 }
-                    
-                                $storedFiles[] = $storedFile;
+
+                                /*
+                                 * Evidencia nueva enviada como Base64.
+                                 */
+                                if (
+                                    is_array($file)
+                                    && !empty($file['data'])
+                                    && is_string($file['data'])
+                                    && str_starts_with($file['data'], 'data:')
+                                ) {
+                                    $storedFile =
+                                        $this->storeEvidenceForReporteMantenimientoPrensas(
+                                            $file,
+                                            $userId,
+                                            'accion_' . ($indiceAccion + 1)
+                                        );
+
+                                    if (!$storedFile) {
+                                        return response()->json([
+                                            'message' =>
+                                                'Solo se permiten imágenes válidas en la evidencia de la Acción realizada ' .
+                                                ($indiceAccion + 1) .
+                                                '.'
+                                        ], 422);
+                                    }
+
+                                    $storedFiles[] = $storedFile;
+                                }
                             }
+
+                            $accionesNormalizadas[] = [
+                                'accion' => $textoAccion,
+                                'evidencia_fotografica' =>
+                                    array_values($storedFiles),
+                            ];
                         }
-                    
-                        $cleanRow['evidencia_fotografica'] =
-                            array_values($storedFiles);
+
+                        $cleanRow['acciones_realizadas'] =
+                            array_values($accionesNormalizadas);
                     }
-                    
+
                     $normalizedRows[] = $cleanRow;
                 }
 
@@ -1253,6 +1410,52 @@ class FormSubmissionsController extends Controller
         return $value;
     }
     
+    /**
+     * Elimina contenido Base64 pesado únicamente de los datos que se
+     * escribirán en form_submission_histories para SGI-POP-FO-05.
+     *
+     * Conserva nombre, tipo, tamaño, ruta y el resto de la estructura.
+     */
+    private function sanitizeReporteMantenimientoHistoryValue($value)
+    {
+        if (is_array($value)) {
+            $sanitized = [];
+
+            foreach ($value as $key => $item) {
+                /*
+                 * No copiar el contenido binario embebido al historial.
+                 */
+                if (
+                    $key === 'data'
+                    && is_string($item)
+                    && str_starts_with($item, 'data:')
+                ) {
+                    continue;
+                }
+
+                $sanitized[$key] =
+                    $this->sanitizeReporteMantenimientoHistoryValue(
+                        $item
+                    );
+            }
+
+            return $sanitized;
+        }
+
+        /*
+         * Protección adicional por si llega un data URL directamente.
+         */
+        if (
+            is_string($value)
+            && str_starts_with($value, 'data:')
+            && str_contains($value, ';base64,')
+        ) {
+            return '[archivo Base64 omitido del historial]';
+        }
+
+        return $value;
+    }
+
     private function normalizeHistoryValue($value)
     {
         if (is_array($value)) {

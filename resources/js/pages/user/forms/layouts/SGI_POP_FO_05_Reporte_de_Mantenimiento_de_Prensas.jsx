@@ -161,6 +161,63 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
     }
   };
 
+  const normalizeMaintenanceActions = (
+    value,
+    legacyEvidence = []
+  ) => {
+    if (Array.isArray(value)) {
+      const normalized = value.map((item) => {
+        if (typeof item === "string") {
+          return {
+            accion: item,
+            evidencia_fotografica: [],
+          };
+        }
+
+        return {
+          accion: String(
+            item?.accion ??
+              item?.texto ??
+              item?.accion_realizada ??
+              ""
+          ),
+          evidencia_fotografica: Array.isArray(
+            item?.evidencia_fotografica
+          )
+            ? item.evidencia_fotografica
+            : item?.evidencia_fotografica
+            ? [item.evidencia_fotografica]
+            : [],
+        };
+      });
+
+      return normalized.length
+        ? normalized
+        : [
+            {
+              accion: "",
+              evidencia_fotografica: [],
+            },
+          ];
+    }
+
+    const legacyAction =
+      value === null || value === undefined ? "" : String(value);
+
+    const legacyFiles = Array.isArray(legacyEvidence)
+      ? legacyEvidence
+      : legacyEvidence
+      ? [legacyEvidence]
+      : [];
+
+    return [
+      {
+        accion: legacyAction,
+        evidencia_fotografica: legacyFiles,
+      },
+    ];
+  };
+
   const buildRowDraft = (field, preload = null) => {
     const rowSchema = Array.isArray(field?.row_schema) ? field.row_schema : [];
     const init = {};
@@ -176,6 +233,18 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
         init[col.id] = "";
       }
     });
+
+    if (field?.id === "tabla_mantenimiento_prensas") {
+      init.tipo_mantenimiento =
+        answers.tipo_mantenimiento ||
+        preload?.tipo_mantenimiento ||
+        "";
+
+      init.acciones_realizadas = normalizeMaintenanceActions(
+        preload?.acciones_realizadas,
+        preload?.evidencia_fotografica
+      );
+    }
 
     return init;
   };
@@ -311,6 +380,137 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
     }));
   };
 
+  const setMaintenanceActions = (nextActions) => {
+    setTableRowDraft((prev) => ({
+      ...prev,
+      acciones_realizadas: nextActions,
+    }));
+
+    if (tableModalErrorFieldId === "acciones_realizadas") {
+      clearTableModalError();
+    }
+  };
+
+  const updateMaintenanceAction = (actionIndex, value) => {
+    const currentActions = normalizeMaintenanceActions(
+      tableRowDraft.acciones_realizadas,
+      tableRowDraft.evidencia_fotografica
+    );
+
+    setMaintenanceActions(
+      currentActions.map((item, index) =>
+        index === actionIndex
+          ? {
+              ...item,
+              accion: value,
+            }
+          : item
+      )
+    );
+  };
+
+  const addMaintenanceAction = () => {
+    const currentActions = normalizeMaintenanceActions(
+      tableRowDraft.acciones_realizadas,
+      tableRowDraft.evidencia_fotografica
+    );
+
+    setMaintenanceActions([
+      ...currentActions,
+      {
+        accion: "",
+        evidencia_fotografica: [],
+      },
+    ]);
+  };
+
+  const removeMaintenanceAction = (actionIndex) => {
+    const currentActions = normalizeMaintenanceActions(
+      tableRowDraft.acciones_realizadas,
+      tableRowDraft.evidencia_fotografica
+    );
+
+    if (currentActions.length <= 1) return;
+
+    setMaintenanceActions(
+      currentActions.filter((_, index) => index !== actionIndex)
+    );
+  };
+
+  const addMaintenanceActionFiles = async (actionIndex, event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+
+    if (!files.length) return;
+
+    const invalidFiles = files.filter(
+      (file) => !String(file.type || "").startsWith("image/")
+    );
+
+    if (invalidFiles.length) {
+      showTableModalFieldError(
+        "acciones_realizadas",
+        "Solo se permiten imágenes en Evidencia fotográfica."
+      );
+      return;
+    }
+
+    try {
+      const parsedFiles = await Promise.all(files.map(fileToPayload));
+
+      const currentActions = normalizeMaintenanceActions(
+        tableRowDraft.acciones_realizadas,
+        tableRowDraft.evidencia_fotografica
+      );
+
+      setMaintenanceActions(
+        currentActions.map((item, index) =>
+          index === actionIndex
+            ? {
+                ...item,
+                evidencia_fotografica: [
+                  ...(Array.isArray(item.evidencia_fotografica)
+                    ? item.evidencia_fotografica
+                    : []),
+                  ...parsedFiles,
+                ],
+              }
+            : item
+        )
+      );
+    } catch {
+      showTableModalFieldError(
+        "acciones_realizadas",
+        "No se pudo leer la evidencia seleccionada."
+      );
+    }
+  };
+
+  const removeMaintenanceActionFile = (
+    actionIndex,
+    fileIndex
+  ) => {
+    const currentActions = normalizeMaintenanceActions(
+      tableRowDraft.acciones_realizadas,
+      tableRowDraft.evidencia_fotografica
+    );
+
+    setMaintenanceActions(
+      currentActions.map((item, index) =>
+        index === actionIndex
+          ? {
+              ...item,
+              evidencia_fotografica: (
+                Array.isArray(item.evidencia_fotografica)
+                  ? item.evidencia_fotografica
+                  : []
+              ).filter((_, idx) => idx !== fileIndex),
+            }
+          : item
+      )
+    );
+  };
+
   const isEmptyValue = (value, type) => {
     if (type === "checkbox") return value !== true;
 
@@ -337,6 +537,29 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
     return rowSchema.some((col) => {
       const value = tableRowDraft[col.id];
 
+      if (
+        field.id === "tabla_mantenimiento_prensas" &&
+        (col.id === "tipo_mantenimiento" ||
+          col.id === "evidencia_fotografica")
+      ) {
+        return false;
+      }
+
+      if (
+        field.id === "tabla_mantenimiento_prensas" &&
+        col.id === "acciones_realizadas"
+      ) {
+        return normalizeMaintenanceActions(
+          value,
+          tableRowDraft.evidencia_fotografica
+        ).some(
+          (item) =>
+            String(item?.accion || "").trim() !== "" ||
+            (Array.isArray(item?.evidencia_fotografica) &&
+              item.evidencia_fotografica.length > 0)
+        );
+      }
+
       if (col.type === "checkbox") return value === true;
       if (col.type === "file") {
         return Array.isArray(value) ? value.length > 0 : !!value;
@@ -359,6 +582,14 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
     for (const col of rowSchema) {
       if (!col?.id) continue;
       if (col.type === "static_text" || col.type === "fixed_image") continue;
+
+      if (
+        field.id === "tabla_mantenimiento_prensas" &&
+        (col.id === "tipo_mantenimiento" ||
+          col.id === "evidencia_fotografica")
+      ) {
+        continue;
+      }
 
       const value = tableRowDraft[col.id];
 
@@ -386,6 +617,53 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
       }
     }
 
+    let rowToSave = { ...tableRowDraft };
+
+    if (field.id === "tabla_mantenimiento_prensas") {
+      const maintenanceActions = normalizeMaintenanceActions(
+        tableRowDraft.acciones_realizadas,
+        tableRowDraft.evidencia_fotografica
+      );
+
+      if (!String(tableRowDraft.problema_actual || "").trim()) {
+        showTableModalFieldError(
+          "problema_actual",
+          "Falta responder: Problema actual"
+        );
+        return;
+      }
+
+      const emptyActionIndex = maintenanceActions.findIndex(
+        (item) => !String(item?.accion || "").trim()
+      );
+
+      if (emptyActionIndex !== -1) {
+        showTableModalFieldError(
+          "acciones_realizadas",
+          `Falta responder: Acción realizada ${emptyActionIndex + 1}`
+        );
+        return;
+      }
+
+      rowToSave = {
+        ...tableRowDraft,
+        tipo_mantenimiento: answers.tipo_mantenimiento || "",
+        problema_actual: String(
+          tableRowDraft.problema_actual || ""
+        ).trim(),
+        acciones_realizadas: maintenanceActions.map((item) => ({
+          accion: String(item?.accion || "").trim(),
+          evidencia_fotografica: Array.isArray(
+            item?.evidencia_fotografica
+          )
+            ? item.evidencia_fotografica
+            : [],
+        })),
+      };
+
+      delete rowToSave.evidencia_fotografica;
+    }
+
     const currentRows = Array.isArray(answers[field.id])
       ? answers[field.id]
       : [];
@@ -394,10 +672,10 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
       tableModal.editIndex === null ||
       tableModal.editIndex === undefined
     ) {
-      setVal(field.id, [...currentRows, { ...tableRowDraft }]);
+      setVal(field.id, [...currentRows, rowToSave]);
     } else {
       const nextRows = currentRows.map((row, idx) =>
-        idx === tableModal.editIndex ? { ...tableRowDraft } : row
+        idx === tableModal.editIndex ? rowToSave : row
       );
 
       setVal(field.id, nextRows);
@@ -1006,6 +1284,298 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
         : "none",
     };
 
+    if (
+      tableModal.field?.id === "tabla_mantenimiento_prensas" &&
+      f.id === "acciones_realizadas"
+    ) {
+      const maintenanceActions = normalizeMaintenanceActions(
+        tableRowDraft.acciones_realizadas,
+        tableRowDraft.evidencia_fotografica
+      );
+
+      return (
+        <div style={{ display: "grid", gap: 12 }}>
+          {maintenanceActions.map((item, actionIndex) => {
+            const currentFiles = Array.isArray(
+              item?.evidencia_fotografica
+            )
+              ? item.evidencia_fotografica
+              : [];
+
+            return (
+              <div
+                key={`maintenance_action_${actionIndex}`}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  background: "#f8fafc",
+                  borderRadius: 12,
+                  padding: 10,
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      color: "#0f172a",
+                      fontSize: 13,
+                    }}
+                  >
+                    Acción realizada {actionIndex + 1}
+                    <span style={{ color: "crimson" }}> *</span>
+                  </div>
+
+                  {maintenanceActions.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeMaintenanceAction(actionIndex)
+                      }
+                      style={{
+                        borderRadius: 8,
+                        border: "1px solid #fecaca",
+                        background: "#fef2f2",
+                        color: "#b91c1c",
+                        padding: "6px 9px",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                    >
+                      Quitar
+                    </button>
+                  ) : null}
+                </div>
+
+                <textarea
+                  ref={(el) => {
+                    if (actionIndex === 0) {
+                      tableFieldRefs.current[f.id] = el;
+                    }
+                  }}
+                  value={item?.accion ?? ""}
+                  onChange={(e) => {
+                    updateMaintenanceAction(
+                      actionIndex,
+                      e.target.value
+                    );
+                  }}
+                  rows={3}
+                  style={{
+                    ...commonStyle,
+                    resize: "vertical",
+                  }}
+                />
+
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      color: "#334155",
+                      fontSize: 13,
+                    }}
+                  >
+                    Evidencia fotográfica{" "}
+                    <span
+                      style={{
+                        fontWeight: 500,
+                        color: "#64748b",
+                      }}
+                    >
+                      (opcional)
+                    </span>
+                  </div>
+
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) =>
+                      addMaintenanceActionFiles(actionIndex, e)
+                    }
+                    style={commonStyle}
+                  />
+
+                  <div
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      background: "#fff",
+                      borderRadius: 12,
+                      padding: 10,
+                      fontSize: 13,
+                      color: "#334155",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {currentFiles.length ? (
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            color: "#0f172a",
+                            fontSize: 13,
+                          }}
+                        >
+                          Imágenes adjuntas
+                        </div>
+
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {currentFiles.map((file, fileIndex) => {
+                            const fileName = getFileName(file);
+                            const fileSize = getFileSizeLabel(file);
+                            const previewSrc =
+                              normalizeStorageUrl(file);
+
+                            return (
+                              <div
+                                key={`maintenance_action_${actionIndex}_file_${fileIndex}_${fileName}`}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 10,
+                                  border: "1px solid #e5e7eb",
+                                  background: "#fff",
+                                  borderRadius: 10,
+                                  padding: isMobile
+                                    ? "9px 10px"
+                                    : "8px 10px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    minWidth: 0,
+                                    flex: 1,
+                                  }}
+                                >
+                                  {previewSrc ? (
+                                    <img
+                                      src={previewSrc}
+                                      alt={fileName}
+                                      style={{
+                                        width: 46,
+                                        height: 46,
+                                        borderRadius: 8,
+                                        border:
+                                          "1px solid #e5e7eb",
+                                        objectFit: "cover",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  ) : null}
+
+                                  <div
+                                    style={{
+                                      minWidth: 0,
+                                      display: "grid",
+                                      gap: 2,
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontWeight: 700,
+                                        color: "#0f172a",
+                                        overflow: "hidden",
+                                        textOverflow:
+                                          "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {fileName}
+                                    </div>
+
+                                    {fileSize ? (
+                                      <div
+                                        style={{
+                                          fontSize: 12,
+                                          color: "#64748b",
+                                        }}
+                                      >
+                                        {fileSize}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeMaintenanceActionFile(
+                                      actionIndex,
+                                      fileIndex
+                                    )
+                                  }
+                                  style={{
+                                    borderRadius: 8,
+                                    border:
+                                      "1px solid #fecaca",
+                                    background: "#fef2f2",
+                                    color: "#b91c1c",
+                                    padding: "6px 9px",
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  Quitar
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <span>No hay imágenes adjuntas.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <button
+              type="button"
+              onClick={addMaintenanceAction}
+              style={{
+                borderRadius: 12,
+                border: "1px solid #c7d2fe",
+                background: "#eef2ff",
+                color: "#1e40af",
+                padding: isMobile ? "10px 14px" : "10px 12px",
+                cursor: "pointer",
+                fontWeight: 800,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
+              <i className="fa-solid fa-circle-plus"></i>
+              Agregar otra acción realizada
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (f.type === "textarea") {
       return (
         <textarea
@@ -1376,6 +1946,80 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
   const renderTableCellValue = (col, row) => {
     const value = row?.[col.id];
 
+    if (col.id === "acciones_realizadas") {
+      const maintenanceActions = normalizeMaintenanceActions(
+        value,
+        row?.evidencia_fotografica
+      );
+
+      return (
+        <div style={{ display: "grid", gap: 8 }}>
+          {maintenanceActions.map((item, actionIndex) => {
+            const files = Array.isArray(
+              item?.evidencia_fotografica
+            )
+              ? item.evidencia_fotografica
+              : [];
+
+            return (
+              <div
+                key={`action_cell_${actionIndex}`}
+                style={{
+                  display: "grid",
+                  gap: 6,
+                  textAlign: "left",
+                }}
+              >
+                <div>
+                  <b>Acción {actionIndex + 1}:</b>{" "}
+                  {item?.accion || "—"}
+                </div>
+
+                {files.length ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {files.slice(0, 4).map((file, index) => {
+                      const src = normalizeStorageUrl(file);
+
+                      return src ? (
+                        <img
+                          key={`action_cell_${actionIndex}_file_${index}`}
+                          src={src}
+                          alt={getFileName(file)}
+                          style={{
+                            width: 46,
+                            height: 46,
+                            objectFit: "cover",
+                            borderRadius: 8,
+                            border: "1px solid #e5e7eb",
+                          }}
+                        />
+                      ) : (
+                        <span
+                          key={`action_cell_${actionIndex}_file_${index}`}
+                          style={{
+                            fontSize: 11,
+                            color: "#64748b",
+                          }}
+                        >
+                          {getFileName(file)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
     if (col.type === "file") {
       const files = Array.isArray(value)
         ? value
@@ -1482,7 +2126,16 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
 
     if (f.type === "table") {
       const rows = Array.isArray(answers[f.id]) ? answers[f.id] : [];
-      const rowSchema = Array.isArray(f.row_schema) ? f.row_schema : [];
+      const rowSchema = (
+        Array.isArray(f.row_schema) ? f.row_schema : []
+      ).filter(
+        (col) =>
+          !(
+            f.id === "tabla_mantenimiento_prensas" &&
+            (col.id === "tipo_mantenimiento" ||
+              col.id === "evidencia_fotografica")
+          )
+      );
 
       return (
         <div style={{ display: "grid", gap: 10 }}>
@@ -1729,12 +2382,121 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
   const acciones = getField("acciones");
   const especifiqueOtra = getField("especifique_otra");
   const tablaMantenimiento = getField("tabla_mantenimiento_prensas");
+  const tipoMantenimiento =
+    getField("tipo_mantenimiento") ||
+    (Array.isArray(tablaMantenimiento?.row_schema)
+      ? tablaMantenimiento.row_schema.find(
+          (col) => col.id === "tipo_mantenimiento"
+        )
+      : null);
   const observaciones = getField("observaciones");
   const recomendaciones = getField("recomendaciones");
   const nombreInspecciona = getField("nombre_inspecciona_mantenimiento");
   const firmaInspecciona = getField("firma_inspecciona_mantenimiento");
   const nombreAutoriza = getField("nombre_autoriza");
   const firmaAutoriza = getField("firma_autoriza");
+
+  /*
+   * Opciones dinámicas de voltaje según el tipo de prensa:
+   *
+   * Caja:
+   * - 440 VOLTS
+   * - 220 VOLTS
+   * - 110 VOLTS
+   *
+   * Rieles:
+   * - 440 VOLTS
+   * - 220 VOLTS
+   *
+   * Mientras no se seleccione un tipo de prensa,
+   * no se muestran opciones de voltaje.
+   */
+  const opcionesTipoVoltaje =
+    answers.tipo_prensa === "Caja"
+      ? ["440 VOLTS", "220 VOLTS", "110 VOLTS"]
+      : answers.tipo_prensa === "Rieles"
+      ? ["440 VOLTS", "220 VOLTS"]
+      : [];
+
+  const tipoVoltajeDinamico = tipoVoltaje
+    ? {
+        ...tipoVoltaje,
+        options: opcionesTipoVoltaje,
+      }
+    : null;
+
+  /*
+   * Si se seleccionó Caja + 110 VOLTS y posteriormente
+   * se cambia el tipo de prensa a Rieles, limpiamos
+   * únicamente ese voltaje porque deja de ser válido.
+   */
+  useEffect(() => {
+    if (readOnly) return;
+
+    if (
+      answers.tipo_prensa === "Rieles" &&
+      answers.tipo_voltaje === "110 VOLTS"
+    ) {
+      setVal("tipo_voltaje", "");
+
+      if (formFieldErrorId === "tipo_voltaje") {
+        clearFormFieldError();
+      }
+    }
+  }, [
+    answers.tipo_prensa,
+    answers.tipo_voltaje,
+    readOnly,
+    setVal,
+  ]);
+
+  useEffect(() => {
+    const rows = Array.isArray(answers.tabla_mantenimiento_prensas)
+      ? answers.tabla_mantenimiento_prensas
+      : [];
+
+    if (
+      !answers.tipo_mantenimiento &&
+      rows.length &&
+      rows[0]?.tipo_mantenimiento
+    ) {
+      setVal(
+        "tipo_mantenimiento",
+        rows[0].tipo_mantenimiento
+      );
+    }
+  }, [
+    answers.tipo_mantenimiento,
+    answers.tabla_mantenimiento_prensas,
+    setVal,
+  ]);
+
+  useEffect(() => {
+    const value = answers.tipo_mantenimiento;
+    const rows = Array.isArray(answers.tabla_mantenimiento_prensas)
+      ? answers.tabla_mantenimiento_prensas
+      : [];
+
+    if (!value || !rows.length) return;
+
+    const requiresSync = rows.some(
+      (row) => row?.tipo_mantenimiento !== value
+    );
+
+    if (!requiresSync) return;
+
+    setVal(
+      "tabla_mantenimiento_prensas",
+      rows.map((row) => ({
+        ...row,
+        tipo_mantenimiento: value,
+      }))
+    );
+  }, [
+    answers.tipo_mantenimiento,
+    answers.tabla_mantenimiento_prensas,
+    setVal,
+  ]);
 
   const accionesSeleccionadas = Array.isArray(answers.acciones)
     ? answers.acciones
@@ -1750,7 +2512,16 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
       ? tableModal.field.row_schema
       : [];
 
-    return schema.map((col) => ({
+    const visibleSchema =
+      tableModal.field?.id === "tabla_mantenimiento_prensas"
+        ? schema.filter(
+            (col) =>
+              col.id !== "tipo_mantenimiento" &&
+              col.id !== "evidencia_fotografica"
+          )
+        : schema;
+
+    return visibleSchema.map((col) => ({
       kind: "single",
       id: col.id,
       fields: [col],
@@ -1938,9 +2709,17 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
       return false;
     }
 
-    if (!validateField(codigo)) return false;
+    if (
+      !validateField(codigo, {
+        required: true,
+        emptyMessage: "Debes capturar el Código.",
+      })
+    ) {
+      return false;
+    }
+
     if (!validateField(tipoPrensa)) return false;
-    if (!validateField(tipoVoltaje)) return false;
+    if (!validateField(tipoVoltajeDinamico)) return false;
     if (!validateField(numeroSerie)) return false;
 
     if (
@@ -1962,6 +2741,15 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
       ) {
         return false;
       }
+    }
+
+    if (
+      !validateField(tipoMantenimiento, {
+        required: true,
+        emptyMessage: "Debes seleccionar el Tipo de mantenimiento.",
+      })
+    ) {
+      return false;
     }
 
     if (!tablaMantenimiento) {
@@ -1989,9 +2777,35 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i] || {};
 
+      const maintenanceActions = normalizeMaintenanceActions(
+        row.acciones_realizadas,
+        row.evidencia_fotografica
+      );
+
+      const emptyActionIndex = maintenanceActions.findIndex(
+        (item) => !String(item?.accion || "").trim()
+      );
+
+      if (emptyActionIndex !== -1) {
+        setMsg(
+          `En la fila ${i + 1} falta responder: Acción realizada ${
+            emptyActionIndex + 1
+          }`
+        );
+        scrollToTopSafe();
+        return false;
+      }
+
       for (const col of rowSchema) {
         if (!col?.id) continue;
         if (col.type === "static_text" || col.type === "fixed_image") {
+          continue;
+        }
+
+        if (
+          col.id === "tipo_mantenimiento" ||
+          col.id === "evidencia_fotografica"
+        ) {
           continue;
         }
 
@@ -2501,13 +3315,13 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
             {renderOuterField(taller)}
             {separator}
 
-            {renderOuterField(codigo)}
+            {renderOuterField(codigo, true)}
             {separator}
 
             {renderOuterField(tipoPrensa)}
             {separator}
 
-            {renderOuterField(tipoVoltaje)}
+            {renderOuterField(tipoVoltajeDinamico)}
             {separator}
 
             {renderOuterField(numeroSerie)}
@@ -2522,6 +3336,9 @@ export default function SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas({
               </>
             ) : null}
 
+            {separator}
+
+            {renderOuterField(tipoMantenimiento, true)}
             {separator}
 
             {renderOuterField(tablaMantenimiento, true)}
