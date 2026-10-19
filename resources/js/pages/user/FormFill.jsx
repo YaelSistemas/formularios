@@ -3,6 +3,11 @@ import { apiPost } from "../../services/api";
 import { enqueue } from "../../offline/sync";
 import { saveOfflineSubmission } from "../../offline/forms-cache";
 
+import {
+  saveFormDraft,
+  deleteFormDraft,
+} from "../../offline/form-drafts";
+
 import DefaultFormLayout from "./forms/layouts/DefaultFormLayout";
 import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "./forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
 import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "./forms/layouts/SST_POP_TA_07_FO_01_Inspeccion_de_Compresor";
@@ -191,10 +196,190 @@ export default function FormFill({
     buildInitAnswers(null, initialAnswers)
   );
 
+  const draftSaveTimerRef = useRef(null);
+  const draftTouchedRef = useRef(false);
+  const latestAnswersRef = useRef(answers);
+  
+  const draftEnabled =
+    !readOnly &&
+    !isEditing &&
+    currentUserId > 0 &&
+    Number(form?.id || 0) > 0;
+  
+  const clearDraftSaveTimer = () => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(
+        draftSaveTimerRef.current
+      );
+  
+      draftSaveTimerRef.current = null;
+    }
+  };
+  
+  const saveDraftNow = async () => {
+    if (
+      !draftEnabled ||
+      !draftTouchedRef.current
+    ) {
+      return;
+    }
+  
+    clearDraftSaveTimer();
+  
+    await saveFormDraft(
+      currentUserId,
+      form.id,
+      latestAnswersRef.current
+    );
+  };
+  
+  const clearCurrentDraft = async () => {
+    clearDraftSaveTimer();
+  
+    /*
+     * Lo desactivamos antes de limpiar answers
+     * para impedir que el reset vuelva a crear
+     * un borrador vacío.
+     */
+    draftTouchedRef.current = false;
+  
+    if (!draftEnabled) {
+      return;
+    }
+  
+    await deleteFormDraft(
+      currentUserId,
+      form.id
+    );
+  };
+
   useEffect(() => {
     setAnswers((prev) => buildInitAnswers(prev, initialAnswers));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form?.id, JSON.stringify(initialAnswers || {})]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Mantener la última respuesta disponible
+  |--------------------------------------------------------------------------
+  */
+  
+  useEffect(() => {
+    latestAnswersRef.current = answers;
+  }, [answers]);
+  
+  /*
+  |--------------------------------------------------------------------------
+  | Autoguardado del borrador
+  |--------------------------------------------------------------------------
+  |
+  | Solo se crea un borrador después de que el usuario
+  | haya modificado al menos un campo.
+  |
+  | No se crean borradores al:
+  | - Ver registros.
+  | - Editar registros existentes.
+  |
+  */
+  
+  useEffect(() => {
+    if (
+      !draftEnabled ||
+      !draftTouchedRef.current
+    ) {
+      return;
+    }
+  
+    clearDraftSaveTimer();
+  
+    draftSaveTimerRef.current =
+      setTimeout(() => {
+        saveFormDraft(
+          currentUserId,
+          form.id,
+          latestAnswersRef.current
+        ).catch(() => null);
+  
+        draftSaveTimerRef.current = null;
+      }, 500);
+  
+    return () => {
+      clearDraftSaveTimer();
+    };
+  }, [
+    answers,
+    draftEnabled,
+    currentUserId,
+    form?.id,
+  ]);
+  
+  /*
+  |--------------------------------------------------------------------------
+  | Guardado al mandar la PWA a segundo plano
+  |--------------------------------------------------------------------------
+  |
+  | Esto ayuda especialmente en celular.
+  |
+  */
+  
+  useEffect(() => {
+    const flushDraft = () => {
+      if (
+        document.visibilityState !== "hidden" ||
+        !draftEnabled ||
+        !draftTouchedRef.current
+      ) {
+        return;
+      }
+  
+      saveFormDraft(
+        currentUserId,
+        form.id,
+        latestAnswersRef.current
+      ).catch(() => null);
+    };
+  
+    document.addEventListener(
+      "visibilitychange",
+      flushDraft
+    );
+  
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        flushDraft
+      );
+    };
+  }, [
+    draftEnabled,
+    currentUserId,
+    form?.id,
+  ]);
+  
+  /*
+  |--------------------------------------------------------------------------
+  | Última protección al salir del componente
+  |--------------------------------------------------------------------------
+  */
+  
+  useEffect(() => {
+    return () => {
+      if (
+        draftEnabled &&
+        draftTouchedRef.current
+      ) {
+        saveFormDraft(
+          currentUserId,
+          form.id,
+          latestAnswersRef.current
+        ).catch(() => null);
+      }
+    };
+  }, [
+    draftEnabled,
+    currentUserId,
+    form?.id,
+  ]);
 
   useEffect(() => {
     const onOnline = () => {
@@ -217,12 +402,48 @@ export default function FormFill({
   const setVal = (id, value) => {
     if (readOnly) return;
   
-    setAnswers((prev) => ({
-      ...prev,
-      [id]: value,
-    }));
+    /*
+     * A partir del primer cambio real del usuario
+     * consideramos que existe una captura en progreso.
+     */
+    if (!isEditing) {
+      draftTouchedRef.current = true;
+    }
+  
+    setAnswers((prev) => {
+      const next = {
+        ...prev,
+        [id]: value,
+      };
+  
+      /*
+       * Actualizamos inmediatamente la referencia.
+       * Así, si el usuario pulsa Volver justo después
+       * de escribir, tenemos el valor más reciente.
+       */
+      latestAnswersRef.current = next;
+  
+      return next;
+    });
   };
   
+  const handleBack = async () => {
+    /*
+     * Si existe una captura modificada,
+     * hacemos un último guardado antes de salir.
+     */
+    try {
+      await saveDraftNow();
+    } catch {
+      // Salir del formulario no debe bloquearse
+      // por un fallo de IndexedDB.
+    }
+  
+    if (typeof onBack === "function") {
+      onBack();
+    }
+  };
+
   const validate = () => {
     for (const f of fields) {
       if (!f?.id) continue;
@@ -440,8 +661,13 @@ export default function FormFill({
           "Las respuestas se actualizaron exitosamente."
         );
       } else {
-        await apiPost(`/forms/${form.id}/submit`, { answers });
-
+        await apiPost(
+          `/forms/${form.id}/submit`,
+          { answers }
+        );
+        
+        await clearCurrentDraft();
+        
         setMsg("");
         resetForm();
 
@@ -469,6 +695,8 @@ export default function FormFill({
             localUuid,
             offlineCreatedAt
           );
+
+          await clearCurrentDraft();
 
           window.dispatchEvent(
             new CustomEvent("offline-record-saved", {
@@ -508,7 +736,7 @@ export default function FormFill({
     saving,
     isOnline,
     msg,
-    onBack,
+    onBack: handleBack,
     onSubmit,
     setMsg,
     readOnly,

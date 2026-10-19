@@ -17,6 +17,11 @@ import {
   preloadVisibleSubmissionPdfs,
 } from "../../offline/pdf-cache";
 
+import {
+  getFormDraft,
+  deleteFormDraft,
+} from "../../offline/form-drafts";
+
 const CURRENT_USER_UPDATED_EVENT =
   "current-user-updated";
 
@@ -293,6 +298,16 @@ export default function FormsIndex() {
 
   const [mode, setMode] = useState("table");
 
+  const [draftInitialAnswers, setDraftInitialAnswers] =
+    useState(null);
+  
+  const [draftModal, setDraftModal] = useState({
+    open: false,
+    formId: null,
+    formTitle: "",
+    draft: null,
+  });
+
   const [me, setMe] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "null");
@@ -519,6 +534,7 @@ export default function FormsIndex() {
     setSelectedId(null);
     setSelectedSub(null);
     setDetail(null);
+    setDraftInitialAnswers(null);
     setSubs([]);
     setErr("");
     setSuccessMsg("");
@@ -1084,33 +1100,178 @@ export default function FormsIndex() {
     };
   }, [selectedId, mode]);
 
-  const onFill = async (id) => {
-    setMobileActions({ open: false, form: null });
-    setMobileSubmissionActions({ open: false, submission: null });
-    setHistoryModal({ open: false, submission: null });
-    setHistoryLoading(false);
-    setHistoryError("");
-    setHistoryData([]);
-
-    if (!canCreateRecord) {
-      setErr(noPermissionMessage("crear un registro"));
-      return;
-    }
-
-    if (!canSubmitForm) {
-      setErr(noPermissionMessage("contestar y guardar este formulario"));
-      return;
-    }
-
-    pushFormsState("fill", { selectedId: id, selectedSub: null });
-
+  const startFill = async (
+    id,
+    initialAnswers = null
+  ) => {
+    pushFormsState("fill", {
+      selectedId: id,
+      selectedSub: null,
+    });
+  
     setSelectedId(id);
     setSelectedSub(null);
+  
+    setDraftInitialAnswers(
+      initialAnswers &&
+        typeof initialAnswers === "object"
+        ? initialAnswers
+        : null
+    );
+  
     setMode("fill");
     setErr("");
     setSuccessMsg("");
     clearSearch();
+  
     await loadDetail(id);
+  };
+
+  const onFill = async (id) => {
+    setMobileActions({
+      open: false,
+      form: null,
+    });
+  
+    setMobileSubmissionActions({
+      open: false,
+      submission: null,
+    });
+  
+    setHistoryModal({
+      open: false,
+      submission: null,
+    });
+  
+    setHistoryLoading(false);
+    setHistoryError("");
+    setHistoryData([]);
+  
+    if (!canCreateRecord) {
+      setErr(
+        noPermissionMessage(
+          "crear un registro"
+        )
+      );
+  
+      return;
+    }
+  
+    if (!canSubmitForm) {
+      setErr(
+        noPermissionMessage(
+          "contestar y guardar este formulario"
+        )
+      );
+  
+      return;
+    }
+  
+    try {
+      const draft =
+        await getFormDraft(
+          currentUserId,
+          id
+        );
+  
+      if (draft) {
+        const selectedForm =
+          forms.find(
+            (form) =>
+              Number(form?.id) ===
+              Number(id)
+          );
+  
+        setDraftModal({
+          open: true,
+          formId: Number(id),
+          formTitle:
+            selectedForm?.title ||
+            "Formulario",
+          draft,
+        });
+  
+        return;
+      }
+  
+      await startFill(
+        id,
+        null
+      );
+    } catch (e) {
+      setErr(
+        e?.message ||
+          "No se pudo revisar el borrador del formulario."
+      );
+    }
+  };
+
+  const closeDraftModal = () => {
+    setDraftModal({
+      open: false,
+      formId: null,
+      formTitle: "",
+      draft: null,
+    });
+  };
+  
+  const continueDraft = async () => {
+    const formId =
+      Number(
+        draftModal.formId || 0
+      );
+  
+    const draft =
+      draftModal.draft;
+  
+    if (!formId || !draft) {
+      closeDraftModal();
+      return;
+    }
+  
+    const draftAnswers =
+      draft.answers &&
+      typeof draft.answers === "object"
+        ? draft.answers
+        : {};
+  
+    closeDraftModal();
+  
+    await startFill(
+      formId,
+      draftAnswers
+    );
+  };
+  
+  const discardDraftAndStart = async () => {
+    const formId =
+      Number(
+        draftModal.formId || 0
+      );
+  
+    if (!formId) {
+      closeDraftModal();
+      return;
+    }
+  
+    try {
+      await deleteFormDraft(
+        currentUserId,
+        formId
+      );
+  
+      closeDraftModal();
+  
+      await startFill(
+        formId,
+        null
+      );
+    } catch (e) {
+      setErr(
+        e?.message ||
+          "No se pudo eliminar el borrador."
+      );
+    }
   };
 
   const onResponses = async (id) => {
@@ -1733,7 +1894,15 @@ export default function FormsIndex() {
   }
 
   if (mode === "fill" && detail) {
-    return <FormFill form={detail} onBack={goToTable} />;
+    return (
+      <FormFill
+        form={detail}
+        onBack={goToTable}
+        initialAnswers={
+          draftInitialAnswers
+        }
+      />
+    );
   }
 
   if (mode === "response_view" && detail && selectedSub) {
@@ -2506,6 +2675,203 @@ export default function FormsIndex() {
             )}
           </Card>
         )
+      ) : null}
+
+      {draftModal.open && draftModal.draft ? (
+        <div
+          onClick={closeDraftModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background:
+              "rgba(15,23,42,0.45)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+            style={{
+              width: "100%",
+              maxWidth: 500,
+              background: "#fff",
+              borderRadius: 18,
+              border:
+                "1px solid #e2e8f0",
+              boxShadow:
+                "0 20px 50px rgba(15,23,42,0.18)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "20px 20px 14px",
+                borderBottom:
+                  "1px solid #f1f5f9",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    background: "#fff7ed",
+                    border:
+                      "1px solid #fdba74",
+                    color: "#c2410c",
+                    display: "grid",
+                    placeItems: "center",
+                    flex: "0 0 auto",
+                  }}
+                >
+                  <i className="fa-solid fa-file-pen" />
+                </div>
+      
+                <div>
+                  <div
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 900,
+                      color: "#0f172a",
+                    }}
+                  >
+                    Tienes un borrador pendiente
+                  </div>
+      
+                  <div
+                    style={{
+                      marginTop: 3,
+                      fontSize: 13,
+                      color: "#64748b",
+                    }}
+                  >
+                    {draftModal.formTitle}
+                  </div>
+                </div>
+              </div>
+            </div>
+      
+            <div
+              style={{
+                padding: 20,
+                display: "grid",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  border:
+                    "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  display: "grid",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "#334155",
+                }}
+              >
+                <div>
+                  <b>Iniciado:</b>{" "}
+                  {formatDate(
+                    draftModal.draft
+                      ?.created_at
+                  )}
+                </div>
+      
+                <div>
+                  <b>
+                    Última modificación:
+                  </b>{" "}
+                  {formatDate(
+                    draftModal.draft
+                      ?.updated_at
+                  )}
+                </div>
+              </div>
+      
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "#64748b",
+                  lineHeight: 1.6,
+                }}
+              >
+                Puedes continuar exactamente
+                donde lo dejaste o descartar
+                este borrador y comenzar un
+                registro nuevo.
+              </div>
+            </div>
+      
+            <div
+              style={{
+                padding: "0 20px 20px",
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: 10,
+              }}
+            >
+              <Btn
+                type="button"
+                variant="primary"
+                onClick={continueDraft}
+                style={{
+                  width: "100%",
+                  minHeight: 46,
+                  justifyContent: "center",
+                  borderRadius: 12,
+                  fontSize: 14,
+                }}
+              >
+                <i className="fa-solid fa-pen-to-square" />
+                Continuar borrador
+              </Btn>
+            
+              <Btn
+                type="button"
+                variant="danger"
+                onClick={discardDraftAndStart}
+                style={{
+                  width: "100%",
+                  minHeight: 46,
+                  justifyContent: "center",
+                  borderRadius: 12,
+                  fontSize: 14,
+                }}
+              >
+                <i className="fa-solid fa-trash" />
+                Descartar y crear nuevo
+              </Btn>
+            
+              <Btn
+                type="button"
+                onClick={closeDraftModal}
+                style={{
+                  width: "100%",
+                  minHeight: 46,
+                  justifyContent: "center",
+                  borderRadius: 12,
+                  fontSize: 14,
+                }}
+              >
+                Cancelar
+              </Btn>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {isMobile && mobileActions.open && mobileActions.form ? (
