@@ -8,38 +8,10 @@ import {
   deleteFormDraft,
 } from "../../offline/form-drafts";
 
-import DefaultFormLayout from "./forms/layouts/DefaultFormLayout";
-import SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil from "./forms/layouts/SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil";
-import SST_POP_TA_07_FO_01_Inspeccion_de_Compresor from "./forms/layouts/SST_POP_TA_07_FO_01_Inspeccion_de_Compresor";
-import SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar from "./forms/layouts/SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar";
-import SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte from "./forms/layouts/SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte";
-import SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos from "./forms/layouts/SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos";
-import SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida from "./forms/layouts/SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida";
-import SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad from "./forms/layouts/SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad";
-import SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast from "./forms/layouts/SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast";
-import SST_POP_TA_01_FO_08_Checklist_de_Tirfor from "./forms/layouts/SST_POP_TA_01_FO_08_Checklist_de_Tirfor";
-import SST_POP_TA_01_FO_07_Checklist_de_Tecle from "./forms/layouts/SST_POP_TA_01_FO_07_Checklist_de_Tecle";
-import SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena from "./forms/layouts/SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena";
-import SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles from "./forms/layouts/SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles";
-import SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal from "./forms/layouts/SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal";
-import SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles from "./forms/layouts/SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles";
-import SST_PGI_TA_02_FO_03_Checklist_de_Botiquines from "./forms/layouts/SST_PGI_TA_02_FO_03_Checklist_de_Botiquines";
-import SST_PGI_TA_02_FO_02_Checklist_de_Extintor from "./forms/layouts/SST_PGI_TA_02_FO_02_Checklist_de_Extintor";
-import SST_PGI_TA_01_FO_01_Boleta_de_Observaciones from "./forms/layouts/SST_PGI_TA_01_FO_01_Boleta_de_Observaciones";
-import SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas from "./forms/layouts/SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas";
-import SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera";
-import SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera from "./forms/layouts/SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera";
-import SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda from "./forms/layouts/SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda";
-import SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas from "./forms/layouts/SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas";
-import SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico from "./forms/layouts/SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico";
-import SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos from "./forms/layouts/SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos";
-import SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas from "./forms/layouts/SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas";
-import SGI_POP_GT_01_FO_09_Checklist_de_Prensas from "./forms/layouts/SGI_POP_GT_01_FO_09_Checklist_de_Prensas";
-import SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales from "./forms/layouts/SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales";
-import SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos from "./forms/layouts/SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos";
-import SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia from "./forms/layouts/SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia";
-import SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo from "./forms/layouts/SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo";
-import SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas from "./forms/layouts/SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas";
+import {
+  hasFormLayoutComponent,
+  resolveFormLayoutComponent,
+} from "./forms/layouts/registry";
 
 const NON_INPUT_TYPES = new Set([
   "static_text",
@@ -59,8 +31,17 @@ export default function FormFill({
   onSaved = null,
 }) {
   const token = useMemo(() => localStorage.getItem("token") || "", []);
-  const fields = Array.isArray(form?.payload?.fields) ? form.payload.fields : [];
-  const layout = form?.payload?.meta?.layout || "default";
+  const fields = Array.isArray(
+    form?.payload?.fields
+  )
+    ? form.payload.fields
+    : [];
+  
+  const layout =
+    form?.version_layout_key ||
+    form?.form_version?.layout_key ||
+    form?.payload?.meta?.layout ||
+    "default";
 
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [saving, setSaving] = useState(false);
@@ -81,6 +62,18 @@ export default function FormFill({
   });
 
   const currentUserId = Number(me?.id || 0);
+
+  const captureFormVersionId = Number(
+    form?.form_version_id ||
+      form?.form_version?.id ||
+      0
+  );
+  
+  const versionedLayoutMissing =
+    captureFormVersionId > 0 &&
+    !hasFormLayoutComponent(
+      layout
+    );
 
   const permissionSet = useMemo(() => {
     const raw = me?.permissions;
@@ -229,7 +222,8 @@ export default function FormFill({
     await saveFormDraft(
       currentUserId,
       form.id,
-      latestAnswersRef.current
+      latestAnswersRef.current,
+      captureFormVersionId
     );
   };
   
@@ -297,7 +291,8 @@ export default function FormFill({
         saveFormDraft(
           currentUserId,
           form.id,
-          latestAnswersRef.current
+          latestAnswersRef.current,
+          captureFormVersionId
         ).catch(() => null);
   
         draftSaveTimerRef.current = null;
@@ -311,6 +306,7 @@ export default function FormFill({
     draftEnabled,
     currentUserId,
     form?.id,
+    captureFormVersionId,
   ]);
   
   /*
@@ -335,7 +331,8 @@ export default function FormFill({
       saveFormDraft(
         currentUserId,
         form.id,
-        latestAnswersRef.current
+        latestAnswersRef.current,
+        captureFormVersionId
       ).catch(() => null);
     };
   
@@ -354,6 +351,7 @@ export default function FormFill({
     draftEnabled,
     currentUserId,
     form?.id,
+    captureFormVersionId,
   ]);
   
   /*
@@ -371,7 +369,8 @@ export default function FormFill({
         saveFormDraft(
           currentUserId,
           form.id,
-          latestAnswersRef.current
+          latestAnswersRef.current,
+          captureFormVersionId
         ).catch(() => null);
       }
     };
@@ -379,6 +378,7 @@ export default function FormFill({
     draftEnabled,
     currentUserId,
     form?.id,
+    captureFormVersionId,
   ]);
 
   useEffect(() => {
@@ -614,6 +614,16 @@ export default function FormFill({
       return;
     }
 
+    if (
+      !isEditing &&
+      !captureFormVersionId
+    ) {
+      setMsg(
+        "No se pudo identificar la versión del formulario. Vuelve al listado e inicia nuevamente la captura."
+      );
+      return;
+    }
+
     if (isEditing && !canEdit) {
       setMsg(
         "No cuentas con los permisos necesarios para editar este registro. Contacta a tu administrador o al equipo de Sistemas."
@@ -641,12 +651,23 @@ export default function FormFill({
 
     const offlinePayload = {
       form_id: form.id,
-      answers: { ...answers },
-      offline_created_at: offlineCreatedAt,
+    
+      form_version_id:
+        captureFormVersionId,
+    
+      answers: {
+        ...answers,
+      },
+    
+      offline_created_at:
+        offlineCreatedAt,
+    
       meta: {
         offline_capable: true,
-        user_agent: navigator.userAgent,
-        created_at: offlineCreatedAt,
+        user_agent:
+          navigator.userAgent,
+        created_at:
+          offlineCreatedAt,
       },
     };
 
@@ -663,7 +684,12 @@ export default function FormFill({
       } else {
         await apiPost(
           `/forms/${form.id}/submit`,
-          { answers }
+          {
+            form_version_id:
+              captureFormVersionId,
+        
+            answers,
+          }
         );
         
         await clearCurrentDraft();
@@ -745,228 +771,71 @@ export default function FormFill({
     editSubmissionId,
   };
 
-  const renderLayout = () => {
-    switch (layout) {
-      case "checklist_herramienta_electrica_portatil":
-        return (
-          <SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil
-            {...sharedProps}
-          />
-        );
-
-        case "inspeccion_compresor":
-        return (
-          <SST_POP_TA_07_FO_01_Inspeccion_de_Compresor
-            {...sharedProps}
-          />
-        );
-
-        case "checklist_maquina_de_soldar":
-        return (
-          <SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar
-            {...sharedProps}
-          />
-        );
-
-        case "inspeccion_equipo_oxicorte":
-        return (
-          <SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte
-            {...sharedProps}
-          />
-        );
-
-        case "checklist_linea_retractil_y_puntos_fijos":
-        return (
-          <SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos
-            {...sharedProps}
-          />
-        );
-
-        case "inspeccion_de_linea_de_vida":
-          return (
-            <SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida
-              {...sharedProps}
-            />
-          );
-          
-        case "inspeccion_de_arnes_de_seguridad":
-          return (
-            <SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad
-              {...sharedProps}
-            />
-          );
-
-        case "checklist_de_sand_blast":
-          return (
-            <SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast
-              {...sharedProps}
-            />
-          );
-          
-        case "checklist_de_tirfor":
-          return (
-            <SST_POP_TA_01_FO_08_Checklist_de_Tirfor
-              {...sharedProps}
-            />
-          );
-        
-        case "checklist_de_tecle":
-          return (
-            <SST_POP_TA_01_FO_07_Checklist_de_Tecle
-              {...sharedProps}
-            />
-          );
-
-        case "checklist_de_polipasto":
-          return (
-            <SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena
-              {...sharedProps}
-            />
-          );
-
-        case "checklist_de_escaleras_portatiles":
-          return (
-            <SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles
-              {...sharedProps}
-            />
-          );
-
-        case "inspeccion_de_equipo_de_proteccion_personal":
-          return (
-            <SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal
-              {...sharedProps}
-            />
-          );
-
-        case "checklist_de_unidades_moviles":
-          return (
-            <SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles
-              {...sharedProps}
-            />
-          );
-
-        case "checklist_de_botiquines":
-          return (
-            <SST_PGI_TA_02_FO_03_Checklist_de_Botiquines
-              {...sharedProps}
-            />
-          );
-
-        case "checklist_de_extintor":
-          return (
-            <SST_PGI_TA_02_FO_02_Checklist_de_Extintor
-              {...sharedProps}
-            />
-          );
-
-        case "boleta_de_observaciones":
-          return (
-            <SST_PGI_TA_01_FO_01_Boleta_de_Observaciones
-              {...sharedProps}
-            />
-          );
-
-        case "checklist_eslingas_de_cadenas":
-          return (
-            <SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas
-              {...sharedProps}
-            />
-          );
-
-        case "inspeccion_de_grua_viajera":
-        return (
-          <SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera
-            {...sharedProps}
-          />
-        );
-
-        case "checklist_de_mantenimiento_grua_viajera":
-          return (
-            <SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera
-              {...sharedProps}
-            />
-          );
+  if (versionedLayoutMissing) {
+    return (
+      <div
+        style={{
+          maxWidth: 760,
+          margin: "40px auto",
+          padding: 24,
+          border: "1px solid #fecaca",
+          borderRadius: 16,
+          background: "#fff",
+          color: "#991b1b",
+        }}
+      >
+        <h3
+          style={{
+            margin: "0 0 10px",
+          }}
+        >
+          No se pudo cargar esta versión del formulario
+        </h3>
   
-        case "checklist_de_mantenimiento_cortadora_de_banda":
-          return (
-            <SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda
-              {...sharedProps}
-            />
-          );
+        <p
+          style={{
+            margin: 0,
+            lineHeight: 1.6,
+          }}
+        >
+          El layout{" "}
+          <strong>
+            {layout}
+          </strong>{" "}
+          no está registrado en la aplicación.
+          Contacta al equipo de Sistemas.
+        </p>
+  
+        <button
+          type="button"
+          onClick={handleBack}
+          style={{
+            marginTop: 18,
+            padding: "10px 18px",
+            borderRadius: 10,
+            border: "1px solid #cbd5e1",
+            background: "#fff",
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+        >
+          Volver
+        </button>
+      </div>
+    );
+  }
 
-          case "checklist_semanal_montacargas":
-            return (
-              <SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas
-                {...sharedProps}
-              />
-            );
-
-          case "checklist_mantenimiento_sistema_electrico":
-            return (
-              <SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico
-                {...sharedProps}
-              />
-            );
-
-          case "checklist_de_inspeccion_de_estrobos":
-            return (
-              <SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos
-                {...sharedProps}
-              />
-            );
-
-          case "checklist_inspeccion_de_eslingas":
-            return (
-              <SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas
-                {...sharedProps}
-              />
-            );
-
-          case "checklist_de_prensas":
-            return (
-              <SGI_POP_GT_01_FO_09_Checklist_de_Prensas
-                {...sharedProps}
-              />
-            );
-
-          case "lista_de_herramientas_materiales":
-            return (
-              <SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales
-                {...sharedProps}
-              />
-            );
-
-          case "checklist_de_prensas_para_pasamanos":
-            return (
-              <SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos
-                {...sharedProps}
-              />
-            );
-
-          case "checklist_de_inspeccion_de_lavaojos_de_emergencia":
-            return (
-              <SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia
-                {...sharedProps}
-              />
-            );
-
-          case "checklist_de_detectores_de_humo":
-            return (
-              <SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo
-                {...sharedProps}
-              />
-            );
-
-          case "reporte_de_mantenimiento_de_prensas":
-            return (
-              <SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas
-                {...sharedProps}
-              />
-            );
-          
-      default:
-        return <DefaultFormLayout {...sharedProps} />;
-    }
+  const renderLayout = () => {
+    const LayoutComponent =
+      resolveFormLayoutComponent(
+        layout
+      );
+  
+    return (
+      <LayoutComponent
+        {...sharedProps}
+      />
+    );
   };
 
   return (

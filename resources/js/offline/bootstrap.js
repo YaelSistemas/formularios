@@ -3,6 +3,7 @@ import {
   cacheFormsCatalog,
   cacheFormDetail,
   cacheFormSubmissions,
+  cacheFormVersions,
   cleanupOfflineScope,
 } from "./forms-cache";
 import { preloadVisibleSubmissionPdfs } from "./pdf-cache";
@@ -305,6 +306,16 @@ async function executeOfflineBootstrap({
       "object"
       ? boot.submissions_by_form
       : {};
+  
+  const formVersions =
+    boot?.form_versions &&
+    typeof boot.form_versions ===
+      "object" &&
+    !Array.isArray(
+      boot.form_versions
+    )
+      ? boot.form_versions
+      : {};
 
   let formsDone = 0;
   let recordsDone = 0;
@@ -384,6 +395,17 @@ async function executeOfflineBootstrap({
   await cleanupOfflineScope(
     resolvedUserId,
     forms
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Guardar versiones históricas
+  |--------------------------------------------------------------------------
+  */
+  
+  await cacheFormVersions(
+    resolvedUserId,
+    formVersions
   );
 
   /*

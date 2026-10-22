@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\FormSubmission;
+use App\Models\FormVersion;
 use Illuminate\Http\Request;
 
 class OfflineBootstrapController extends Controller
@@ -121,9 +122,17 @@ class OfflineBootstrapController extends Controller
         $lastSubmissionChange = (clone $submissionsQuery)
             ->max('updated_at');
 
+        $lastVersionChange = FormVersion::query()
+            ->whereIn(
+                'form_id',
+                $formIds
+            )
+            ->max('updated_at');
+
         $lastChange = collect([
             $lastFormChange,
             $lastSubmissionChange,
+            $lastVersionChange,
         ])
             ->filter()
             ->map(function ($date) {
@@ -262,6 +271,94 @@ class OfflineBootstrapController extends Controller
     
         /*
         |--------------------------------------------------------------------------
+        | Versiones de los formularios accesibles
+        |--------------------------------------------------------------------------
+        |
+        | Se envían todas las versiones del alcance.
+        |
+        | Esto permite:
+        | - consultar registros históricos offline;
+        | - conocer la versión vigente;
+        | - conservar V1 aunque exista V2/V3.
+        |
+        */
+        
+        $formIds = $forms
+            ->pluck('id')
+            ->map(
+                fn ($id) => (int) $id
+            )
+            ->values();
+        
+        $formVersions = FormVersion::query()
+            ->whereIn(
+                'form_id',
+                $formIds
+            )
+            ->orderBy('form_id')
+            ->orderBy('version')
+            ->get([
+                'id',
+                'form_id',
+                'version',
+                'version_key',
+                'definition_class',
+                'layout_key',
+                'pdf_view',
+                'payload',
+                'fecha_desde',
+                'fecha_hasta',
+                'descripcion',
+                'created_at',
+                'updated_at',
+            ])
+            ->mapWithKeys(function ($version) {
+                return [
+                    (string) $version->id => [
+                        'id' =>
+                            $version->id,
+        
+                        'form_id' =>
+                            $version->form_id,
+        
+                        'version' =>
+                            $version->version,
+        
+                        'version_key' =>
+                            $version->version_key,
+        
+                        'definition_class' =>
+                            $version->definition_class,
+        
+                        'layout_key' =>
+                            $version->layout_key,
+        
+                        'pdf_view' =>
+                            $version->pdf_view,
+        
+                        'payload' =>
+                            $version->payload,
+        
+                        'fecha_desde' =>
+                            $version->fecha_desde,
+        
+                        'fecha_hasta' =>
+                            $version->fecha_hasta,
+        
+                        'descripcion' =>
+                            $version->descripcion,
+        
+                        'created_at' =>
+                            $version->created_at,
+        
+                        'updated_at' =>
+                            $version->updated_at,
+                    ],
+                ];
+            });
+
+        /*
+        |--------------------------------------------------------------------------
         | Registros visibles agrupados por formulario
         |--------------------------------------------------------------------------
         */
@@ -286,6 +383,7 @@ class OfflineBootstrapController extends Controller
                 ->get([
                     'id',
                     'form_id',
+                    'form_version_id',
                     'consecutive',
                     'user_id',
                     'answers',
@@ -298,6 +396,9 @@ class OfflineBootstrapController extends Controller
     
                         'form_id' =>
                             $submission->form_id,
+
+                        'form_version_id' =>
+                            $submission->form_version_id,
     
                         'consecutive' =>
                             $submission->consecutive,
@@ -324,7 +425,10 @@ class OfflineBootstrapController extends Controller
     
         return response()->json([
             'forms' => $forms,
-    
+        
+            'form_versions' =>
+                $formVersions,
+        
             'submissions_by_form' =>
                 $submissionsByForm,
         ]);

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\FormSubmission;
 use App\Models\FormSubmissionHistory;
+use App\Models\FormVersion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,11 @@ class FormSubmissionsController extends Controller
                 'required',
                 'array',
             ],
+
+            'form_version_id' => [
+                'nullable',
+                'integer',
+            ],
     
             /*
              * Solo se envía cuando el registro fue creado offline.
@@ -56,16 +62,6 @@ class FormSubmissionsController extends Controller
                 'date',
             ],
         ]);
-    
-        $cleanAnswers = $this->validateAndCleanAnswers(
-            form: $form,
-            userId: $user?->id,
-            answers: $data['answers']
-        );
-    
-        if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
-            return $cleanAnswers;
-        }
     
         /*
          * Convertimos la fecha ISO enviada por JavaScript a la zona
@@ -104,8 +100,67 @@ class FormSubmissionsController extends Controller
             }
         }
     
+        /*
+        |--------------------------------------------------------------------------
+        | Versión del formulario
+        |--------------------------------------------------------------------------
+        |
+        | Si el cliente envía form_version_id significa que la versión fue
+        | congelada cuando inició la captura.
+        |
+        | Esto es especialmente importante para:
+        | - borradores;
+        | - capturas offline;
+        | - registros que comenzaron en V1 y se sincronizan cuando ya existe V2.
+        |
+        | Si no llega form_version_id conservamos compatibilidad con clientes
+        | anteriores y resolvemos la versión por fecha.
+        |
+        */
+        
+        $formVersionId = (int) (
+            $data['form_version_id'] ?? 0
+        );
+        
+        if ($formVersionId > 0) {
+            $formVersion = FormVersion::query()
+                ->whereKey($formVersionId)
+                ->where(
+                    'form_id',
+                    $form->id
+                )
+                ->first();
+        
+            if (!$formVersion) {
+                return response()->json([
+                    'message' =>
+                        'La versión seleccionada no pertenece a este formulario.',
+                ], 422);
+            }
+        } else {
+            $formVersion = $this->resolveFormVersion(
+                form: $form,
+                captureAt: $offlineCreatedAt
+            );
+        }
+
+        $versionPayload = is_array($formVersion->payload)
+            ? $formVersion->payload
+            : [];
+        
+        $cleanAnswers = $this->validateAndCleanAnswers(
+            payload: $versionPayload,
+            userId: $user?->id,
+            answers: $data['answers']
+        );
+        
+        if ($cleanAnswers instanceof \Illuminate\Http\JsonResponse) {
+            return $cleanAnswers;
+        }
+
         $submission = DB::transaction(function () use (
             $form,
+            $formVersion,
             $user,
             $cleanAnswers,
             $offlineCreatedAt
@@ -120,6 +175,7 @@ class FormSubmissionsController extends Controller
              */
             $submission = new FormSubmission([
                 'form_id' => $form->id,
+                'form_version_id' => $formVersion->id,
                 'consecutive' => $consecutive,
                 'user_id' => $user?->id,
                 'answers' => $cleanAnswers,
@@ -146,9 +202,9 @@ class FormSubmissionsController extends Controller
             $historySnapshot = $cleanAnswers;
 
             if (
-                data_get($form->payload, '_code_key') ===
-                'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
-            ) {
+                    data_get($formVersion->payload, '_code_key') ===
+                    'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
+                ) {
                 $historySnapshot =
                     $this->sanitizeReporteMantenimientoHistoryValue(
                         $historySnapshot
@@ -207,37 +263,85 @@ class FormSubmissionsController extends Controller
         }
     
         $query = FormSubmission::query()
-            ->with(['user:id,name'])
+            ->with([
+                'user:id,name',
+                'formVersion:id,form_id,version,version_key,layout_key,pdf_view,payload,fecha_desde,fecha_hasta',
+            ])
             ->where('form_id', $form->id)
             ->visibleTo($user);
-    
-        $subs = $query
+        
+        $rows = $query
             ->orderByDesc('consecutive')
             ->orderByDesc('id')
             ->limit(100)
             ->get([
                 'id',
                 'form_id',
+                'form_version_id',
                 'consecutive',
                 'user_id',
                 'answers',
                 'created_at',
-            ])
+            ]);
+        
+        /*
+        |--------------------------------------------------------------------------
+        | Versiones utilizadas por los registros
+        |--------------------------------------------------------------------------
+        |
+        | El payload se devuelve una sola vez por versión.
+        |
+        | Así, si existen 80 registros V1, no enviamos 80 veces
+        | exactamente el mismo payload.
+        |
+        */
+        $formVersions = $rows
+            ->pluck('formVersion')
+            ->filter()
+            ->unique('id')
+            ->mapWithKeys(function ($version) {
+                return [
+                    (string) $version->id => [
+                        'id' => $version->id,
+                        'form_id' => $version->form_id,
+                        'version' => $version->version,
+                        'version_key' => $version->version_key,
+                        'layout_key' => $version->layout_key,
+                        'pdf_view' => $version->pdf_view,
+                        'payload' => $version->payload,
+                        'fecha_desde' => $version->fecha_desde,
+                        'fecha_hasta' => $version->fecha_hasta,
+                    ],
+                ];
+            });
+        
+        $subs = $rows
             ->map(function ($sub) {
                 return [
                     'id' => $sub->id,
                     'form_id' => $sub->form_id,
+                    'form_version_id' => $sub->form_version_id,
                     'consecutive' => $sub->consecutive,
                     'user_id' => $sub->user_id,
                     'user_name' => $sub->user?->name,
                     'answers' => $sub->answers,
                     'created_at' => $sub->created_at,
+        
+                    'form_version' => $sub->formVersion
+                        ? [
+                            'id' => $sub->formVersion->id,
+                            'version' => $sub->formVersion->version,
+                            'version_key' => $sub->formVersion->version_key,
+                            'layout_key' => $sub->formVersion->layout_key,
+                        ]
+                        : null,
                 ];
             })
             ->values();
-    
+        
         return response()->json([
             'submissions' => $subs,
+            'form_versions' => $formVersions,
         ]);
     }
 
@@ -270,8 +374,20 @@ class FormSubmissionsController extends Controller
     
         $previousAnswers = is_array($submission->answers) ? $submission->answers : [];
     
+        $formVersion = $submission->formVersion;
+        
+        if (!$formVersion) {
+            return response()->json([
+                'message' => 'El registro no tiene una versión de formulario asociada.',
+            ], 422);
+        }
+        
+        $versionPayload = is_array($formVersion->payload)
+            ? $formVersion->payload
+            : [];
+
         $cleanAnswers = $this->validateAndCleanAnswers(
-            form: $form,
+            payload: $versionPayload,
             userId: $user?->id,
             answers: $data['answers'],
             previousAnswers: $previousAnswers
@@ -282,7 +398,7 @@ class FormSubmissionsController extends Controller
         }
     
         $changes = $this->buildSubmissionChanges(
-            form: $form,
+            payload: $versionPayload,
             oldAnswers: $previousAnswers,
             newAnswers: $cleanAnswers
         );
@@ -298,7 +414,7 @@ class FormSubmissionsController extends Controller
          * Para SGI-POP-FO-05 quitamos el Base64 únicamente del historial.
          */
         if (
-            data_get($form->payload, '_code_key') ===
+            data_get($versionPayload, '_code_key') ===
             'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
         ) {
             $historySnapshot =
@@ -368,6 +484,60 @@ class FormSubmissionsController extends Controller
     }
 
     /**
+     * Obtiene la versión del formulario que corresponde a una fecha
+     * cuando el cliente no envía explícitamente form_version_id.
+     *
+     * Se mantiene como compatibilidad para clientes anteriores:
+     * - Online: fecha actual.
+     * - Offline: offline_created_at.
+     */
+    private function resolveFormVersion(
+        Form $form,
+        ?Carbon $captureAt = null
+    ): FormVersion {
+        $captureDate = ($captureAt ?? now())
+            ->copy()
+            ->setTimezone(
+                config(
+                    'app.timezone',
+                    'America/Mexico_City'
+                )
+            )
+            ->toDateString();
+    
+        $version = FormVersion::query()
+            ->where(
+                'form_id',
+                $form->id
+            )
+            ->whereDate(
+                'fecha_desde',
+                '<=',
+                $captureDate
+            )
+            ->where(function ($query) use ($captureDate) {
+                $query
+                    ->whereNull('fecha_hasta')
+                    ->orWhereDate(
+                        'fecha_hasta',
+                        '>=',
+                        $captureDate
+                    );
+            })
+            ->orderByDesc('version')
+            ->first();
+    
+        if (!$version) {
+            abort(
+                422,
+                'No existe una versión vigente para este formulario.'
+            );
+        }
+    
+        return $version;
+    }
+
+    /**
      * Obtiene el siguiente consecutivo permanente por formulario.
      *
      * - Nunca reutiliza un consecutivo ya asignado.
@@ -427,22 +597,24 @@ class FormSubmissionsController extends Controller
      * Retorna array limpio o JsonResponse en caso de error.
      */
     private function validateAndCleanAnswers(
-        Form $form,
+        array $payload,
         ?int $userId,
         array $answers,
         array $previousAnswers = []
     ) {
-        // payload estándar esperado
         $fields = [];
+    
         if (
-            is_array($form->payload) &&
-            isset($form->payload['fields']) &&
-            is_array($form->payload['fields'])
+            isset($payload['fields']) &&
+            is_array($payload['fields'])
         ) {
-            $fields = $form->payload['fields'];
+            $fields = $payload['fields'];
         }
-
-        $formCodeKey = data_get($form->payload, '_code_key');
+    
+        $formCodeKey = data_get(
+            $payload,
+            '_code_key'
+        );
 
         // Tipos que NO son de entrada
         $nonInputTypes = ['static_text', 'separator', 'fixed_image', 'fixed_file'];
@@ -1321,17 +1493,20 @@ class FormSubmissionsController extends Controller
         return $cleanAnswers;
     }
 
-    private function buildSubmissionChanges(Form $form, array $oldAnswers, array $newAnswers): array
-    {
+    private function buildSubmissionChanges(
+        array $payload,
+        array $oldAnswers,
+        array $newAnswers
+    ): array {
         $changes = [];
     
         $fields = [];
+    
         if (
-            is_array($form->payload) &&
-            isset($form->payload['fields']) &&
-            is_array($form->payload['fields'])
+            isset($payload['fields']) &&
+            is_array($payload['fields'])
         ) {
-            $fields = $form->payload['fields'];
+            $fields = $payload['fields'];
         }
     
         foreach ($fields as $field) {

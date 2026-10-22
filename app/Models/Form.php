@@ -17,6 +17,13 @@ class Form extends Model
         return $this->hasMany(FormSubmission::class);
     }
 
+    public function versions()
+    {
+        return $this->hasMany(
+            FormVersion::class
+        );
+    }
+
     public function assignedUsers()
     {
         return $this->belongsToMany(User::class, 'form_user')->withTimestamps();

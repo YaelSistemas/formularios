@@ -112,6 +112,26 @@ export default function AdminForms() {
   const [historyItems, setHistoryItems] = useState([]);
   const [historyError, setHistoryError] = useState("");
 
+  // versiones
+  const [openVersionsModal, setOpenVersionsModal] = useState(false);
+  const [versionsForm, setVersionsForm] = useState(null);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionsItems, setVersionsItems] = useState([]);
+  const [pendingVersionsItems, setPendingVersionsItems] = useState([]);
+  const [versionsToday, setVersionsToday] = useState("");
+  const [versionsError, setVersionsError] = useState("");
+
+  const [versionCreateDate, setVersionCreateDate] = useState("");
+  const [versionCreateDescription, setVersionCreateDescription] = useState("");
+  const [creatingVersion, setCreatingVersion] = useState(false);
+  const [versionCreateError, setVersionCreateError] = useState("");
+
+  const [editingVersionId, setEditingVersionId] = useState(null);
+  const [versionEditDate, setVersionEditDate] = useState("");
+  const [versionEditDescription, setVersionEditDescription] = useState("");
+  const [updatingVersion, setUpdatingVersion] = useState(false);
+  const [versionEditError, setVersionEditError] = useState("");
+
   // asignaciones
   const [openAssignments, setOpenAssignments] = useState(false);
   const [assignmentForm, setAssignmentForm] = useState(null);
@@ -214,7 +234,14 @@ export default function AdminForms() {
   }, [page, lastPage]);
 
   useEffect(() => {
-    if (openPreview || openAssignments || openHistoryModal) return;
+    if (
+      openPreview ||
+      openAssignments ||
+      openHistoryModal ||
+      openVersionsModal
+    ) {
+      return;
+    }
     if (!searchWasFocusedRef.current) return;
 
     const el = searchRef.current;
@@ -237,7 +264,8 @@ export default function AdminForms() {
     openPreview,
     openAssignments,
     openHistoryModal,
-  ]);
+    openVersionsModal,
+    ]);
 
   const openPreviewModal = async (f) => {
     if (!canViewFormsAdmin) {
@@ -294,6 +322,263 @@ export default function AdminForms() {
       setHistoryError(e?.message || "Error cargando historial del formulario");
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const closeVersionsModal = () => {
+    setOpenVersionsModal(false);
+    setVersionsForm(null);
+    setVersionsItems([]);
+    setPendingVersionsItems([]);
+    setVersionsToday("");
+    setVersionsError("");
+    setVersionsLoading(false);
+  
+    setVersionCreateDate("");
+    setVersionCreateDescription("");
+    setCreatingVersion(false);
+    setVersionCreateError("");
+
+    setEditingVersionId(null);
+    setVersionEditDate("");
+    setVersionEditDescription("");
+    setUpdatingVersion(false);
+    setVersionEditError("");
+  };
+  
+  const openVersions = async (f) => {
+    if (!canViewFormsAdmin) {
+      setErr(
+        "No tienes permiso para ver las versiones del formulario."
+      );
+      return;
+    }
+  
+    setErr("");
+    setVersionsForm(f);
+    setVersionsItems([]);
+    setPendingVersionsItems([]);
+    setVersionsToday("");
+    setVersionsError("");
+    
+    setVersionCreateDate("");
+    setVersionCreateDescription("");
+    setVersionCreateError("");
+    setCreatingVersion(false);
+    
+    setEditingVersionId(null);
+    setVersionEditDate("");
+    setVersionEditDescription("");
+    setUpdatingVersion(false);
+    setVersionEditError("");
+    
+    setOpenVersionsModal(true);
+  
+    try {
+      const data = await apiGet(
+        `/admin/forms/${f.id}/versions`
+      );
+  
+      setVersionsItems(
+        Array.isArray(data?.versions)
+          ? data.versions
+          : []
+      );
+  
+      setPendingVersionsItems(
+        Array.isArray(data?.pending_versions)
+          ? data.pending_versions
+          : []
+      );
+  
+      setVersionsToday(
+        String(data?.today || "")
+      );
+    } catch (e) {
+      setVersionsError(
+        e?.message ||
+          "Error cargando versiones del formulario"
+      );
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
+
+  const createPendingVersion = async (version) => {
+    if (!versionsForm?.id || !version?.version_key) {
+      return;
+    }
+  
+    if (!versionCreateDate) {
+      setVersionCreateError(
+        "Selecciona la fecha de inicio de la nueva versión."
+      );
+      return;
+    }
+  
+    setVersionCreateError("");
+    setCreatingVersion(true);
+  
+    try {
+      await apiPost(
+        `/admin/forms/${versionsForm.id}/versions`,
+        {
+          version_key: version.version_key,
+          fecha_desde: versionCreateDate,
+          descripcion:
+            versionCreateDescription.trim() || null,
+        }
+      );
+  
+      showToast(
+        "success",
+        `✅ Versión V${version.version} creada correctamente`
+      );
+  
+      /*
+       * Recargamos las versiones para que:
+       * - desaparezca la pendiente creada;
+       * - cambie fecha_hasta de la anterior;
+       * - aparezca la nueva versión.
+       */
+      const data = await apiGet(
+        `/admin/forms/${versionsForm.id}/versions`
+      );
+  
+      setVersionsItems(
+        Array.isArray(data?.versions)
+          ? data.versions
+          : []
+      );
+  
+      setPendingVersionsItems(
+        Array.isArray(data?.pending_versions)
+          ? data.pending_versions
+          : []
+      );
+  
+      setVersionsToday(
+        String(data?.today || "")
+      );
+  
+      setVersionCreateDate("");
+      setVersionCreateDescription("");
+    } catch (e) {
+      setVersionCreateError(
+        e?.message ||
+          "Error creando la versión del formulario."
+      );
+    } finally {
+      setCreatingVersion(false);
+    }
+  };
+
+  const canEditScheduledVersion = (version) => {
+    if (!isAdmin || !version) {
+      return false;
+    }
+  
+    const latestVersionNumber = versionsItems.reduce(
+      (max, item) =>
+        Math.max(max, Number(item?.version || 0)),
+      0
+    );
+  
+    return (
+      String(version.status || "").toUpperCase() ===
+        "PROGRAMADA" &&
+      Number(version.submissions_count || 0) === 0 &&
+      Number(version.version || 0) ===
+        latestVersionNumber
+    );
+  };
+  
+  const startVersionEdit = (version) => {
+    if (!canEditScheduledVersion(version)) {
+      return;
+    }
+  
+    setEditingVersionId(Number(version.id));
+    setVersionEditDate(
+      String(version.fecha_desde || "")
+    );
+    setVersionEditDescription(
+      String(version.descripcion || "")
+    );
+    setVersionEditError("");
+  };
+  
+  const cancelVersionEdit = () => {
+    setEditingVersionId(null);
+    setVersionEditDate("");
+    setVersionEditDescription("");
+    setVersionEditError("");
+  };
+  
+  const updateScheduledVersion = async (version) => {
+    if (
+      !versionsForm?.id ||
+      !version?.id
+    ) {
+      return;
+    }
+  
+    if (!versionEditDate) {
+      setVersionEditError(
+        "Selecciona la nueva fecha de inicio."
+      );
+      return;
+    }
+  
+    setVersionEditError("");
+    setUpdatingVersion(true);
+  
+    try {
+      await apiPost(
+        `/admin/forms/${versionsForm.id}/versions/${version.id}/update`,
+        {
+          fecha_desde: versionEditDate,
+          descripcion:
+            versionEditDescription.trim() || null,
+        }
+      );
+  
+      showToast(
+        "success",
+        `✅ Versión V${version.version} actualizada correctamente`
+      );
+  
+      const data = await apiGet(
+        `/admin/forms/${versionsForm.id}/versions`
+      );
+  
+      setVersionsItems(
+        Array.isArray(data?.versions)
+          ? data.versions
+          : []
+      );
+  
+      setPendingVersionsItems(
+        Array.isArray(data?.pending_versions)
+          ? data.pending_versions
+          : []
+      );
+  
+      setVersionsToday(
+        String(data?.today || "")
+      );
+  
+      setEditingVersionId(null);
+      setVersionEditDate("");
+      setVersionEditDescription("");
+      setVersionEditError("");
+    } catch (e) {
+      setVersionEditError(
+        e?.message ||
+          "Error actualizando la versión."
+      );
+    } finally {
+      setUpdatingVersion(false);
     }
   };
 
@@ -563,6 +848,28 @@ export default function AdminForms() {
     if (status === "BORRADOR") return "warn";
     if (status === "INACTIVO") return "danger";
     return "default";
+  };
+
+  const versionStatusBadgeVariant = (status) => {
+    if (status === "VIGENTE") return "success";
+    if (status === "PROGRAMADA") return "info";
+    if (status === "HISTORICA") return "default";
+    if (status === "PENDIENTE_BD") return "warn";
+  
+    return "default";
+  };
+  
+  const formatVersionDate = (value) => {
+    if (!value) return "Sin fecha final";
+  
+    const raw = String(value).slice(0, 10);
+    const parts = raw.split("-");
+  
+    if (parts.length !== 3) {
+      return raw;
+    }
+  
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
   const toastStyle = (() => {
@@ -1623,6 +1930,16 @@ export default function AdminForms() {
                                 </IconBtn>
                               ) : null}
 
+                              {canViewFormsAdmin ? (
+                                <IconBtn
+                                  onClick={() => openVersions(f)}
+                                  title="Versiones"
+                                  variant="default"
+                                >
+                                  <i className="fa-solid fa-code-branch" />
+                                </IconBtn>
+                              ) : null}
+
                               {canAssignForms ? (
                                 <IconBtn
                                   onClick={() => openAssignmentsModal(f)}
@@ -1946,6 +2263,768 @@ export default function AdminForms() {
 
             <div style={S.modalFooter}>
               <Btn type="button" onClick={closeHistoryModal}>
+                Cerrar
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openVersionsModal && (
+        <div
+          style={S.modalOverlay}
+          onClick={closeVersionsModal}
+        >
+          <div
+            style={S.historyModal}
+            className="forms-history-modal-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={S.modalHeader}>
+              <div>
+                <h3 style={S.modalTitle}>
+                  Versiones del formulario
+                </h3>
+      
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#64748b",
+                    marginTop: 4,
+                  }}
+                >
+                  {versionsForm?.title || "Formulario"}
+                </div>
+              </div>
+      
+              <button
+                type="button"
+                style={S.xBtn}
+                onClick={closeVersionsModal}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+      
+            <div style={S.modalBody}>
+              {versionsToday ? (
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: "1px solid #dbeafe",
+                    background: "#eff6ff",
+                    color: "#1e40af",
+                    fontSize: 13,
+                    fontWeight: 700,
+                  }}
+                >
+                  Fecha utilizada para determinar la vigencia:{" "}
+                  <b>{formatVersionDate(versionsToday)}</b>
+                </div>
+              ) : null}
+      
+              {versionsLoading ? (
+                <div
+                  style={{
+                    color: "#475569",
+                    fontWeight: 800,
+                  }}
+                >
+                  Cargando versiones...
+                </div>
+              ) : versionsError ? (
+                <div
+                  style={{
+                    color: "#b91c1c",
+                    fontWeight: 800,
+                  }}
+                >
+                  {versionsError}
+                </div>
+              ) : (
+                <>
+                  {versionsItems.length ? (
+                    versionsItems.map((version) => (
+                      <div
+                        key={version.id}
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 16,
+                          background: "#fff",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: "14px 16px",
+                            borderBottom: "1px solid #eef2f7",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            gap: 12,
+                            flexWrap: "wrap",
+                            background: "#f8fafc",
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                fontSize: 20,
+                                fontWeight: 900,
+                                color: "#0f172a",
+                              }}
+                            >
+                              V{version.version}
+                            </div>
+      
+                            <div
+                              style={{
+                                marginTop: 4,
+                                fontSize: 12,
+                                color: "#64748b",
+                              }}
+                            >
+                              {version.version_key}
+                            </div>
+                          </div>
+      
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {canEditScheduledVersion(version) ? (
+                              <Btn
+                                type="button"
+                                variant="violet"
+                                onClick={() =>
+                                  startVersionEdit(version)
+                                }
+                                disabled={updatingVersion}
+                                style={{
+                                  padding: "6px 10px",
+                                  fontSize: 12,
+                                }}
+                              >
+                                <i className="fa-solid fa-pen" />
+                                Editar
+                              </Btn>
+                            ) : null}
+                          
+                            <Badge
+                              variant={versionStatusBadgeVariant(
+                                version.status
+                              )}
+                            >
+                              {version.status}
+                            </Badge>
+                          </div>
+                        </div>
+      
+                        <div
+                          style={{
+                            padding: 16,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 14,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fit, minmax(180px, 1fr))",
+                              gap: 12,
+                            }}
+                          >
+                            <div style={S.historyFieldBox}>
+                              <div style={S.historyFieldLabel}>
+                                Vigente desde
+                              </div>
+                              <div style={{ fontWeight: 800 }}>
+                                {formatVersionDate(
+                                  version.fecha_desde
+                                )}
+                              </div>
+                            </div>
+      
+                            <div style={S.historyFieldBox}>
+                              <div style={S.historyFieldLabel}>
+                                Vigente hasta
+                              </div>
+                              <div style={{ fontWeight: 800 }}>
+                                {version.fecha_hasta
+                                  ? formatVersionDate(
+                                      version.fecha_hasta
+                                    )
+                                  : "Sin fecha final"}
+                              </div>
+                            </div>
+      
+                            <div style={S.historyFieldBox}>
+                              <div style={S.historyFieldLabel}>
+                                Registros
+                              </div>
+                              <div
+                                style={{
+                                  fontWeight: 900,
+                                  fontSize: 18,
+                                }}
+                              >
+                                {Number(
+                                  version.submissions_count || 0
+                                )}
+                              </div>
+                            </div>
+      
+                            <div style={S.historyFieldBox}>
+                              <div style={S.historyFieldLabel}>
+                                Coincidencia con código
+                              </div>
+      
+                              <div>
+                                {version.code_matches ? (
+                                  <Badge variant="success">
+                                    Correcta
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="danger">
+                                    Inconsistente
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+      
+                          <div style={S.historyFieldBox}>
+                            <div style={S.historyFieldLabel}>
+                              Descripción
+                            </div>
+      
+                            <div
+                              style={{
+                                color: "#334155",
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              {version.descripcion ||
+                                "Sin descripción."}
+                            </div>
+                          </div>
+
+                          {Number(editingVersionId) ===
+                          Number(version.id) ? (
+                            <div
+                              style={{
+                                padding: 14,
+                                borderRadius: 12,
+                                border: "1px solid #c4b5fd",
+                                background: "#f5f3ff",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 12,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: 900,
+                                  color: "#5b21b6",
+                                }}
+                              >
+                                Editar V{version.version}
+                              </div>
+                          
+                              <div>
+                                <div style={S.label}>
+                                  Nueva fecha de inicio *
+                                </div>
+                          
+                                <input
+                                  type="date"
+                                  value={versionEditDate}
+                                  onChange={(e) => {
+                                    setVersionEditDate(
+                                      e.target.value
+                                    );
+                                    setVersionEditError("");
+                                  }}
+                                  style={{
+                                    ...S.input,
+                                    background: "#fff",
+                                  }}
+                                  disabled={updatingVersion}
+                                />
+                              </div>
+                          
+                              <div>
+                                <div style={S.label}>
+                                  Descripción
+                                </div>
+                          
+                                <textarea
+                                  rows={3}
+                                  value={versionEditDescription}
+                                  onChange={(e) =>
+                                    setVersionEditDescription(
+                                      e.target.value
+                                    )
+                                  }
+                                  style={{
+                                    ...S.input,
+                                    resize: "vertical",
+                                    background: "#fff",
+                                  }}
+                                  disabled={updatingVersion}
+                                />
+                              </div>
+                          
+                              {versionEditError ? (
+                                <div
+                                  style={{
+                                    padding: "10px 12px",
+                                    borderRadius: 10,
+                                    border: "1px solid #fecaca",
+                                    background: "#fef2f2",
+                                    color: "#b91c1c",
+                                    fontWeight: 800,
+                                    fontSize: 13,
+                                  }}
+                                >
+                                  {versionEditError}
+                                </div>
+                              ) : null}
+                          
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "flex-end",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <Btn
+                                  type="button"
+                                  onClick={cancelVersionEdit}
+                                  disabled={updatingVersion}
+                                >
+                                  Cancelar
+                                </Btn>
+                          
+                                <Btn
+                                  type="button"
+                                  variant="violet"
+                                  onClick={() =>
+                                    updateScheduledVersion(
+                                      version
+                                    )
+                                  }
+                                  disabled={
+                                    updatingVersion ||
+                                    !versionEditDate
+                                  }
+                                >
+                                  {updatingVersion
+                                    ? "Guardando..."
+                                    : "Guardar cambios"}
+                                </Btn>
+                              </div>
+                          
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: "#6d28d9",
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                Al cambiar la fecha de inicio,
+                                la versión anterior terminará
+                                automáticamente un día antes.
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {String(version.status || "").toUpperCase() ===
+                            "PROGRAMADA" &&
+                          Number(version.submissions_count || 0) > 0 ? (
+                            <div
+                              style={{
+                                padding: "10px 12px",
+                                borderRadius: 10,
+                                border: "1px solid #fed7aa",
+                                background: "#fff7ed",
+                                color: "#9a3412",
+                                fontWeight: 700,
+                                fontSize: 12,
+                              }}
+                            >
+                              Fecha bloqueada: esta versión ya tiene{" "}
+                              {Number(version.submissions_count || 0)}{" "}
+                              registro(s) asociados.
+                            </div>
+                          ) : null}
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fit, minmax(240px, 1fr))",
+                              gap: 12,
+                            }}
+                          >
+                            <div style={S.historyFieldBox}>
+                              <div style={S.historyFieldLabel}>
+                                Layout
+                              </div>
+                              <div
+                                style={{
+                                  fontFamily: "monospace",
+                                  fontSize: 12,
+                                  overflowWrap: "anywhere",
+                                }}
+                              >
+                                {version.layout_key}
+                              </div>
+                            </div>
+      
+                            <div style={S.historyFieldBox}>
+                              <div style={S.historyFieldLabel}>
+                                PDF
+                              </div>
+                              <div
+                                style={{
+                                  fontFamily: "monospace",
+                                  fontSize: 12,
+                                  overflowWrap: "anywhere",
+                                }}
+                              >
+                                {version.pdf_view}
+                              </div>
+                            </div>
+                          </div>
+      
+                          {!version.registered_in_code ? (
+                            <div
+                              style={{
+                                padding: "12px 14px",
+                                borderRadius: 12,
+                                border: "1px solid #fecaca",
+                                background: "#fef2f2",
+                                color: "#b91c1c",
+                                fontWeight: 800,
+                              }}
+                            >
+                              Esta versión existe en la base de datos
+                              pero ya no está registrada en código.
+                            </div>
+                          ) : null}
+      
+                          {version.registered_in_code &&
+                          !version.code_matches ? (
+                            <div
+                              style={{
+                                padding: "12px 14px",
+                                borderRadius: 12,
+                                border: "1px solid #fecaca",
+                                background: "#fef2f2",
+                                color: "#b91c1c",
+                                fontWeight: 800,
+                              }}
+                            >
+                              Los archivos registrados en código no
+                              coinciden con los metadatos guardados
+                              para esta versión.
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div
+                      style={{
+                        color: "#64748b",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Este formulario no tiene versiones registradas.
+                    </div>
+                  )}
+      
+                  {pendingVersionsItems.length ? (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 900,
+                          color: "#92400e",
+                        }}
+                      >
+                        Versiones pendientes de crear en la base
+                      </div>
+                  
+                      {[...pendingVersionsItems]
+                        .sort(
+                          (a, b) =>
+                            Number(a?.version || 0) -
+                            Number(b?.version || 0)
+                        )
+                        .map((version, index) => {
+                          const isNextVersion =
+                            index === 0;
+                  
+                          return (
+                            <div
+                              key={version.version_key}
+                              style={{
+                                padding: 14,
+                                borderRadius: 14,
+                                border: "1px solid #fde68a",
+                                background: "#fffbeb",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: 10,
+                                  flexWrap: "wrap",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <div>
+                                  <div
+                                    style={{
+                                      fontWeight: 900,
+                                      fontSize: 18,
+                                    }}
+                                  >
+                                    V{version.version}
+                                  </div>
+                  
+                                  <div
+                                    style={{
+                                      marginTop: 5,
+                                      fontSize: 12,
+                                      color: "#92400e",
+                                      overflowWrap: "anywhere",
+                                    }}
+                                  >
+                                    {version.version_key}
+                                  </div>
+                                </div>
+                  
+                                <Badge variant="warn">
+                                  PENDIENTE
+                                </Badge>
+                              </div>
+                  
+                              <div
+                                style={{
+                                  marginTop: 12,
+                                  display: "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit, minmax(220px, 1fr))",
+                                  gap: 10,
+                                }}
+                              >
+                                <div style={S.historyFieldBox}>
+                                  <div style={S.historyFieldLabel}>
+                                    Layout
+                                  </div>
+                  
+                                  <div
+                                    style={{
+                                      fontFamily: "monospace",
+                                      fontSize: 12,
+                                      overflowWrap: "anywhere",
+                                    }}
+                                  >
+                                    {version.layout_key}
+                                  </div>
+                                </div>
+                  
+                                <div style={S.historyFieldBox}>
+                                  <div style={S.historyFieldLabel}>
+                                    PDF
+                                  </div>
+                  
+                                  <div
+                                    style={{
+                                      fontFamily: "monospace",
+                                      fontSize: 12,
+                                      overflowWrap: "anywhere",
+                                    }}
+                                  >
+                                    {version.pdf_view}
+                                  </div>
+                                </div>
+                              </div>
+                  
+                              {isAdmin && isNextVersion ? (
+                                <div
+                                  style={{
+                                    marginTop: 14,
+                                    paddingTop: 14,
+                                    borderTop:
+                                      "1px solid #fde68a",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 12,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontWeight: 900,
+                                      color: "#78350f",
+                                    }}
+                                  >
+                                    Crear V{version.version}
+                                  </div>
+                  
+                                  <div>
+                                    <div style={S.label}>
+                                      Fecha de inicio *
+                                    </div>
+                  
+                                    <input
+                                      type="date"
+                                      value={versionCreateDate}
+                                      onChange={(e) => {
+                                        setVersionCreateDate(
+                                          e.target.value
+                                        );
+                  
+                                        setVersionCreateError("");
+                                      }}
+                                      style={{
+                                        ...S.input,
+                                        background: "#fff",
+                                      }}
+                                      disabled={creatingVersion}
+                                    />
+                                  </div>
+                  
+                                  <div>
+                                    <div style={S.label}>
+                                      Descripción
+                                    </div>
+                  
+                                    <textarea
+                                      rows={3}
+                                      value={
+                                        versionCreateDescription
+                                      }
+                                      onChange={(e) => {
+                                        setVersionCreateDescription(
+                                          e.target.value
+                                        );
+                                      }}
+                                      placeholder="Ej. Nueva revisión del formato..."
+                                      style={{
+                                        ...S.input,
+                                        resize: "vertical",
+                                        background: "#fff",
+                                      }}
+                                      disabled={creatingVersion}
+                                    />
+                                  </div>
+                  
+                                  {versionCreateError ? (
+                                    <div
+                                      style={{
+                                        padding: "10px 12px",
+                                        borderRadius: 10,
+                                        border:
+                                          "1px solid #fecaca",
+                                        background: "#fef2f2",
+                                        color: "#b91c1c",
+                                        fontWeight: 800,
+                                        fontSize: 13,
+                                      }}
+                                    >
+                                      {versionCreateError}
+                                    </div>
+                                  ) : null}
+                  
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent:
+                                        "flex-end",
+                                    }}
+                                  >
+                                    <Btn
+                                      type="button"
+                                      variant="violet"
+                                      onClick={() =>
+                                        createPendingVersion(
+                                          version
+                                        )
+                                      }
+                                      disabled={
+                                        creatingVersion ||
+                                        !versionCreateDate
+                                      }
+                                    >
+                                      {creatingVersion
+                                        ? "Creando versión..."
+                                        : `Crear V${version.version}`}
+                                    </Btn>
+                                  </div>
+                  
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      color: "#92400e",
+                                      lineHeight: 1.5,
+                                    }}
+                                  >
+                                    Al crear esta versión, la
+                                    versión anterior terminará
+                                    automáticamente un día antes
+                                    de la fecha seleccionada.
+                                  </div>
+                                </div>
+                              ) : null}
+                  
+                              {!isNextVersion ? (
+                                <div
+                                  style={{
+                                    marginTop: 12,
+                                    fontSize: 12,
+                                    color: "#92400e",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  Primero debe crearse la versión
+                                  pendiente anterior.
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+      
+            <div style={S.modalFooter}>
+              <Btn
+                type="button"
+                onClick={closeVersionsModal}
+              >
                 Cerrar
               </Btn>
             </div>

@@ -9,6 +9,8 @@ import {
   getCachedFormDetail,
   cacheFormSubmissions,
   getCachedFormSubmissions,
+  cacheFormVersions,
+  getCachedFormVersions,
 } from "../../offline/forms-cache";
 
 import {
@@ -268,6 +270,14 @@ export default function FormsIndex() {
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [selectedSub, setSelectedSub] = useState(null);
 
+  const [formVersions, setFormVersions] =
+    useState({});
+
+  const [
+    captureFormVersion,
+    setCaptureFormVersion,
+  ] = useState(null);
+
   const [search, setSearch] = useState("");
   const [mobileSearchResetKey, setMobileSearchResetKey] = useState(0);
   const searchInputRef = useRef(null);
@@ -375,6 +385,153 @@ export default function FormsIndex() {
   const currentUserId = Number(
     me?.id || 0
   );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Resolver versión para una captura nueva
+  |--------------------------------------------------------------------------
+  |
+  | Si preferredVersionId viene informado, se respeta exactamente esa
+  | versión. Esto se utilizará para continuar borradores V1 aunque V2
+  | ya esté vigente.
+  |
+  | Si no se especifica versión, buscamos la vigente para la fecha actual.
+  |
+  */
+  
+  const getMexicoDateString = () => {
+    const parts =
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Mexico_City",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+  
+    const year =
+      parts.find(
+        (part) => part.type === "year"
+      )?.value || "";
+  
+    const month =
+      parts.find(
+        (part) => part.type === "month"
+      )?.value || "";
+  
+    const day =
+      parts.find(
+        (part) => part.type === "day"
+      )?.value || "";
+  
+    return `${year}-${month}-${day}`;
+  };
+  
+  const getVersionDateOnly = (value) => {
+    if (!value) {
+      return null;
+    }
+  
+    const match = String(value).match(
+      /^(\d{4}-\d{2}-\d{2})/
+    );
+  
+    return match?.[1] || null;
+  };
+  
+  const resolveCaptureFormVersion = async (
+    formId,
+    preferredVersionId = null
+  ) => {
+    const fid = Number(formId || 0);
+  
+    if (!fid || !currentUserId) {
+      return {
+        version: null,
+        versions: {},
+      };
+    }
+  
+    const versions =
+      await getCachedFormVersions(
+        currentUserId,
+        fid
+      );
+  
+    const rows = Object.values(
+      versions || {}
+    ).filter(
+      (version) =>
+        Number(version?.form_id || 0) ===
+        fid
+    );
+  
+    /*
+     * Un borrador que ya tiene versión debe
+     * conservarla aunque ya no esté vigente.
+     */
+    const preferredId = Number(
+      preferredVersionId || 0
+    );
+  
+    if (preferredId > 0) {
+      const preferred =
+        rows.find(
+          (version) =>
+            Number(version?.id || 0) ===
+            preferredId
+        ) || null;
+  
+      return {
+        version: preferred,
+        versions,
+      };
+    }
+  
+    /*
+     * Captura completamente nueva:
+     * buscamos la versión vigente hoy.
+     */
+    const today =
+      getMexicoDateString();
+  
+    const activeVersion =
+      rows
+        .filter((version) => {
+          const from =
+            getVersionDateOnly(
+              version?.fecha_desde
+            );
+  
+          const to =
+            getVersionDateOnly(
+              version?.fecha_hasta
+            );
+  
+          if (!from) {
+            return false;
+          }
+  
+          if (from > today) {
+            return false;
+          }
+  
+          if (to && to < today) {
+            return false;
+          }
+  
+          return true;
+        })
+        .sort(
+          (a, b) =>
+            Number(b?.version || 0) -
+            Number(a?.version || 0)
+        )[0] || null;
+  
+    return {
+      version: activeVersion,
+      versions,
+    };
+  };
 
   const selectedFormKey = useMemo(() => {
     const catalogForm = forms.find(
@@ -501,15 +658,38 @@ export default function FormsIndex() {
   const noPermissionMessage = (actionText) =>
     `No cuentas con los permisos necesarios para ${actionText}. Contacta a tu administrador o al equipo de Sistemas.`;
 
-  const pushFormsState = (nextMode, extra = {}) => {
+  const pushFormsState = (
+    nextMode,
+    extra = {}
+  ) => {
     const state = {
       page: "forms-index",
       mode: nextMode,
-      selectedId: extra.selectedId ?? selectedId ?? null,
-      selectedSub: extra.selectedSub ?? selectedSub ?? null,
+  
+      selectedId:
+        extra.selectedId ??
+        selectedId ??
+        null,
+  
+      selectedSub:
+        extra.selectedSub ??
+        selectedSub ??
+        null,
+  
+      captureFormVersionId:
+        nextMode === "fill"
+          ? (
+              extra.captureFormVersionId ??
+              captureFormVersion?.id ??
+              null
+            )
+          : null,
     };
-
-    window.history.pushState(state, "");
+  
+    window.history.pushState(
+      state,
+      ""
+    );
   };
 
   const clearSearch = () => {
@@ -526,6 +706,7 @@ export default function FormsIndex() {
       mode: "table",
       selectedId: null,
       selectedSub: null,
+      captureFormVersionId: null,
     };
 
     window.history.pushState(nextState, "");
@@ -535,7 +716,9 @@ export default function FormsIndex() {
     setSelectedSub(null);
     setDetail(null);
     setDraftInitialAnswers(null);
+    setCaptureFormVersion(null);
     setSubs([]);
+    setFormVersions({});
     setErr("");
     setSuccessMsg("");
     clearSearch();
@@ -711,26 +894,41 @@ export default function FormsIndex() {
   
     try {
       /*
-       * Sin conexión no intentamos consultar la API.
-       * Leemos directamente los registros guardados en IndexedDB.
-       *
-       * Un arreglo vacío también es válido:
-       * significa que el formulario no tiene registros guardados.
+       * Sin conexión:
+       * leemos registros y versiones históricas
+       * directamente desde IndexedDB.
        */
       if (!navigator.onLine) {
-        const cached =
-          await getCachedFormSubmissions(
+        const [
+          cached,
+          cachedVersions,
+        ] = await Promise.all([
+          getCachedFormSubmissions(
             currentUserId,
             id
-          );
+          ),
+  
+          getCachedFormVersions(
+            currentUserId,
+            id
+          ),
+        ]);
   
         setSubs(cached);
+  
+        setFormVersions(
+          cachedVersions
+        );
+  
         setOfflineMode(true);
         setErr("");
   
         return;
       }
   
+      /*
+       * Modo online.
+       */
       const data = await apiGet(
         `/forms/${id}/submissions`
       );
@@ -741,6 +939,36 @@ export default function FormsIndex() {
         ? data.submissions
         : [];
   
+      const versions =
+        data?.form_versions &&
+        typeof data.form_versions ===
+          "object" &&
+        !Array.isArray(
+          data.form_versions
+        )
+          ? data.form_versions
+          : {};
+  
+      /*
+       * Primero dejamos las versiones
+       * disponibles en memoria.
+       */
+      setFormVersions(
+        versions
+      );
+  
+      /*
+       * También las guardamos en IndexedDB
+       * para poder usarlas offline.
+       */
+      await cacheFormVersions(
+        currentUserId,
+        versions
+      );
+  
+      /*
+       * Guardamos los registros.
+       */
       await cacheFormSubmissions(
         currentUserId,
         id,
@@ -764,11 +992,24 @@ export default function FormsIndex() {
         token,
       }).catch(() => null);
     } catch (e) {
-      const cached =
-        await getCachedFormSubmissions(
+      /*
+       * Si falla la API recuperamos tanto
+       * registros como versiones desde IndexedDB.
+       */
+      const [
+        cached,
+        cachedVersions,
+      ] = await Promise.all([
+        getCachedFormSubmissions(
           currentUserId,
           id
-        );
+        ),
+  
+        getCachedFormVersions(
+          currentUserId,
+          id
+        ),
+      ]);
   
       const errorMessage = String(
         e?.message || ""
@@ -790,11 +1031,16 @@ export default function FormsIndex() {
         );
   
       /*
-       * Cuando falla la red usamos la caché incluso
-       * cuando está vacía.
+       * Cuando falla la red usamos
+       * la caché incluso si está vacía.
        */
       if (isNetworkError) {
         setSubs(cached);
+  
+        setFormVersions(
+          cachedVersions
+        );
+  
         setOfflineMode(true);
         setErr("");
   
@@ -802,11 +1048,17 @@ export default function FormsIndex() {
       }
   
       /*
-       * Si existe información guardada, todavía podemos
-       * mostrarla aunque el servidor haya fallado.
+       * Si existe información guardada,
+       * todavía podemos mostrarla aunque
+       * haya fallado el servidor.
        */
       if (cached.length > 0) {
         setSubs(cached);
+  
+        setFormVersions(
+          cachedVersions
+        );
+  
         setOfflineMode(true);
         setErr("");
   
@@ -844,6 +1096,7 @@ export default function FormsIndex() {
       mode: "table",
       selectedId: null,
       selectedSub: null,
+      captureFormVersionId: null,
     };
 
     if (
@@ -860,9 +1113,19 @@ export default function FormsIndex() {
         return;
       }
 
-      const nextMode = state.mode || "table";
-      const nextSelectedId = state.selectedId ?? null;
-      const nextSelectedSub = state.selectedSub ?? null;
+      const nextMode =
+        state.mode || "table";
+      
+      const nextSelectedId =
+        state.selectedId ?? null;
+      
+      const nextSelectedSub =
+        state.selectedSub ?? null;
+      
+      const nextCaptureFormVersionId =
+        Number(
+          state.captureFormVersionId || 0
+        );
 
       setMode(nextMode);
       setSelectedId(nextSelectedId);
@@ -878,14 +1141,62 @@ export default function FormsIndex() {
       if (nextMode === "table") {
         setDetail(null);
         setSubs([]);
+        setFormVersions({});
+        setCaptureFormVersion(null);
+      
         return;
       }
 
       if (nextSelectedId) {
-        await loadDetail(nextSelectedId);
-
-        if (nextMode === "responses" && canViewSubmissions) {
-          await loadSubmissions(nextSelectedId);
+        /*
+         * Si regresamos mediante Atrás/Adelante
+         * a una captura, restauramos exactamente
+         * la versión que estaba fijada.
+         */
+        if (nextMode === "fill") {
+          const {
+            version,
+            versions,
+          } =
+            await resolveCaptureFormVersion(
+              nextSelectedId,
+              nextCaptureFormVersionId ||
+                null
+            );
+      
+          if (!version) {
+            setCaptureFormVersion(null);
+      
+            setErr(
+              "No se pudo restaurar la versión del formulario para esta captura."
+            );
+      
+            return;
+          }
+      
+          setFormVersions((prev) => ({
+            ...prev,
+            ...versions,
+          }));
+      
+          setCaptureFormVersion(
+            version
+          );
+        } else {
+          setCaptureFormVersion(null);
+        }
+      
+        await loadDetail(
+          nextSelectedId
+        );
+      
+        if (
+          nextMode === "responses" &&
+          canViewSubmissions
+        ) {
+          await loadSubmissions(
+            nextSelectedId
+          );
         }
       }
     };
@@ -1032,23 +1343,38 @@ export default function FormsIndex() {
           const [
             cachedDetail,
             cachedSubmissions,
+            cachedVersions,
           ] = await Promise.all([
             getCachedFormDetail(
               currentUserId,
               selectedId
             ),
-
+        
             getCachedFormSubmissions(
               currentUserId,
               selectedId
             ),
+        
+            getCachedFormVersions(
+              currentUserId,
+              selectedId
+            ),
           ]);
-
+        
           if (cachedDetail) {
-            setDetail(cachedDetail);
+            setDetail(
+              cachedDetail
+            );
           }
-
-          setSubs(cachedSubmissions);
+        
+          setSubs(
+            cachedSubmissions
+          );
+        
+          setFormVersions(
+            cachedVersions
+          );
+        
           setOfflineMode(false);
           setErr("");
         }
@@ -1102,11 +1428,62 @@ export default function FormsIndex() {
 
   const startFill = async (
     id,
-    initialAnswers = null
+    initialAnswers = null,
+    preferredVersionId = null
   ) => {
+    setErr("");
+  
+    /*
+     * La versión se fija ANTES de entrar
+     * a la captura.
+     */
+    const {
+      version,
+      versions,
+    } =
+      await resolveCaptureFormVersion(
+        id,
+        preferredVersionId
+      );
+  
+    if (!version) {
+      setCaptureFormVersion(null);
+  
+      if (
+        Number(
+          preferredVersionId || 0
+        ) > 0
+      ) {
+        setErr(
+          "No se encontró la versión del formulario con la que se inició este borrador."
+        );
+      } else {
+        setErr(
+          "No existe una versión vigente disponible para iniciar este formulario."
+        );
+      }
+  
+      return;
+    }
+  
+    /*
+     * Dejamos las versiones disponibles
+     * también en memoria.
+     */
+    setFormVersions((prev) => ({
+      ...prev,
+      ...versions,
+    }));
+  
+    setCaptureFormVersion(
+      version
+    );
+  
     pushFormsState("fill", {
       selectedId: id,
       selectedSub: null,
+      captureFormVersionId:
+        version.id,
     });
   
     setSelectedId(id);
@@ -1114,7 +1491,8 @@ export default function FormsIndex() {
   
     setDraftInitialAnswers(
       initialAnswers &&
-        typeof initialAnswers === "object"
+        typeof initialAnswers ===
+          "object"
         ? initialAnswers
         : null
     );
@@ -1237,9 +1615,15 @@ export default function FormsIndex() {
   
     closeDraftModal();
   
+    const draftVersionId =
+      Number(
+        draft?.form_version_id || 0
+      );
+    
     await startFill(
       formId,
-      draftAnswers
+      draftAnswers,
+      draftVersionId || null
     );
   };
   
@@ -1889,14 +2273,255 @@ export default function FormsIndex() {
     return historyData.filter((item) => item.action === "updated");
   }, [historyData]);
 
+  /*
+  |--------------------------------------------------------------------------
+  | Versión histórica del registro seleccionado
+  |--------------------------------------------------------------------------
+  |
+  | Para visualizar o editar un registro existente utilizamos
+  | permanentemente la versión que tiene en form_version_id.
+  |
+  */
+  const selectedFormVersion = useMemo(() => {
+    const versionId = Number(
+      selectedSub?.form_version_id || 0
+    );
+  
+    if (!versionId) {
+      return null;
+    }
+  
+    return (
+      formVersions[String(versionId)] ||
+      null
+    );
+  }, [
+    selectedSub,
+    formVersions,
+  ]);
+  
+  /*
+  |--------------------------------------------------------------------------
+  | Formulario de la captura actual
+  |--------------------------------------------------------------------------
+  |
+  | Una captura nueva utiliza el snapshot de la versión que quedó fijada
+  | al entrar al formulario.
+  |
+  */
+  
+  const versionedFillForm =
+    useMemo(() => {
+      if (
+        !detail ||
+        !captureFormVersion
+      ) {
+        return null;
+      }
+  
+      const versionPayload =
+        captureFormVersion?.payload;
+  
+      if (
+        !versionPayload ||
+        typeof versionPayload !==
+          "object" ||
+        Array.isArray(versionPayload)
+      ) {
+        return null;
+      }
+  
+      const currentMeta =
+        versionPayload?.meta &&
+        typeof versionPayload.meta ===
+          "object" &&
+        !Array.isArray(
+          versionPayload.meta
+        )
+          ? versionPayload.meta
+          : {};
+  
+      const layoutKey = String(
+        captureFormVersion
+          ?.layout_key ||
+          currentMeta.layout ||
+          ""
+      ).trim();
+  
+      return {
+        ...detail,
+  
+        payload: {
+          ...versionPayload,
+  
+          meta: {
+            ...currentMeta,
+  
+            ...(layoutKey
+              ? {
+                  layout:
+                    layoutKey,
+                }
+              : {}),
+          },
+        },
+  
+        form_version_id:
+          captureFormVersion.id,
+  
+        form_version_number:
+          captureFormVersion.version,
+  
+        version_key:
+          captureFormVersion.version_key,
+  
+        version_layout_key:
+          layoutKey || null,
+  
+        form_version:
+          captureFormVersion,
+      };
+    }, [
+      detail,
+      captureFormVersion,
+    ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Formulario histórico
+  |--------------------------------------------------------------------------
+  |
+  | Conservamos id, título y demás información general del formulario,
+  | pero reemplazamos el payload actual por el snapshot de FormVersion.
+  |
+  */
+  const versionedResponseForm = useMemo(() => {
+    if (!detail || !selectedSub) {
+      return null;
+    }
+  
+    const versionId = Number(
+      selectedSub?.form_version_id || 0
+    );
+  
+    /*
+     * Un registro local pendiente todavía puede no tener versión.
+     * Esos casos se terminarán de adaptar cuando versionemos offline.
+     */
+    if (!versionId) {
+      return detail;
+    }
+  
+    if (
+      !selectedFormVersion ||
+      !selectedFormVersion.payload ||
+      typeof selectedFormVersion.payload !==
+        "object" ||
+      Array.isArray(
+        selectedFormVersion.payload
+      )
+    ) {
+      return null;
+    }
+  
+    const versionPayload =
+      selectedFormVersion.payload;
+  
+    const currentMeta =
+      versionPayload?.meta &&
+      typeof versionPayload.meta ===
+        "object" &&
+      !Array.isArray(versionPayload.meta)
+        ? versionPayload.meta
+        : {};
+  
+    const layoutKey = String(
+      selectedFormVersion.layout_key ||
+        currentMeta.layout ||
+        ""
+    ).trim();
+  
+    return {
+      ...detail,
+  
+      /*
+       * Snapshot inmutable de la versión.
+       */
+      payload: {
+        ...versionPayload,
+        meta: {
+          ...currentMeta,
+          ...(layoutKey
+            ? {
+                layout: layoutKey,
+              }
+            : {}),
+        },
+      },
+  
+      /*
+       * Metadatos útiles para React.
+       */
+      form_version_id:
+        selectedFormVersion.id,
+  
+      form_version_number:
+        selectedFormVersion.version,
+  
+      version_key:
+        selectedFormVersion.version_key,
+  
+      version_layout_key:
+        layoutKey || null,
+  
+      form_version:
+        selectedFormVersion,
+    };
+  }, [
+    detail,
+    selectedSub,
+    selectedFormVersion,
+  ]);
+
   if (loading) {
     return <div style={{ padding: 16 }}>Cargando formularios...</div>;
   }
 
-  if (mode === "fill" && detail) {
+  if (
+    mode === "fill" &&
+    detail &&
+    !versionedFillForm
+  ) {
+    return (
+      <Card>
+        <div
+          style={{
+            color: "#b91c1c",
+            fontWeight: 800,
+            marginBottom: 12,
+          }}
+        >
+          No se pudo cargar la versión
+          del formulario para esta captura.
+        </div>
+  
+        <Btn
+          type="button"
+          onClick={goToTable}
+        >
+          Volver a formularios
+        </Btn>
+      </Card>
+    );
+  }
+  
+  if (
+    mode === "fill" &&
+    versionedFillForm
+  ) {
     return (
       <FormFill
-        form={detail}
+        form={versionedFillForm}
         onBack={goToTable}
         initialAnswers={
           draftInitialAnswers
@@ -1905,10 +2530,54 @@ export default function FormsIndex() {
     );
   }
 
+  if (
+    (
+      mode === "response_view" ||
+      mode === "response_edit"
+    ) &&
+    detail &&
+    selectedSub &&
+    selectedSub?.form_version_id &&
+    !versionedResponseForm
+  ) {
+    return (
+      <Card>
+        <div
+          style={{
+            color: "#b91c1c",
+            fontWeight: 800,
+            marginBottom: 12,
+          }}
+        >
+          No se pudo cargar la versión histórica
+          de este registro.
+        </div>
+  
+        <div
+          style={{
+            color: "#64748b",
+            fontSize: 13,
+            marginBottom: 14,
+          }}
+        >
+          Vuelve al listado y actualiza los
+          registros con conexión a internet.
+        </div>
+  
+        <Btn
+          type="button"
+          onClick={goToResponses}
+        >
+          Volver a registros
+        </Btn>
+      </Card>
+    );
+  }
+
   if (mode === "response_view" && detail && selectedSub) {
     return (
       <FormFill
-        form={detail}
+        form={versionedResponseForm || detail}
         onBack={goToResponses}
         readOnly={true}
         initialAnswers={selectedSub.answers || {}}
@@ -1924,7 +2593,7 @@ export default function FormsIndex() {
   if (mode === "response_edit" && detail && selectedSub) {
     return (
       <FormFill
-        form={detail}
+        form={versionedResponseForm || detail}
         onBack={goToResponses}
         readOnly={false}
         initialAnswers={selectedSub.answers || {}}

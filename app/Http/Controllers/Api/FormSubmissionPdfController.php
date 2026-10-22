@@ -10,143 +10,184 @@ use Illuminate\Http\Request;
 
 class FormSubmissionPdfController extends Controller
 {
-    public function show(Request $request, Form $form, FormSubmission $submission)
-    {
+    public function show(
+        Request $request,
+        Form $form,
+        FormSubmission $submission
+    ) {
         $user = $request->user();
 
         if (!$user) {
-            return response()->json(['message' => 'No autorizado.'], 401);
+            return response()->json([
+                'message' => 'No autorizado.',
+            ], 401);
         }
 
-        if ((int) $submission->form_id !== (int) $form->id) {
-            return response()->json(['message' => 'Registro no encontrado para este formulario.'], 404);
+        if (
+            (int) $submission->form_id !==
+            (int) $form->id
+        ) {
+            return response()->json([
+                'message' =>
+                    'Registro no encontrado para este formulario.',
+            ], 404);
         }
 
-        if (!$user->hasRole('Administrador') && $form->status !== 'PUBLICADO') {
-            return response()->json(['message' => 'No encontrado.'], 404);
+        if (
+            !$user->hasRole('Administrador') &&
+            $form->status !== 'PUBLICADO'
+        ) {
+            return response()->json([
+                'message' => 'No encontrado.',
+            ], 404);
         }
 
-        $submission->load('user');
-
-        $answers = is_array($submission->answers) ? $submission->answers : [];
-        $fields = is_array(data_get($form->payload, 'fields')) ? data_get($form->payload, 'fields') : [];
-        $formCodeKey = (string) data_get($form->payload, '_code_key', '');
-
-        $view = $this->resolvePdfView($formCodeKey);
-
-        $pdf = Pdf::loadView($view, [
-            'form' => $form,
-            'submission' => $submission,
-            'answers' => $answers,
-            'fields' => $fields,
-            'userName' => $submission->user?->name,
-            'generatedAt' => now(),
+        /*
+        |--------------------------------------------------------------------------
+        | Cargar usuario y versión histórica
+        |--------------------------------------------------------------------------
+        |
+        | El PDF debe depender de la versión que quedó guardada
+        | permanentemente en el registro.
+        |
+        */
+        $submission->load([
+            'user',
+            'formVersion',
         ]);
 
-        $fileName = 'registro_' . $form->id . '_' . $submission->id . '.pdf';
+        $formVersion = $submission->formVersion;
 
-        return response($pdf->output(), 200)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
-    }
+        if (!$formVersion) {
+            return response()->json([
+                'message' =>
+                    'El registro no tiene una versión de formulario asociada.',
+            ], 422);
+        }
 
-    private function resolvePdfView(string $formCodeKey): string
-    {
-        return match ($formCodeKey) {
-            'sst_pop_ta_07_fo_01_inspeccion_de_compresor'
-                => 'pdf.forms.SST_POP_TA_07_FO_01_Inspeccion_de_Compresor',
+        /*
+         * Protección adicional:
+         * la versión asociada debe pertenecer al mismo formulario.
+         */
+        if (
+            (int) $formVersion->form_id !==
+            (int) $form->id
+        ) {
+            return response()->json([
+                'message' =>
+                    'La versión asociada al registro no corresponde al formulario.',
+            ], 422);
+        }
 
-            'sst_pop_ta_08_fo_01_checklist_herramienta_electrica_portatil'
-                => 'pdf.forms.SST_POP_TA_08_FO_01_Checklist_de_Herramienta_Electrica_Portatil',
+        /*
+        |--------------------------------------------------------------------------
+        | Snapshot histórico
+        |--------------------------------------------------------------------------
+        */
+        $versionPayload = is_array($formVersion->payload)
+            ? $formVersion->payload
+            : [];
 
-            'sst_pop_ta_05_fo_02_inspeccion_de_equipo_de_oxicorte'
-                => 'pdf.forms.SST_POP_TA_05_FO_02_Inspeccion_de_Equipo_de_Oxicorte',
+        $answers = is_array($submission->answers)
+            ? $submission->answers
+            : [];
 
-            'sst_pop_ta_05_fo_03_checklist_maquina_de_soldar'
-                => 'pdf.forms.SST_POP_TA_05_FO_03_Checklist_Maquina_de_Soldar',
-            
-            'sst_pop_ta_04_fo_04_checklist_linea_retractil_y_puntos_fijos'
-                => 'pdf.forms.SST_POP_TA_04_FO_04_Checklist_Linea_Retractil_y_Puntos_Fijos',
-            
-            'sst_pop_ta_04_fo_03_inspeccion_de_linea_de_vida'
-                => 'pdf.forms.SST_POP_TA_04_FO_03_Inspeccion_de_Linea_de_Vida',
+        $fields = is_array(
+            data_get(
+                $versionPayload,
+                'fields'
+            )
+        )
+            ? data_get(
+                $versionPayload,
+                'fields'
+            )
+            : [];
 
-            'sst_pop_ta_04_fo_02_inspeccion_de_arnes_de_seguridad'
-                => 'pdf.forms.SST_POP_TA_04_FO_02_Inspeccion_de_Arnes_de_Seguridad',
+        /*
+        |--------------------------------------------------------------------------
+        | Vista PDF de la versión
+        |--------------------------------------------------------------------------
+        |
+        | Ya no resolvemos el Blade mediante el _code_key actual.
+        |
+        | V1 utiliza su pdf_view.
+        | V2 utilizará su propio pdf_view.
+        | V3 utilizará el suyo, etc.
+        |
+        */
+        $view = trim(
+            (string) $formVersion->pdf_view
+        );
 
-            'sst_pop_ta_04_fo_01_checklist_de_sand_blast'
-                => 'pdf.forms.SST_POP_TA_04_FO_01_Checklist_de_Sand_Blast',
-            
-            'sst_pop_ta_01_fo_08_checklist_de_tirfor'
-                => 'pdf.forms.SST_POP_TA_01_FO_08_Checklist_de_Tirfor',
+        if (
+            $view === '' ||
+            !view()->exists($view)
+        ) {
+            return response()->json([
+                'message' =>
+                    'La versión del formulario no tiene una vista PDF válida.',
+            ], 422);
+        }
 
-            'sst_pop_ta_01_fo_07_checklist_de_tecle'
-                => 'pdf.forms.SST_POP_TA_01_FO_07_Checklist_de_Tecle',
-            
-            'sst_pop_ta_01_fo_06_checklist_de_polipasto_manual_de_cadena'
-                => 'pdf.forms.SST_POP_TA_01_FO_06_Checklist_de_Polipasto_Manual_de_Cadena',
+        /*
+        |--------------------------------------------------------------------------
+        | Formulario versionado para el Blade
+        |--------------------------------------------------------------------------
+        |
+        | Algunos Blade pueden consultar directamente $form->payload.
+        | Por eso no les pasamos el Form actual tal cual.
+        |
+        | Creamos una copia en memoria y sustituimos únicamente su payload
+        | por el snapshot guardado en FormVersion.
+        |
+        | Esta copia NO se guarda en la base de datos.
+        |
+        */
+        $versionedForm = clone $form;
 
-            'sst_pop_ta_01_fo_04_checklist_de_inspeccion_de_escaleras_portatiles'
-                => 'pdf.forms.SST_POP_TA_01_FO_04_Checklist_de_Inspeccion_de_Escaleras_Portatiles',
+        $versionedForm->payload =
+            $versionPayload;
 
-            'sst_pop_ta_01_fo_03_inspeccion_de_equipo_de_proteccion_personal'
-                => 'pdf.forms.SST_POP_TA_01_FO_03_Inspeccion_de_Equipo_de_Proteccion_Personal',
+        /*
+        |--------------------------------------------------------------------------
+        | Generar PDF
+        |--------------------------------------------------------------------------
+        */
+        $pdf = Pdf::loadView(
+            $view,
+            [
+                'form' => $versionedForm,
+                'formVersion' => $formVersion,
+                'submission' => $submission,
+                'answers' => $answers,
+                'fields' => $fields,
+                'userName' =>
+                    $submission->user?->name,
+                'generatedAt' => now(),
+            ]
+        );
 
-            'sst_pgi_ta_02_fo_04_checklist_de_unidades_moviles'
-                => 'pdf.forms.SST_PGI_TA_02_FO_04_Checklist_de_Unidades_Moviles',
-            
-            'sst_pgi_ta_02_fo_03_checklist_de_botiquines'
-                => 'pdf.forms.SST_PGI_TA_02_FO_03_Checklist_de_Botiquines',
+        $fileName =
+            'registro_' .
+            $form->id .
+            '_' .
+            $submission->id .
+            '.pdf';
 
-            'sst_pgi_ta_02_fo_02_checklist_de_extintor'
-                => 'pdf.forms.SST_PGI_TA_02_FO_02_Checklist_de_Extintor',
-
-            'sst_pgi_ta_01_fo_01_boleta_de_observaciones'
-                => 'pdf.forms.SST_PGI_TA_01_FO_01_Boleta_de_Observaciones',
-
-            'sgi_pop_lg_01_fo_09_checklist_eslingas_de_cadenas'
-                => 'pdf.forms.SGI_POP_LG_01_FO_09_Checklist_Eslingas_de_Cadenas',
-
-            'sgi_pop_lg_01_fo_08_inspeccion_de_grua_viajera'
-                => 'pdf.forms.SGI_POP_LG_01_FO_08_Inspeccion_de_Grua_Viajera',
-            
-            'sgi_pop_lg_01_fo_06_checklist_de_mantenimiento_grua_viajera'
-                => 'pdf.forms.SGI_POP_LG_01_FO_06_Checklist_de_Mantenimiento_Grua_Viajera',
-
-            'sgi_pop_lg_01_fo_04_checklist_de_mantenimiento_cortadora_de_banda'
-                => 'pdf.forms.SGI_POP_LG_01_FO_04_Checklist_de_Mantenimiento_Cortadora_de_Banda',
-
-            'sgi_pop_lg_01_fo_03_checklist_semanal_montacargas'
-                => 'pdf.forms.SGI_POP_LG_01_FO_03_Checklist_Semanal_Montacargas',
-
-            'sgi_pop_lg_01_07_checklist_mantenimiento_sistema_electrico'
-                => 'pdf.forms.SGI_POP_LG_01_07_Checklist_Mantenimiento_Sistema_Electrico',
-
-            'sgi_pop_gt_01_fo_11_checklist_de_inspeccion_de_estrobos'
-                => 'pdf.forms.SGI_POP_GT_01_FO_11_Checklist_de_Inspeccion_de_Estrobos',
-
-            'sgi_pop_gt_01_fo_10_checklist_inspeccion_de_eslingas'
-                => 'pdf.forms.SGI_POP_GT_01_FO_10_Checklist_Inspeccion_de_Eslingas',
-            
-            'sgi_pop_gt_01_fo_09_checklist_de_prensas'
-                => 'pdf.forms.SGI_POP_GT_01_FO_09_Checklist_de_Prensas',
-      
-            'sgi_pop_gt_01_fo_08_lista_de_herramientas_materiales'
-                => 'pdf.forms.SGI_POP_GT_01_FO_08_Lista_de_Herramientas_Materiales',
-
-            'sgi_pop_fo_01_checklist_de_prensas_para_pasamanos'
-                => 'pdf.forms.SGI_POP_FO_01_Checklist_de_Prensas_para_Pasamanos',
-
-            'sgi_pgi_ta_04_fo_02_checklist_de_inspeccion_de_lavaojos_de_emergencia'
-                => 'pdf.forms.SGI_PGI_TA_04_FO_02_Checklist_de_Inspeccion_de_Lavaojos_de_Emergencia',
-
-            'sgi_pgi_ta_04_fo_01_checklist_de_detectores_de_humo'
-                => 'pdf.forms.SGI_PGI_TA_04_FO_01_Checklist_de_Detectores_de_Humo',
-
-            'sgi_pop_fo_05_reporte_de_mantenimiento_de_prensas'
-                => 'pdf.forms.SGI_POP_FO_05_Reporte_de_Mantenimiento_de_Prensas',
-      
-            default => 'pdf.forms.generic_submission',
-        };
+        return response(
+            $pdf->output(),
+            200
+        )
+            ->header(
+                'Content-Type',
+                'application/pdf'
+            )
+            ->header(
+                'Content-Disposition',
+                'inline; filename="' .
+                    $fileName .
+                    '"'
+            );
     }
 }

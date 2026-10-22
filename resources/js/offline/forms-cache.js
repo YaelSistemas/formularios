@@ -99,6 +99,142 @@ export async function getCachedFormDetail(userId, formId) {
 }
 
 // ==========================
+// VERSIONES DE FORMULARIOS
+// ==========================
+export async function cacheFormVersions(
+  userId,
+  versions = {}
+) {
+  const uid = normalizeUserId(userId);
+
+  if (!uid) return;
+
+  const rows = Array.isArray(versions)
+    ? versions
+    : versions &&
+        typeof versions === "object"
+      ? Object.values(versions)
+      : [];
+
+  await db.transaction(
+    "rw",
+    db.form_versions,
+    async () => {
+      for (const version of rows) {
+        const versionId = Number(
+          version?.id || 0
+        );
+
+        const formId = Number(
+          version?.form_id || 0
+        );
+
+        if (!versionId || !formId) {
+          continue;
+        }
+
+        const existing =
+          await db.form_versions
+            .where(
+              "[user_id+form_version_id]"
+            )
+            .equals([
+              uid,
+              versionId,
+            ])
+            .first();
+
+        const data = {
+          user_id: uid,
+
+          form_version_id:
+            versionId,
+
+          form_id:
+            formId,
+
+          version:
+            Number(
+              version?.version || 0
+            ),
+
+          version_key:
+            String(
+              version?.version_key || ""
+            ),
+
+          form_version:
+            version,
+
+          updated_at:
+            nowIso(),
+        };
+
+        if (existing?.id) {
+          await db.form_versions.update(
+            existing.id,
+            data
+          );
+
+          continue;
+        }
+
+        await db.form_versions.add(
+          data
+        );
+      }
+    }
+  );
+}
+
+export async function getCachedFormVersions(
+  userId,
+  formId = null
+) {
+  const uid = normalizeUserId(userId);
+
+  if (!uid) {
+    return {};
+  }
+
+  const fid = Number(formId || 0);
+
+  const rows = fid
+    ? await db.form_versions
+        .where("[user_id+form_id]")
+        .equals([uid, fid])
+        .toArray()
+    : await db.form_versions
+        .where("user_id")
+        .equals(uid)
+        .toArray();
+
+  return rows.reduce(
+    (result, row) => {
+      const version =
+        row?.form_version;
+
+      const versionId = Number(
+        version?.id ||
+          row?.form_version_id ||
+          0
+      );
+
+      if (
+        versionId &&
+        version
+      ) {
+        result[String(versionId)] =
+          version;
+      }
+
+      return result;
+    },
+    {}
+  );
+}
+
+// ==========================
 // SUBMISSIONS
 // ==========================
 export async function cacheFormSubmissions(userId, formId, submissions = []) {
@@ -123,6 +259,12 @@ export async function cacheFormSubmissions(userId, formId, submissions = []) {
       await db.form_submissions.add({
         user_id: uid,
         form_id: fid,
+      
+        form_version_id:
+          Number(
+            sub?.form_version_id || 0
+          ) || null,
+      
         remote_id: sub.id ?? null,
         local_uuid: null,
         consecutive: sub.consecutive ?? null,
@@ -153,12 +295,36 @@ export async function getCachedFormSubmissions(userId, formId) {
       if (row.submission) return row.submission;
 
       return {
-        id: row.remote_id ?? row.local_uuid,
-        consecutive: row.consecutive ?? "Pendiente",
-        answers: row.answers ?? {},
-        created_at: row.created_at,
-        offline_pending: !!row.pending_sync,
-        synced: !!row.synced,
+        id:
+          row.remote_id ??
+          row.local_uuid,
+      
+        form_id:
+          row.form_id,
+      
+        form_version_id:
+          Number(
+            row.form_version_id || 0
+          ) || null,
+      
+        consecutive:
+          row.consecutive ??
+          "Pendiente",
+      
+        answers:
+          row.answers ?? {},
+      
+        created_at:
+          row.created_at,
+      
+        offline_pending:
+          !!row.pending_sync,
+      
+        pending_sync:
+          !!row.pending_sync,
+      
+        synced:
+          !!row.synced,
       };
     });
 }
@@ -173,39 +339,82 @@ export async function saveOfflineSubmission(
   localUuid = null,
   createdAt = null
 ) {
-  const uid = normalizeUserId(userId);
-  const formId = Number(form?.id);
+  const uid =
+    normalizeUserId(userId);
 
-  if (!uid || !formId) return;
+  const formId =
+    Number(form?.id);
+
+  const formVersionId =
+    Number(
+      form?.form_version_id ||
+        form?.form_version?.id ||
+        0
+    );
+
+  if (!uid || !formId) {
+    return;
+  }
+
+  if (!formVersionId) {
+    throw new Error(
+      "No se pudo identificar la versión del formulario para guardar el registro offline."
+    );
+  }
 
   const uuid =
     localUuid ||
     `local_${Date.now()}`;
 
   /*
-   * Conservamos la misma fecha generada en FormFill.jsx.
-   * Esto evita crear fechas distintas para records,
-   * outbox y form_submissions.
+   * Conservamos exactamente la misma
+   * fecha generada en FormFill.jsx.
    */
   const offlineCreatedAt =
     createdAt || nowIso();
 
   await db.form_submissions.add({
-    user_id: uid,
-    form_id: formId,
-    remote_id: null,
-    local_uuid: uuid,
-    consecutive: "Pendiente",
-    answers: { ...(answers || {}) },
+    user_id:
+      uid,
+
+    form_id:
+      formId,
+
+    form_version_id:
+      formVersionId,
+
+    remote_id:
+      null,
+
+    local_uuid:
+      uuid,
+
+    consecutive:
+      "Pendiente",
+
+    answers: {
+      ...(answers || {}),
+    },
 
     offline_created_at:
       offlineCreatedAt,
 
     submission: {
-      id: uuid,
-      form_id: formId,
-      consecutive: "Pendiente",
-      answers: { ...(answers || {}) },
+      id:
+        uuid,
+
+      form_id:
+        formId,
+
+      form_version_id:
+        formVersionId,
+
+      consecutive:
+        "Pendiente",
+
+      answers: {
+        ...(answers || {}),
+      },
 
       created_at:
         offlineCreatedAt,
@@ -213,16 +422,24 @@ export async function saveOfflineSubmission(
       offline_created_at:
         offlineCreatedAt,
 
-      offline_pending: true,
-      pending_sync: true,
-      synced: false,
+      offline_pending:
+        true,
+
+      pending_sync:
+        true,
+
+      synced:
+        false,
     },
 
     created_at:
       offlineCreatedAt,
 
-    synced: false,
-    pending_sync: true,
+    synced:
+      false,
+
+    pending_sync:
+      true,
   });
 }
 
@@ -237,6 +454,7 @@ export async function cleanupOfflineScope(userId, forms = []) {
       deletedDetails: 0,
       deletedSubmissions: 0,
       deletedPdfs: 0,
+      deletedVersions: 0,
     };
   }
 
@@ -251,6 +469,7 @@ export async function cleanupOfflineScope(userId, forms = []) {
     db.form_details,
     db.form_submissions,
     db.submission_pdfs,
+    db.form_versions,
     async () => {
       /*
        * Detalles de formularios almacenados para este usuario.
@@ -275,6 +494,16 @@ export async function cleanupOfflineScope(userId, forms = []) {
         .where("user_id")
         .equals(uid)
         .toArray();
+
+      /*
+       * Versiones de formularios almacenadas
+       * para este usuario.
+       */
+      const existingVersions =
+        await db.form_versions
+          .where("user_id")
+          .equals(uid)
+          .toArray();
 
       /*
        * Eliminamos detalles de formularios que ya no
@@ -330,6 +559,21 @@ export async function cleanupOfflineScope(userId, forms = []) {
         .map((row) => row.id)
         .filter(Boolean);
 
+      /*
+       * Eliminamos versiones de formularios
+       * que ya no pertenecen al alcance.
+       */
+      const versionIdsToDelete =
+        existingVersions
+          .filter(
+            (row) =>
+              !allowedFormIds.has(
+                Number(row.form_id)
+              )
+          )
+          .map((row) => row.id)
+          .filter(Boolean);
+
       if (detailIdsToDelete.length > 0) {
         await db.form_details.bulkDelete(
           detailIdsToDelete
@@ -350,15 +594,26 @@ export async function cleanupOfflineScope(userId, forms = []) {
         );
       }
 
+      if (
+        versionIdsToDelete.length > 0
+      ) {
+        await db.form_versions.bulkDelete(
+          versionIdsToDelete
+        );
+      }
+
       return {
         deletedDetails:
           detailIdsToDelete.length,
-
+      
         deletedSubmissions:
           submissionIdsToDelete.length,
-
+      
         deletedPdfs:
           pdfIdsToDelete.length,
+      
+        deletedVersions:
+          versionIdsToDelete.length,
       };
     }
   );

@@ -136,6 +136,14 @@ async function markLocalSubmissionAsSynced(
       remote_id:
         serverSubmission?.id ?? null,
 
+      form_version_id:
+        Number(
+          serverSubmission?.form_version_id ||
+            rec?.form_version_id ||
+            localRow?.form_version_id ||
+            0
+        ) || null,
+
       consecutive:
         serverSubmission?.consecutive ??
         localRow.consecutive ??
@@ -157,6 +165,14 @@ async function markLocalSubmissionAsSynced(
         form_id:
           serverSubmission?.form_id ??
           rec.form_id,
+
+        form_version_id:
+          Number(
+            serverSubmission?.form_version_id ||
+              rec?.form_version_id ||
+              localRow?.form_version_id ||
+              0
+          ) || null,
 
         consecutive:
           serverSubmission?.consecutive ??
@@ -241,7 +257,14 @@ async function processOutboxItem(item) {
       const response = await apiPost(
         `/forms/${rec.form_id}/submit`,
         {
-          answers: rec.answers,
+          form_version_id:
+            Number(
+              rec?.form_version_id || 0
+            ) || null,
+      
+          answers:
+            rec.answers,
+      
           offline_created_at:
             offlineCreatedAt,
         }

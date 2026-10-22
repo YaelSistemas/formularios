@@ -10,6 +10,7 @@ class FormSubmission extends Model
 {
     protected $fillable = [
         'form_id',
+        'form_version_id',
         'consecutive',
         'user_id',
         'answers',
@@ -89,6 +90,14 @@ class FormSubmission extends Model
                 });
             }
         });
+    }
+
+    public function formVersion()
+    {
+        return $this->belongsTo(
+            FormVersion::class,
+            'form_version_id'
+        );
     }
 
     public function user()

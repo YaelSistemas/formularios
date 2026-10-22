@@ -66,13 +66,17 @@ export async function getFormDraft(
 export async function saveFormDraft(
   userId,
   formId,
-  answers = {}
+  answers = {},
+  formVersionId = null
 ) {
   const normalizedUserId =
     normalizeId(userId);
 
   const normalizedFormId =
     normalizeId(formId);
+
+  const normalizedFormVersionId =
+    normalizeId(formVersionId);
 
   if (!normalizedUserId) {
     throw new Error(
@@ -83,6 +87,12 @@ export async function saveFormDraft(
   if (!normalizedFormId) {
     throw new Error(
       "No se pudo identificar el formulario del borrador."
+    );
+  }
+
+  if (!normalizedFormVersionId) {
+    throw new Error(
+      "No se pudo identificar la versión del formulario del borrador."
     );
   }
 
@@ -102,21 +112,42 @@ export async function saveFormDraft(
           .first();
 
       if (existing?.id) {
+        /*
+         * Si el borrador ya tenía una versión,
+         * esa versión queda congelada.
+         *
+         * Si es un borrador antiguo que todavía
+         * no tenía form_version_id, se le asigna
+         * la versión actual de la captura.
+         */
+        const storedFormVersionId =
+          normalizeId(
+            existing.form_version_id
+          ) ||
+          normalizedFormVersionId;
+
         await db.form_drafts.update(
           existing.id,
           {
+            form_version_id:
+              storedFormVersionId,
+
             answers:
               answers &&
               typeof answers === "object"
                 ? answers
                 : {},
 
-            updated_at: timestamp,
+            updated_at:
+              timestamp,
           }
         );
 
         return {
           ...existing,
+
+          form_version_id:
+            storedFormVersionId,
 
           answers:
             answers &&
@@ -124,7 +155,8 @@ export async function saveFormDraft(
               ? answers
               : {},
 
-          updated_at: timestamp,
+          updated_at:
+            timestamp,
         };
       }
 
@@ -134,6 +166,9 @@ export async function saveFormDraft(
 
         form_id:
           normalizedFormId,
+
+        form_version_id:
+          normalizedFormVersionId,
 
         answers:
           answers &&

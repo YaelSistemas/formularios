@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\FormSubmissionPdfController;
 use App\Http\Controllers\Api\AdminFormAssignmentsController;
 use App\Http\Controllers\Api\OfflineBootstrapController;
 
+use App\Http\Controllers\Api\AdminFormVersionsController;
+
 /*
 |--------------------------------------------------------------------------
 | Public
@@ -34,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Sesión
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
 
     // ---------------- FORMS (Usuarios autenticados) ----------------
     Route::get('/forms', [FormsController::class, 'index'])
@@ -203,9 +206,20 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/forms/{form}', [FormsController::class, 'show'])
             ->middleware('perm:formularios.admin.view');
 
-            // Historial de Formularios Admin
-            Route::get('/forms/{form}/history', [FormsController::class, 'history'])
-                ->middleware('perm:formularios.admin.view');
+        // Versiones del formulario
+        Route::get('/forms/{form}/versions', [AdminFormVersionsController::class, 'index',])
+            ->middleware('perm:formularios.admin.view');
+
+        Route::post('/forms/{form}/versions', [AdminFormVersionsController::class, 'store',])
+            ->middleware('perm:formularios.admin.view');
+
+        // Editar fecha / descripción de versión programada
+        Route::post('/forms/{form}/versions/{version}/update', [AdminFormVersionsController::class, 'update',])
+            ->middleware('perm:formularios.admin.view');
+
+        // Historial de Formularios Admin
+        Route::get('/forms/{form}/history', [FormsController::class, 'history'])
+            ->middleware('perm:formularios.admin.view');
 
         // Asignaciones de formularios
         Route::get('/forms/{form}/assignments', [AdminFormAssignmentsController::class, 'index'])
