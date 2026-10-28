@@ -317,6 +317,8 @@ export default function AdminUsers() {
   const [empresasAll, setEmpresasAll] = useState([]);
   const [gruposAll, setGruposAll] = useState([]);
   const [unidadesServicioAll, setUnidadesServicioAll] = useState([]);
+  const [turnosAll, setTurnosAll] = useState([]);
+
   const [loadingCats, setLoadingCats] = useState(false);
 
   const [qDraft, setQDraft] = useState("");
@@ -338,6 +340,16 @@ export default function AdminUsers() {
   const [fEmpresas, setFEmpresas] = useState([]);
   const [fGrupos, setFGrupos] = useState([]);
   const [fUnidadesServicio, setFUnidadesServicio] = useState([]);
+
+  const [fControlAccesoEnabled, setFControlAccesoEnabled] = useState(false);
+  const [fControlAccesoId, setFControlAccesoId] = useState(null);
+  const [fEmpresaLaboral, setFEmpresaLaboral] = useState("");
+  const [fUnidadLaboral, setFUnidadLaboral] = useState("");
+  const [fTurno, setFTurno] = useState("");
+  const [fTipoTrabajo, setFTipoTrabajo] = useState("fijo");
+  const [fKioscoHabilitado, setFKioscoHabilitado] = useState(false);
+  const [fControlFechaInicio, setFControlFechaInicio] = useState("");
+  const [fControlFechaFin, setFControlFechaFin] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -401,10 +413,11 @@ export default function AdminUsers() {
   const loadCatalogs = async () => {
     setLoadingCats(true);
     try {
-      const [eData, gData, usData] = await Promise.all([
+      const [eData, gData, usData, turnosData] = await Promise.all([
         apiGet("/admin/empresas?per_page=1000&page=1&q="),
         apiGet("/admin/grupos?per_page=1000&page=1&q="),
         apiGet("/admin/unidades-servicio?per_page=1000&page=1&q="),
+        apiGet("/admin/turnos"),
       ]);
   
       const onlyActive = (items) =>
@@ -415,6 +428,12 @@ export default function AdminUsers() {
       setEmpresasAll(onlyActive(eData?.data));
       setGruposAll(onlyActive(gData?.data));
       setUnidadesServicioAll(onlyActive(usData?.data));
+
+      setTurnosAll(
+        (Array.isArray(turnosData?.turnos) ? turnosData.turnos : []).filter(
+          (turno) => turno?.activo === true || Number(turno?.activo) === 1
+        )
+      );
     } finally {
       setLoadingCats(false);
     }
@@ -498,6 +517,17 @@ export default function AdminUsers() {
     setFEmpresas([]);
     setFGrupos([]);
     setFUnidadesServicio([]);
+
+    setFControlAccesoEnabled(false);
+    setFControlAccesoId(null);
+    setFEmpresaLaboral("");
+    setFUnidadLaboral("");
+    setFTurno("");
+    setFTipoTrabajo("fijo");
+    setFKioscoHabilitado(false);
+    setFControlFechaInicio("");
+    setFControlFechaFin("");
+
     setFieldErrors({});
     setErr("");
   };
@@ -552,6 +582,48 @@ export default function AdminUsers() {
     setFEmpresas(empresaIds);
     setFGrupos(grupoIds);
     setFUnidadesServicio(unidadServicioIds);
+
+    const controlAcceso = u?.control_acceso_configuracion || u?.control_acceso_actual || null;
+
+    if (controlAcceso) {
+      setFControlAccesoEnabled(true);
+
+      setFControlAccesoId(controlAcceso.id || null);
+
+      setFEmpresaLaboral(
+        controlAcceso.empresa_id
+          ? String(controlAcceso.empresa_id)
+          : ""
+      );
+    
+      setFUnidadLaboral(
+        controlAcceso.unidad_servicio_id
+          ? String(controlAcceso.unidad_servicio_id)
+          : ""
+      );
+    
+      setFTurno(
+        controlAcceso.turno_id
+          ? String(controlAcceso.turno_id)
+          : ""
+      );
+    
+      setFTipoTrabajo(
+        controlAcceso.tipo_trabajo || "fijo"
+      );
+    
+      setFKioscoHabilitado(
+        !!controlAcceso.kiosco_habilitado
+      );
+    
+      setFControlFechaInicio(
+        controlAcceso.fecha_inicio || ""
+      );
+    
+      setFControlFechaFin(
+        controlAcceso.fecha_fin || ""
+      );
+    }
 
     setOpenForm(true);
   };
@@ -626,6 +698,42 @@ export default function AdminUsers() {
       errors.grupo = `No se puede ${actionText} el usuario porque falta el grupo.`;
     }
 
+    if (fControlAccesoEnabled) {
+      if (!fEmpresaLaboral) {
+        errors.control_empresa =
+          "No se puede guardar la configuración de Control de acceso porque falta la empresa laboral.";
+      }
+    
+      if (!fUnidadLaboral) {
+        errors.control_unidad =
+          "No se puede guardar la configuración de Control de acceso porque falta la unidad laboral.";
+      }
+    
+      if (!fTurno) {
+        errors.control_turno =
+          "No se puede guardar la configuración de Control de acceso porque falta el turno.";
+      }
+    
+      if (!fTipoTrabajo) {
+        errors.control_tipo =
+          "No se puede guardar la configuración de Control de acceso porque falta el tipo de trabajo.";
+      }
+    
+      if (!fControlFechaInicio) {
+        errors.control_fecha_inicio =
+          "No se puede guardar la configuración de Control de acceso porque falta la fecha inicial.";
+      }
+    
+      if (
+        fControlFechaInicio &&
+        fControlFechaFin &&
+        fControlFechaFin < fControlFechaInicio
+      ) {
+        errors.control_fecha_fin =
+          "La fecha final de Control de acceso no puede ser anterior a la fecha inicial.";
+      }
+    }
+
     setFieldErrors(errors);
 
     if (Object.keys(errors).length > 0) {
@@ -661,9 +769,27 @@ export default function AdminUsers() {
         email: fEmail.trim(),
         roles: [fRole],
         activo: !!fActivo,
+      
         empresa_ids: fEmpresas,
         grupo_ids: fGrupos,
+      
+        // Unidades utilizadas para Formularios.
         unidad_servicio_ids: fUnidadesServicio,
+      
+        // Configuración laboral independiente para Asistencia.
+        control_acceso: fControlAccesoEnabled
+          ? {
+              id: fControlAccesoId || null,
+        
+              empresa_id: Number(fEmpresaLaboral),
+              unidad_servicio_id: Number(fUnidadLaboral),
+              turno_id: Number(fTurno),
+              tipo_trabajo: fTipoTrabajo,
+              kiosco_habilitado: !!fKioscoHabilitado,
+              fecha_inicio: fControlFechaInicio,
+              fecha_fin: fControlFechaFin || null,
+            }
+          : null,
       };
 
       if (formMode === "create") {
@@ -958,7 +1084,7 @@ export default function AdminUsers() {
     },
     modal: {
       width: "100%",
-      maxWidth: 760,
+      maxWidth: 900,
       maxHeight: "90vh",
       overflowY: "auto",
       background: "#fff",
@@ -1567,6 +1693,32 @@ export default function AdminUsers() {
             <form onSubmit={submitUserForm}>
               <div style={S.modalBody}>
                 <div className="users-form-grid" style={S.formGrid}>
+                  <div
+                    style={{
+                      gridColumn: "1 / -1",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 900,
+                        color: "#0f172a",
+                      }}
+                    >
+                      Datos del usuario
+                    </div>
+                
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 12,
+                        color: "#64748b",
+                      }}
+                    >
+                      Información general para identificar y acceder con este usuario.
+                    </div>
+                  </div>
+                
                   <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
                     <div style={S.label}>Nombre</div>
                     <input
@@ -1663,6 +1815,35 @@ export default function AdminUsers() {
                     {fieldErrors.role ? <div style={S.errorText}>{fieldErrors.role}</div> : null}
                   </div>
 
+                  <div
+                    style={{
+                      gridColumn: "1 / -1",
+                      marginTop: 8,
+                      paddingTop: 16,
+                      borderTop: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 900,
+                        color: "#0f172a",
+                      }}
+                    >
+                      Formularios
+                    </div>
+                  
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 12,
+                        color: "#64748b",
+                      }}
+                    >
+                      Configuración utilizada para la asignación y visualización de formularios.
+                    </div>
+                  </div>
+
                   <div style={S.fieldWrap}>
                     <MultiSelectInlineBox
                       label="Unidades de servicio"
@@ -1720,7 +1901,422 @@ export default function AdminUsers() {
                     />
                   </div>
 
-                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                  <div
+                  style={{
+                    gridColumn: "1 / -1",
+                    marginTop: 8,
+                    paddingTop: 16,
+                    borderTop: "1px solid #e2e8f0",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 900,
+                      color: "#0f172a",
+                    }}
+                  >
+                    Control de acceso
+                  </div>
+                
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 12,
+                      color: "#64748b",
+                    }}
+                  >
+                    Configuración laboral utilizada únicamente para asistencia.
+                    Es independiente de las unidades asignadas para Formularios.
+                  </div>
+                </div>
+                
+                <div
+                  style={{
+                    ...S.fieldWrap,
+                    gridColumn: "1 / -1",
+                  }}
+                >
+                  <div style={S.label}>
+                    Participa en Control de acceso
+                  </div>
+                
+                  <div style={S.toggleWrap}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        /*
+                         * Si ya existe una configuración laboral,
+                         * no permitimos quitarla simplemente desde aquí,
+                         * porque debemos conservar su historial.
+                         */
+                        if (
+                          formMode === "edit" &&
+                          fControlAccesoEnabled &&
+                          users.find(
+                            (u) => Number(u.id) === Number(editingId)
+                          )?.control_acceso_configuracion
+                        ) {
+                          return;
+                        }
+                
+                        setFControlAccesoEnabled((prev) => !prev);
+                      }}
+                      aria-pressed={fControlAccesoEnabled}
+                      style={{
+                        ...S.toggleButton,
+                        background: fControlAccesoEnabled
+                          ? "#22c55e"
+                          : "#cbd5e1",
+                        cursor:
+                          formMode === "edit" &&
+                          users.find(
+                            (u) => Number(u.id) === Number(editingId)
+                          )?.control_acceso_configuracion
+                            ? "not-allowed"
+                            : "pointer",
+                      }}
+                    >
+                      <span
+                        style={{
+                          ...S.toggleThumb,
+                          left: fControlAccesoEnabled ? 30 : 4,
+                        }}
+                      />
+                    </button>
+                
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: fControlAccesoEnabled
+                          ? "#166534"
+                          : "#64748b",
+                      }}
+                    >
+                      {fControlAccesoEnabled
+                        ? "Sí"
+                        : "No"}
+                    </span>
+                  </div>
+                
+                  {formMode === "edit" &&
+                  users.find(
+                    (u) => Number(u.id) === Number(editingId)
+                  )?.control_acceso_configuracion ? (
+                    <div style={S.helper}>
+                      Esta configuración ya tiene historial. Para dejar de utilizarla,
+                      posteriormente se cerrará mediante su fecha de vigencia.
+                    </div>
+                  ) : null}
+                </div>
+                
+                {fControlAccesoEnabled ? (
+                  <>
+                    <div style={S.fieldWrap}>
+                      <div style={S.label}>
+                        Empresa laboral
+                      </div>
+                    
+                      <select
+                        value={fEmpresaLaboral}
+                        onChange={(e) => {
+                          setFEmpresaLaboral(e.target.value);
+                    
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            control_empresa: "",
+                          }));
+                        }}
+                        style={{
+                          ...S.inputFull,
+                          borderColor: fieldErrors.control_empresa
+                            ? "#fecaca"
+                            : "#dbeafe",
+                        }}
+                      >
+                        <option value="">
+                          Selecciona una empresa laboral
+                        </option>
+                    
+                        {empresasAll.map((empresa) => (
+                          <option
+                            key={empresa.id}
+                            value={empresa.id}
+                          >
+                            {empresa.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    
+                      {fieldErrors.control_empresa ? (
+                        <div style={S.errorText}>
+                          {fieldErrors.control_empresa}
+                        </div>
+                      ) : null}
+                    
+                      <div style={{ ...S.helper, marginTop: 6 }}>
+                        Solo una. Se utilizará para Control de acceso y asistencia.
+                      </div>
+                    </div>
+
+                    <div style={S.fieldWrap}>
+                      <div style={S.label}>
+                        Unidad laboral
+                      </div>
+                
+                      <select
+                        value={fUnidadLaboral}
+                        onChange={(e) => {
+                          setFUnidadLaboral(e.target.value);
+                
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            control_unidad: "",
+                          }));
+                        }}
+                        style={{
+                          ...S.inputFull,
+                          borderColor: fieldErrors.control_unidad
+                            ? "#fecaca"
+                            : "#dbeafe",
+                        }}
+                      >
+                        <option value="">
+                          Selecciona una unidad laboral
+                        </option>
+                
+                        {unidadesServicioAll.map((unidad) => (
+                          <option
+                            key={unidad.id}
+                            value={unidad.id}
+                          >
+                            {unidad.nombre}
+                          </option>
+                        ))}
+                      </select>
+                
+                      {fieldErrors.control_unidad ? (
+                        <div style={S.errorText}>
+                          {fieldErrors.control_unidad}
+                        </div>
+                      ) : null}
+                
+                      <div style={{ ...S.helper, marginTop: 6 }}>
+                        Solo una. Se utilizará para reportes de asistencia.
+                      </div>
+                    </div>
+                
+                    <div style={S.fieldWrap}>
+                      <div style={S.label}>
+                        Turno
+                      </div>
+                
+                      <select
+                        value={fTurno}
+                        onChange={(e) => {
+                          setFTurno(e.target.value);
+                
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            control_turno: "",
+                          }));
+                        }}
+                        style={{
+                          ...S.inputFull,
+                          borderColor: fieldErrors.control_turno
+                            ? "#fecaca"
+                            : "#dbeafe",
+                        }}
+                      >
+                        <option value="">
+                          Selecciona un turno
+                        </option>
+                
+                        {turnosAll.map((turno) => (
+                          <option
+                            key={turno.id}
+                            value={turno.id}
+                          >
+                            {turno.nombre} ·{" "}
+                            {String(turno.hora_inicio || "").slice(0, 5)}
+                            {" - "}
+                            {String(turno.hora_fin || "").slice(0, 5)}
+                            {" · "}
+                            {Number(turno.horas_jornada || 0).toFixed(2)} h
+                          </option>
+                        ))}
+                      </select>
+                
+                      {fieldErrors.control_turno ? (
+                        <div style={S.errorText}>
+                          {fieldErrors.control_turno}
+                        </div>
+                      ) : null}
+                    </div>
+                
+                    <div style={S.fieldWrap}>
+                      <div style={S.label}>
+                        Tipo de trabajo
+                      </div>
+                
+                      <select
+                        value={fTipoTrabajo}
+                        onChange={(e) => {
+                          setFTipoTrabajo(e.target.value);
+                
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            control_tipo: "",
+                          }));
+                        }}
+                        style={S.inputFull}
+                      >
+                        <option value="fijo">
+                          Fijo
+                        </option>
+                
+                        <option value="mixto_salidas">
+                          Mixto / Salidas
+                        </option>
+                      </select>
+                
+                      <div style={{ ...S.helper, marginTop: 6 }}>
+                        Fijo: oficina / home. Mixto / Salidas: puede realizar
+                        actividades fuera de su ubicación habitual.
+                      </div>
+                    </div>
+                
+                    <div style={S.fieldWrap}>
+                      <div style={S.label}>
+                        Vigente desde
+                      </div>
+                
+                      <input
+                        type="date"
+                        value={fControlFechaInicio}
+                        onChange={(e) => {
+                          setFControlFechaInicio(e.target.value);
+                
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            control_fecha_inicio: "",
+                          }));
+                        }}
+                        style={{
+                          ...S.inputFull,
+                          borderColor: fieldErrors.control_fecha_inicio
+                            ? "#fecaca"
+                            : "#dbeafe",
+                        }}
+                      />
+                
+                      {fieldErrors.control_fecha_inicio ? (
+                        <div style={S.errorText}>
+                          {fieldErrors.control_fecha_inicio}
+                        </div>
+                      ) : null}
+                    </div>
+                
+                    <div style={S.fieldWrap}>
+                      <div style={S.label}>
+                        Vigente hasta
+                      </div>
+                
+                      <input
+                        type="date"
+                        value={fControlFechaFin}
+                        onChange={(e) => {
+                          setFControlFechaFin(e.target.value);
+                
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            control_fecha_fin: "",
+                          }));
+                        }}
+                        style={{
+                          ...S.inputFull,
+                          borderColor: fieldErrors.control_fecha_fin
+                            ? "#fecaca"
+                            : "#dbeafe",
+                        }}
+                      />
+                
+                      {fieldErrors.control_fecha_fin ? (
+                        <div style={S.errorText}>
+                          {fieldErrors.control_fecha_fin}
+                        </div>
+                      ) : null}
+                
+                      <div style={{ ...S.helper, marginTop: 6 }}>
+                        Puede quedar vacía si no tiene fecha de terminación.
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        ...S.fieldWrap,
+                        gridColumn: "1 / -1",
+                      }}
+                    >
+                      <div style={S.label}>
+                        Kiosco
+                      </div>
+                    
+                      <div style={S.toggleWrap}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFKioscoHabilitado((prev) => !prev)
+                          }
+                          aria-pressed={fKioscoHabilitado}
+                          style={{
+                            ...S.toggleButton,
+                            background: fKioscoHabilitado
+                              ? "#22c55e"
+                              : "#cbd5e1",
+                          }}
+                        >
+                          <span
+                            style={{
+                              ...S.toggleThumb,
+                              left: fKioscoHabilitado ? 30 : 4,
+                            }}
+                          />
+                        </button>
+                    
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 800,
+                            color: fKioscoHabilitado
+                              ? "#166534"
+                              : "#64748b",
+                          }}
+                        >
+                          {fKioscoHabilitado
+                            ? "Habilitado"
+                            : "No habilitado"}
+                        </span>
+                      </div>
+                    
+                      <div style={S.helper}>
+                        Si está habilitado, podrá aparecer en Kiosco para que
+                        otro usuario autorizado registre su entrada o salida.
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                  <div
+                    style={{
+                      ...S.fieldWrap,
+                      gridColumn: "1 / -1",
+                      marginTop: 8,
+                      paddingTop: 16,
+                      borderTop: "1px solid #e2e8f0",
+                    }}
+                  >
                     <div style={S.label}>Estado</div>
                     <div style={S.toggleWrap}>
                       <button
@@ -1857,6 +2453,96 @@ export default function AdminUsers() {
                                 {renderHistoryValue("list", snapshot?.grupos)}
                               </div>
 
+                              {snapshot?.control_empresa_laboral ||
+                              snapshot?.control_unidad_laboral ||
+                              snapshot?.control_turno ? (
+                                <>
+                                  <div
+                                    style={{
+                                      ...S.historyFieldBox,
+                                      gridColumn: "1 / -1",
+                                      background: "#f8fafc",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: 900,
+                                        color: "#334155",
+                                      }}
+                                    >
+                                      Control de acceso
+                                    </div>
+                                  </div>
+
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Empresa laboral
+                                    </div>
+                                  
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_empresa_laboral
+                                    )}
+                                  </div>
+
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Unidad laboral
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_unidad_laboral
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Turno
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_turno
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Tipo de trabajo
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_tipo_trabajo
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Kiosco
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_kiosco
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Vigencia
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_vigencia
+                                    )}
+                                  </div>
+                                </>
+                              ) : null}
+
                               <div style={S.historyFieldBox}>
                                 <div style={S.historyFieldLabel}>Estado</div>
                                 {renderHistoryValue("boolean", snapshot?.activo)}
@@ -1938,6 +2624,96 @@ export default function AdminUsers() {
                                 <div style={S.historyFieldLabel}>Grupo</div>
                                 {renderHistoryValue("list", snapshot?.grupos)}
                               </div>
+
+                              {snapshot?.control_empresa_laboral ||
+                              snapshot?.control_unidad_laboral ||
+                              snapshot?.control_turno ? (
+                                <>
+                                  <div
+                                    style={{
+                                      ...S.historyFieldBox,
+                                      gridColumn: "1 / -1",
+                                      background: "#f8fafc",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: 900,
+                                        color: "#334155",
+                                      }}
+                                    >
+                                      Control de acceso
+                                    </div>
+                                  </div>
+
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Empresa laboral
+                                    </div>
+                                  
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_empresa_laboral
+                                    )}
+                                  </div>
+
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Unidad laboral
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_unidad_laboral
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Turno
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_turno
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Tipo de trabajo
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_tipo_trabajo
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Kiosco
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_kiosco
+                                    )}
+                                  </div>
+                              
+                                  <div style={S.historyFieldBox}>
+                                    <div style={S.historyFieldLabel}>
+                                      Vigencia
+                                    </div>
+                              
+                                    {renderHistoryValue(
+                                      "text",
+                                      snapshot?.control_vigencia
+                                    )}
+                                  </div>
+                                </>
+                              ) : null}
 
                               <div style={S.historyFieldBox}>
                                 <div style={S.historyFieldLabel}>Estado</div>

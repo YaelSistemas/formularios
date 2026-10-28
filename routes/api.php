@@ -16,7 +16,11 @@ use App\Http\Controllers\Api\FormSubmissionsController;
 use App\Http\Controllers\Api\FormSubmissionPdfController;
 use App\Http\Controllers\Api\AdminFormAssignmentsController;
 use App\Http\Controllers\Api\OfflineBootstrapController;
-
+use App\Http\Controllers\Api\AsistenciasController;
+use App\Http\Controllers\Api\Admin\TurnosController;
+use App\Http\Controllers\Api\KioscoAsistenciasController;
+use App\Http\Controllers\Api\Admin\AsistenciasAdminController;
+use App\Http\Controllers\Api\Admin\AsistenciaIncidenciasController;
 use App\Http\Controllers\Api\AdminFormVersionsController;
 
 /*
@@ -37,6 +41,37 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // ---------------- CONTROL DE ACCESO / ASISTENCIAS ----------------
+
+    Route::get('/asistencias', [AsistenciasController::class, 'index'])
+        ->middleware('perm:asistencias.view');
+    
+    Route::post('/asistencias/entrada', [AsistenciasController::class, 'entrada'])
+        ->middleware('perm:asistencias.create');
+    
+    Route::post('/asistencias/salida', [AsistenciasController::class, 'salida'])
+        ->middleware('perm:asistencias.create');
+    
+    Route::post('/asistencias/comida/inicio', [AsistenciasController::class, 'inicioComida'])
+        ->middleware('perm:asistencias.create');
+    
+    Route::post('/asistencias/comida/fin', [AsistenciasController::class, 'finComida'])
+        ->middleware('perm:asistencias.create');
+    
+    Route::get('/asistencias/kiosco', [KioscoAsistenciasController::class, 'index'])
+        ->middleware('perm:asistencias.kiosco');
+    
+    Route::post('/asistencias/kiosco/{user}/entrada', [KioscoAsistenciasController::class, 'entrada'])
+        ->middleware('perm:asistencias.kiosco');
+    
+    Route::post('/asistencias/kiosco/{user}/comida/inicio', [KioscoAsistenciasController::class, 'inicioComida'])
+        ->middleware('perm:asistencias.kiosco');
+    
+    Route::post('/asistencias/kiosco/{user}/comida/fin', [KioscoAsistenciasController::class, 'finComida'])
+        ->middleware('perm:asistencias.kiosco');
+    
+    Route::post('/asistencias/kiosco/{user}/salida', [KioscoAsistenciasController::class, 'salida'])
+        ->middleware('perm:asistencias.kiosco');
 
     // ---------------- FORMS (Usuarios autenticados) ----------------
     Route::get('/forms', [FormsController::class, 'index'])
@@ -198,6 +233,68 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
 
         Route::delete('/unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'destroy'])
             ->middleware('perm:unidades_servicio.delete');
+
+                // ---------------- CONTROL DE ACCESO / TURNOS ----------------
+
+        Route::get('/turnos', [TurnosController::class, 'index'])
+            ->middleware('perm:turnos.view');
+
+        Route::get('/turnos/{turno}', [TurnosController::class, 'show'])
+            ->middleware('perm:turnos.view');
+
+        Route::post('/turnos', [TurnosController::class, 'store'])
+            ->middleware('perm:turnos.create');
+
+        Route::put('/turnos/{turno}', [TurnosController::class, 'update'])
+            ->middleware('perm:turnos.edit');
+
+        Route::delete('/turnos/{turno}', [TurnosController::class, 'destroy'])
+            ->middleware('perm:turnos.delete');
+
+        // ---------------- GESTIÓN DE ASISTENCIAS ----------------
+        
+        Route::get('/asistencias', [AsistenciasAdminController::class, 'index'])
+            ->middleware('perm:asistencias.view');
+
+        // Exportaciones
+        Route::get('/asistencias/export/excel', [AsistenciasAdminController::class, 'exportExcel'])
+            ->middleware('perm:asistencias.view');
+        
+        Route::get('/asistencias/export/pdf', [AsistenciasAdminController::class, 'exportPdf'])
+            ->middleware('perm:asistencias.view');
+
+        Route::get('/asistencias/history', [AsistenciasAdminController::class, 'generalHistory'])
+            ->middleware('perm:asistencias.view');
+        
+        Route::get('/asistencias/{asistencia}', [AsistenciasAdminController::class, 'show'])
+            ->middleware('perm:asistencias.view');
+        
+        // Historial de Asistencias
+        Route::get('/asistencias/{asistencia}/history', [AsistenciasAdminController::class, 'history'])
+            ->middleware('perm:asistencias.view');
+        
+        Route::put('/asistencias/{asistencia}', [AsistenciasAdminController::class, 'update'])
+            ->middleware('perm:asistencias.edit');
+        
+        Route::delete('/asistencias/{asistencia}', [AsistenciasAdminController::class, 'destroy'])
+            ->middleware('perm:asistencias.delete');
+
+        // ---------------- INCIDENCIAS DE ASISTENCIA ----------------
+        
+        Route::get('/asistencia-incidencias', [AsistenciaIncidenciasController::class, 'index'])
+            ->middleware('perm:asistencias.incidencias.view');
+        
+        Route::post('/asistencia-incidencias', [AsistenciaIncidenciasController::class, 'store'])
+            ->middleware('perm:asistencias.incidencias.create');
+        
+        Route::get('/asistencia-incidencias/{grupoUuid}', [AsistenciaIncidenciasController::class, 'show'])
+            ->middleware('perm:asistencias.incidencias.view');
+        
+        Route::put('/asistencia-incidencias/{grupoUuid}', [AsistenciaIncidenciasController::class, 'update'])
+            ->middleware('perm:asistencias.incidencias.edit');
+        
+        Route::delete('/asistencia-incidencias/{grupoUuid}', [AsistenciaIncidenciasController::class, 'destroy'])
+            ->middleware('perm:asistencias.incidencias.delete');
 
         // ---------------- FORMS ADMIN ----------------
         Route::get('/forms', [FormsController::class, 'adminIndex'])

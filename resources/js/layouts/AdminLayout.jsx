@@ -112,6 +112,9 @@ export default function AdminLayout() {
   const canViewEmpresas = hasPermission("empresas.view");
   const canViewGrupos = hasPermission("grupos.view");
   const canViewFormsAdmin = hasPermission("formularios.admin.view");
+  const canViewControlAcceso = hasPermission("turnos.view");
+  const canViewAsistencias = hasPermission("asistencias.view");
+  const canViewIncidencias = hasPermission("asistencias.incidencias.view");
 
   const visibleAdminLinks = [
     canViewUsers && {
@@ -163,6 +166,37 @@ export default function AdminLayout() {
       icon: "fa-brands fa-wpforms",
       active: location.pathname.startsWith("/admin/forms"),
     },
+    canViewControlAcceso && {
+      to: "/admin/control-acceso",
+      title: "Control de acceso",
+      label: "Control de acceso",
+      icon: "fa-solid fa-clock",
+      active: location.pathname.startsWith(
+        "/admin/control-acceso"
+      ),
+    },
+    canViewAsistencias && {
+      to: "/admin/asistencias",
+      title: "Gestión de asistencias",
+      label: "Asistencias",
+      icon: "fa-solid fa-clipboard-user",
+      active: location.pathname.startsWith(
+        "/admin/asistencias"
+      ),
+    },
+    canViewIncidencias && {
+      to:
+        "/admin/asistencia-incidencias",
+      title:
+        "Incidencias de asistencia",
+      label: "Incidencias",
+      icon:
+        "fa-solid fa-calendar-check",
+      active:
+        location.pathname.startsWith(
+          "/admin/asistencia-incidencias"
+        ),
+    },
   ].filter(Boolean);
 
   const currentModuleAccess = [
@@ -193,6 +227,18 @@ export default function AdminLayout() {
     {
       prefix: "/admin/forms",
       allowed: canViewFormsAdmin,
+    },
+    {
+      prefix: "/admin/control-acceso",
+      allowed: canViewControlAcceso,
+    },
+    {
+      prefix: "/admin/asistencias",
+      allowed: canViewAsistencias,
+    },
+    {
+      prefix: "/admin/asistencia-incidencias",
+      allowed: canViewIncidencias,
     },
   ].find((item) =>
     location.pathname.startsWith(
@@ -261,7 +307,28 @@ export default function AdminLayout() {
   };
 
   const goUserPanel = () => {
-    window.location.href = "/forms";
+    if (
+      hasPermission(
+        "formularios.view"
+      )
+    ) {
+      window.location.href =
+        "/forms";
+      return;
+    }
+  
+    if (
+      hasPermission(
+        "asistencias.view"
+      )
+    ) {
+      window.location.href =
+        "/asistencias";
+      return;
+    }
+  
+    window.location.href =
+      "/admin";
   };
 
   const onLogout = async () => {
@@ -617,10 +684,23 @@ export default function AdminLayout() {
 
   if (loading) return <div style={{ padding: 16 }}>Cargando panel admin...</div>;
 
+  const userPanelPath =
+    hasPermission("formularios.view")
+      ? "/forms"
+      : hasPermission("asistencias.view")
+        ? "/asistencias"
+        : "/admin";
+
   if (!canAccessAdminPanel) {
     return (
       <Navigate
-        to="/forms"
+        to={
+          hasPermission("formularios.view")
+            ? "/forms"
+            : hasPermission("asistencias.view")
+              ? "/asistencias"
+              : "/login"
+        }
         replace
       />
     );
@@ -634,7 +714,7 @@ export default function AdminLayout() {
       <Navigate
         to={
           visibleAdminLinks[0]?.to ||
-          "/forms"
+          userPanelPath
         }
         replace
       />

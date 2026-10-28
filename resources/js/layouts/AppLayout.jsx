@@ -52,10 +52,31 @@ export default function AppLayout() {
   const roles = normalizeRoles(me);
   const permissions = normalizePermissions(me);
 
-  const canViewAdminPanel =
+  const isAdministrator =
     !!me?.is_admin ||
-    roles.some((r) => String(r).toLowerCase() === "administrador") ||
-    permissions.includes("admin.panel.view");
+    roles.some(
+      (r) =>
+        String(r).toLowerCase() ===
+        "administrador"
+    );
+
+  const canViewForms =
+    isAdministrator ||
+    permissions.includes(
+      "formularios.view"
+    );
+  
+  const canViewAsistencias =
+    isAdministrator ||
+    permissions.includes(
+      "asistencias.view"
+    );
+
+  const canViewAdminPanel =
+  isAdministrator ||
+  permissions.includes(
+    "admin.panel.view"
+  );
 
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(() => {
@@ -192,8 +213,20 @@ export default function AppLayout() {
     fontSize: 18,
   };
 
-  const isFormsActive = location.pathname.startsWith("/forms");
-  const isAdminActive = location.pathname.startsWith("/admin");
+  const isFormsActive =
+    location.pathname.startsWith(
+      "/forms"
+    );
+
+  const isAsistenciasActive =
+    location.pathname.startsWith(
+      "/asistencias"
+    );
+
+  const isAdminActive =
+    location.pathname.startsWith(
+      "/admin"
+    );
 
   const bottomNavItemStyle = (active) => ({
     flex: 1,
@@ -474,7 +507,25 @@ export default function AppLayout() {
   };
 
   const handleFormsGo = () => {
-    navigate("/forms");
+    // Si puede ver Formularios, siempre será
+    // la opción principal.
+    if (canViewForms) {
+      navigate("/forms");
+      return;
+    }
+  
+    // Si no tiene Formularios pero sí
+    // Control de acceso.
+    if (canViewAsistencias) {
+      navigate("/asistencias");
+      return;
+    }
+  
+    // Si sólo tiene acceso al Panel Admin.
+    if (canViewAdminPanel) {
+      window.location.href = "/admin";
+      return;
+    }
   };
 
   const handleProfileGo = () => {
@@ -514,24 +565,49 @@ export default function AppLayout() {
               type="button"
               onClick={handleFormsGo}
               style={S.logoRow}
-              title="Ir a Formularios"
-              aria-label="Ir a Formularios"
+              title="Ir al inicio"
+              aria-label="Ir al inicio"
             >
               <img src="/images/Logo-vysisa.png" alt="VYSISA" style={S.logo} />
             </button>
           </div>
 
           <nav style={S.nav}>
-            <NavLink
-              to="/forms"
-              title="Formularios"
-              style={({ isActive }) => navItemStyle(isActive)}
-            >
-              <span style={navIconWrapStyle}>
-                <i className="fa-brands fa-wpforms" />
-              </span>
-              <span style={S.navLabel}>Formularios</span>
-            </NavLink>
+            {canViewForms ? (
+              <NavLink
+                to="/forms"
+                title="Formularios"
+                style={({ isActive }) =>
+                  navItemStyle(isActive)
+                }
+              >
+                <span style={navIconWrapStyle}>
+                  <i className="fa-brands fa-wpforms" />
+                </span>
+          
+                <span style={S.navLabel}>
+                  Formularios
+                </span>
+              </NavLink>
+            ) : null}
+          
+            {canViewAsistencias ? (
+              <NavLink
+                to="/asistencias"
+                title="Control de acceso"
+                style={({ isActive }) =>
+                  navItemStyle(isActive)
+                }
+              >
+                <span style={navIconWrapStyle}>
+                  <i className="fa-solid fa-clock" />
+                </span>
+          
+                <span style={S.navLabel}>
+                  Control de acceso
+                </span>
+              </NavLink>
+            ) : null}
           </nav>
 
           {canViewAdminPanel ? (
@@ -665,18 +741,83 @@ export default function AppLayout() {
       {isMobile ? (
         <div style={S.mobileBottomBarWrap}>
           <nav style={S.mobileBottomBar}>
-            <NavLink
-              to="/forms"
-              style={() => bottomNavItemStyle(isFormsActive)}
-            >
-              <span style={bottomTopIndicatorStyle(isFormsActive)} />
-              <span style={bottomNavInnerStyle(isFormsActive)}>
-                <span style={bottomIconWrapStyle(isFormsActive)}>
-                  <i className="fa-brands fa-wpforms" />
+            {canViewForms ? (
+              <NavLink
+                to="/forms"
+                style={() =>
+                  bottomNavItemStyle(
+                    isFormsActive
+                  )
+                }
+              >
+                <span
+                  style={bottomTopIndicatorStyle(
+                    isFormsActive
+                  )}
+                />
+            
+                <span
+                  style={bottomNavInnerStyle(
+                    isFormsActive
+                  )}
+                >
+                  <span
+                    style={bottomIconWrapStyle(
+                      isFormsActive
+                    )}
+                  >
+                    <i className="fa-brands fa-wpforms" />
+                  </span>
+            
+                  <span
+                    style={bottomLabelStyle(
+                      isFormsActive
+                    )}
+                  >
+                    Formularios
+                  </span>
                 </span>
-                <span style={bottomLabelStyle(isFormsActive)}>Formularios</span>
-              </span>
-            </NavLink>
+              </NavLink>
+            ) : null}
+
+            {canViewAsistencias ? (
+              <NavLink
+                to="/asistencias"
+                style={() =>
+                  bottomNavItemStyle(
+                    isAsistenciasActive
+                  )
+                }
+              >
+                <span
+                  style={bottomTopIndicatorStyle(
+                    isAsistenciasActive
+                  )}
+                />
+            
+                <span
+                  style={bottomNavInnerStyle(
+                    isAsistenciasActive
+                  )}
+                >
+                  <span
+                    style={bottomIconWrapStyle(
+                      isAsistenciasActive
+                    )}
+                  >
+                    <i className="fa-solid fa-clock" />
+                  </span>
+            
+                  <span
+                    style={bottomLabelStyle(
+                      isAsistenciasActive
+                    )}
+                  >
+                    Asistencia
+                  </span>
+                </span>
+              </NavLink>
+            ) : null}
 
             {canViewAdminPanel ? (
               <button

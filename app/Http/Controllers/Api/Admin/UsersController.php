@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserHistory;
+use App\Models\UserControlAcceso;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -24,6 +26,19 @@ class UsersController extends Controller
                 'grupos:id,nombre,nombre_mostrar,activo',
                 'unidadesServicio:id,nombre,descripcion,activo',
                 'roles:id,name',
+            
+                'controlAccesos' => function ($query) {
+                    $query
+                        ->with([
+                            'empresa:id,nombre,razon_social,activo',
+                
+                            'unidadServicio:id,nombre,descripcion,activo',
+                
+                            'turno:id,nombre,descripcion,hora_inicio,hora_fin,horas_jornada,minutos_comida,comida_cuenta_jornada,vigente_desde,vigente_hasta,activo',
+                        ])
+                        ->orderByDesc('fecha_inicio')
+                        ->orderByDesc('id');
+                },
             ])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
@@ -78,7 +93,15 @@ class UsersController extends Controller
                     'descripcion' => $us->descripcion,
                     'activo' => (bool) $us->activo,
                 ])->values() ?? [],
-
+                
+                'control_acceso_actual' => $this->formatControlAcceso(
+                    $this->findCurrentControlAcceso($u->controlAccesos)
+                ),
+                
+                'control_acceso_configuracion' => $this->formatControlAcceso(
+                    $u->controlAccesos->first()
+                ),
+                
                 'created_at' => $u->created_at,
             ];
         });
@@ -158,6 +181,39 @@ class UsersController extends Controller
             'unidad_servicio_ids.array' => 'La unidad de servicio enviada no es válida.',
             'unidad_servicio_ids.min' => 'No se puede crear el usuario porque falta la unidad de servicio.',
             'unidad_servicio_ids.*.exists' => 'La unidad de servicio seleccionada no existe.',
+
+            'control_acceso.empresa_id.required' =>
+                'Falta seleccionar la empresa laboral.',
+            
+            'control_acceso.empresa_id.exists' =>
+                'La empresa laboral seleccionada no existe.',
+
+            'control_acceso.unidad_servicio_id.required' =>
+                'Falta seleccionar la unidad laboral.',
+            
+            'control_acceso.unidad_servicio_id.exists' =>
+                'La unidad laboral seleccionada no existe.',
+            
+            'control_acceso.turno_id.required' =>
+                'Falta seleccionar el turno.',
+            
+            'control_acceso.turno_id.exists' =>
+                'El turno seleccionado no existe.',
+            
+            'control_acceso.tipo_trabajo.required' =>
+                'Falta seleccionar el tipo de trabajo.',
+            
+            'control_acceso.tipo_trabajo.in' =>
+                'El tipo de trabajo seleccionado no es válido.',
+            
+            'control_acceso.kiosco_habilitado.required' =>
+                'Falta indicar si el usuario estará habilitado en Kiosco.',
+            
+            'control_acceso.fecha_inicio.required' =>
+                'Falta indicar la fecha inicial de la configuración de Control de acceso.',
+            
+            'control_acceso.fecha_fin.after_or_equal' =>
+                'La fecha final de Control de acceso no puede ser anterior a la fecha inicial.',
         ];
 
         $data = $request->validate([
@@ -196,41 +252,105 @@ class UsersController extends Controller
 
             'unidad_servicio_ids' => ['required', 'array', 'min:1'],
             'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
+
+            'control_acceso' => [
+                'nullable',
+                'array',
+            ],
+
+            'control_acceso.id' => [
+                'nullable',
+                'integer',
+                Rule::exists('user_control_accesos', 'id'),
+            ],
+            
+            'control_acceso.empresa_id' => [
+                'required_with:control_acceso',
+                'integer',
+                Rule::exists('empresas', 'id'),
+            ],
+
+            'control_acceso.unidad_servicio_id' => [
+                'required_with:control_acceso',
+                'integer',
+                Rule::exists('unidades_servicio', 'id'),
+            ],
+            
+            'control_acceso.turno_id' => [
+                'required_with:control_acceso',
+                'integer',
+                Rule::exists('turnos', 'id'),
+            ],
+            
+            'control_acceso.tipo_trabajo' => [
+                'required_with:control_acceso',
+                Rule::in([
+                    'fijo',
+                    'mixto_salidas',
+                ]),
+            ],
+            
+            'control_acceso.kiosco_habilitado' => [
+                'required_with:control_acceso',
+                'boolean',
+            ],
+            
+            'control_acceso.fecha_inicio' => [
+                'required_with:control_acceso',
+                'date',
+            ],
+            
+            'control_acceso.fecha_fin' => [
+                'nullable',
+                'date',
+                'after_or_equal:control_acceso.fecha_inicio',
+            ],
         ], $messages);
 
-        $user = User::create([
-            'name' => trim($data['name']),
-            'email' => trim($data['email']),
-            'activo' => (bool) $data['activo'],
-            'password' => Hash::make($data['password']),
-        ]);
-
-        $user->syncRoles($data['roles']);
-        $user->empresas()->sync($data['empresa_ids']);
-        $user->grupos()->sync($data['grupo_ids']);
-        $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
-
-        $user->load([
-            'empresas:id,nombre,razon_social,activo',
-            'grupos:id,nombre,nombre_mostrar,activo',
-            'unidadesServicio:id,nombre,descripcion,activo',
-        ]);
-
-        $this->recordUserHistory(
-            user: $user,
-            actor: $request->user(),
-            action: 'created',
-            snapshot: $this->buildUserSnapshot($user),
-            changes: [
-                [
-                    'field' => 'password',
-                    'label' => 'Contraseña',
-                    'type' => 'password',
-                    'old' => null,
-                    'new' => 'Establecida',
+        $user = DB::transaction(function () use ($data, $request) {
+            $user = User::create([
+                'name' => trim($data['name']),
+                'email' => trim($data['email']),
+                'activo' => (bool) $data['activo'],
+                'password' => Hash::make($data['password']),
+            ]);
+        
+            $user->syncRoles($data['roles']);
+            $user->empresas()->sync($data['empresa_ids']);
+            $user->grupos()->sync($data['grupo_ids']);
+            $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
+        
+            if (!empty($data['control_acceso'])) {
+                $this->createControlAcceso(
+                    $user,
+                    $data['control_acceso']
+                );
+            }
+        
+            $user->load([
+                'empresas:id,nombre,razon_social,activo',
+                'grupos:id,nombre,nombre_mostrar,activo',
+                'unidadesServicio:id,nombre,descripcion,activo',
+            ]);
+        
+            $this->recordUserHistory(
+                user: $user,
+                actor: $request->user(),
+                action: 'created',
+                snapshot: $this->buildUserSnapshot($user),
+                changes: [
+                    [
+                        'field' => 'password',
+                        'label' => 'Contraseña',
+                        'type' => 'password',
+                        'old' => null,
+                        'new' => 'Establecida',
+                    ],
                 ],
-            ],
-        );
+            );
+        
+            return $user;
+        });
 
         return response()->json([
             'ok' => true,
@@ -300,6 +420,39 @@ class UsersController extends Controller
             'unidad_servicio_ids.array' => 'La unidad de servicio enviada no es válida.',
             'unidad_servicio_ids.min' => 'No se puede actualizar el usuario porque falta la unidad de servicio.',
             'unidad_servicio_ids.*.exists' => 'La unidad de servicio seleccionada no existe.',
+
+            'control_acceso.empresa_id.required' =>
+                'Falta seleccionar la empresa laboral.',
+            
+            'control_acceso.empresa_id.exists' =>
+                'La empresa laboral seleccionada no existe.',
+
+            'control_acceso.unidad_servicio_id.required' =>
+                'Falta seleccionar la unidad laboral.',
+            
+            'control_acceso.unidad_servicio_id.exists' =>
+                'La unidad laboral seleccionada no existe.',
+            
+            'control_acceso.turno_id.required' =>
+                'Falta seleccionar el turno.',
+            
+            'control_acceso.turno_id.exists' =>
+                'El turno seleccionado no existe.',
+            
+            'control_acceso.tipo_trabajo.required' =>
+                'Falta seleccionar el tipo de trabajo.',
+            
+            'control_acceso.tipo_trabajo.in' =>
+                'El tipo de trabajo seleccionado no es válido.',
+            
+            'control_acceso.kiosco_habilitado.required' =>
+                'Falta indicar si el usuario estará habilitado en Kiosco.',
+            
+            'control_acceso.fecha_inicio.required' =>
+                'Falta indicar la fecha inicial de la configuración de Control de acceso.',
+            
+            'control_acceso.fecha_fin.after_or_equal' =>
+                'La fecha final de Control de acceso no puede ser anterior a la fecha inicial.',
         ];
 
         $data = $request->validate([
@@ -337,45 +490,120 @@ class UsersController extends Controller
 
             'unidad_servicio_ids' => ['required', 'array', 'min:1'],
             'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
+
+            'control_acceso' => [
+                'nullable',
+                'array',
+            ],
+            
+            'control_acceso.id' => [
+                'nullable',
+                'integer',
+                Rule::exists('user_control_accesos', 'id'),
+            ],
+
+            'control_acceso.empresa_id' => [
+                'required_with:control_acceso',
+                'integer',
+                Rule::exists('empresas', 'id'),
+            ],
+
+            'control_acceso.unidad_servicio_id' => [
+                'required_with:control_acceso',
+                'integer',
+                Rule::exists('unidades_servicio', 'id'),
+            ],
+            
+            'control_acceso.turno_id' => [
+                'required_with:control_acceso',
+                'integer',
+                Rule::exists('turnos', 'id'),
+            ],
+            
+            'control_acceso.tipo_trabajo' => [
+                'required_with:control_acceso',
+                Rule::in([
+                    'fijo',
+                    'mixto_salidas',
+                ]),
+            ],
+            
+            'control_acceso.kiosco_habilitado' => [
+                'required_with:control_acceso',
+                'boolean',
+            ],
+            
+            'control_acceso.fecha_inicio' => [
+                'required_with:control_acceso',
+                'date',
+            ],
+            
+            'control_acceso.fecha_fin' => [
+                'nullable',
+                'date',
+                'after_or_equal:control_acceso.fecha_inicio',
+            ],
         ], $messages);
 
         $this->loadUserRelations($user);
         $beforeSnapshot = $this->buildUserSnapshot($user);
         $passwordChanged = !empty($data['password'] ?? null);
 
-        $user->name = trim($data['name']);
-        $user->email = trim($data['email']);
-        $user->activo = (bool) $data['activo'];
-
-        if ($passwordChanged) {
-            $user->password = Hash::make($data['password']);
-        }
-
-        $user->save();
-
-        $user->syncRoles($data['roles']);
-        $user->empresas()->sync($data['empresa_ids']);
-        $user->grupos()->sync($data['grupo_ids']);
-        $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
-
-        $user->load([
-            'empresas:id,nombre,razon_social,activo',
-            'grupos:id,nombre,nombre_mostrar,activo',
-            'unidadesServicio:id,nombre,descripcion,activo',
-        ]);
-
-        $afterSnapshot = $this->buildUserSnapshot($user);
-        $changes = $this->buildUserChanges($beforeSnapshot, $afterSnapshot, $passwordChanged);
-
-        if (!empty($changes)) {
-            $this->recordUserHistory(
-                user: $user,
-                actor: $request->user(),
-                action: 'updated',
-                snapshot: $afterSnapshot,
-                changes: $changes,
-            );
-        }
+        DB::transaction(function () use (
+            $user,
+            $data,
+            $request,
+            $beforeSnapshot,
+            $passwordChanged
+        ) {
+            $user->name = trim($data['name']);
+            $user->email = trim($data['email']);
+            $user->activo = (bool) $data['activo'];
+        
+            if ($passwordChanged) {
+                $user->password = Hash::make($data['password']);
+            }
+        
+            $user->save();
+        
+            $user->syncRoles($data['roles']);
+            $user->empresas()->sync($data['empresa_ids']);
+            $user->grupos()->sync($data['grupo_ids']);
+            $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
+        
+            if (!empty($data['control_acceso'])) {
+                $this->updateControlAcceso(
+                    $user,
+                    $data['control_acceso']
+                );
+            }
+        
+            $user->load([
+                'empresas:id,nombre,razon_social,activo',
+                'grupos:id,nombre,nombre_mostrar,activo',
+                'unidadesServicio:id,nombre,descripcion,activo',
+            ]);
+        
+            $afterSnapshot =
+                $this->buildUserSnapshot($user);
+        
+            $changes =
+                $this->buildUserChanges(
+                    $beforeSnapshot,
+                    $afterSnapshot,
+                    $passwordChanged
+                );
+        
+            if (!empty($changes)) {
+                $this->recordUserHistory(
+                    user: $user,
+                    actor: $request->user(),
+                    action: 'updated',
+                    snapshot: $afterSnapshot,
+                    changes: $changes,
+                );
+            }
+        });
 
         return response()->json([
             'ok' => true,
@@ -461,35 +689,117 @@ class UsersController extends Controller
             'grupos:id,nombre,nombre_mostrar,activo',
             'unidadesServicio:id,nombre,descripcion,activo',
             'roles:id,name',
+    
+            'controlAccesos' => function ($query) {
+                $query
+                    ->with([
+                        'empresa:id,nombre,razon_social',
+                        'unidadServicio:id,nombre',
+                        'turno:id,nombre',
+                    ])
+                    ->orderByDesc('fecha_inicio')
+                    ->orderByDesc('id');
+            },
         ]);
     }
 
     private function buildUserSnapshot(User $user): array
     {
         $this->loadUserRelations($user);
-
+    
+        /*
+         * La relación viene ordenada por fecha_inicio DESC e id DESC,
+         * así que el primer elemento representa la configuración
+         * laboral más reciente.
+         */
+        $control = $user->controlAccesos->first();
+    
+        $tipoTrabajo = null;
+    
+        if ($control) {
+            $tipoTrabajo = match ($control->tipo_trabajo) {
+                'fijo' => 'Fijo',
+                'mixto_salidas' => 'Mixto / Salidas',
+                default => $control->tipo_trabajo,
+            };
+        }
+    
+        $vigenciaControl = null;
+    
+        if ($control) {
+            $inicio = $control->fecha_inicio
+                ? $control->fecha_inicio->format('d/m/Y')
+                : '—';
+    
+            $fin = $control->fecha_fin
+                ? $control->fecha_fin->format('d/m/Y')
+                : 'Sin fecha final';
+    
+            $vigenciaControl = "{$inicio} → {$fin}";
+        }
+    
         return [
             'name' => $user->name,
+    
             'email' => $user->email,
-            'roles' => $user->getRoleNames()->sort()->values()->all(),
+    
+            'roles' => $user->getRoleNames()
+                ->sort()
+                ->values()
+                ->all(),
+    
+            /*
+             * Estas siguen siendo exclusivamente las unidades
+             * utilizadas para Formularios.
+             */
             'unidades_servicio' => $user->unidadesServicio
                 ->map(fn ($us) => $us->nombre)
                 ->filter()
                 ->sort()
                 ->values()
                 ->all(),
+    
             'empresas' => $user->empresas
                 ->map(fn ($e) => $e->nombre)
                 ->filter()
                 ->sort()
                 ->values()
                 ->all(),
+    
             'grupos' => $user->grupos
                 ->map(fn ($g) => $g->nombre_mostrar ?: $g->nombre)
                 ->filter()
                 ->sort()
                 ->values()
                 ->all(),
+    
+            /*
+             * Control de acceso
+             */
+            'control_empresa_laboral' =>
+                $control?->empresa?->nombre,
+            
+            'control_unidad_laboral' =>
+                $control?->unidadServicio?->nombre,
+            
+            'control_turno' =>
+                $control?->turno?->nombre,
+    
+            'control_tipo_trabajo' =>
+                $tipoTrabajo,
+    
+            'control_kiosco' =>
+                $control
+                    ? (
+                        $control->kiosco_habilitado
+                            ? 'Habilitado'
+                            : 'No habilitado'
+                    )
+                    : null,
+    
+            'control_vigencia' =>
+                $vigenciaControl,
+    
             'activo' => (bool) ($user->activo ?? true),
         ];
     }
@@ -497,13 +807,73 @@ class UsersController extends Controller
     private function userFieldMeta(): array
     {
         return [
-            'name' => ['label' => 'Nombre', 'type' => 'text'],
-            'email' => ['label' => 'Correo / Usuario', 'type' => 'text'],
-            'roles' => ['label' => 'Rol', 'type' => 'list'],
-            'unidades_servicio' => ['label' => 'Unidad de servicio', 'type' => 'list'],
-            'empresas' => ['label' => 'Empresa', 'type' => 'list'],
-            'grupos' => ['label' => 'Grupo', 'type' => 'list'],
-            'activo' => ['label' => 'Estado', 'type' => 'boolean'],
+            'name' => [
+                'label' => 'Nombre',
+                'type' => 'text',
+            ],
+    
+            'email' => [
+                'label' => 'Correo / Usuario',
+                'type' => 'text',
+            ],
+    
+            'roles' => [
+                'label' => 'Rol',
+                'type' => 'list',
+            ],
+    
+            'unidades_servicio' => [
+                'label' => 'Unidad de servicio',
+                'type' => 'list',
+            ],
+    
+            'empresas' => [
+                'label' => 'Empresa',
+                'type' => 'list',
+            ],
+    
+            'grupos' => [
+                'label' => 'Grupo',
+                'type' => 'list',
+            ],
+    
+            /*
+             * Control de acceso
+             */
+            'control_empresa_laboral' => [
+                'label' => 'Empresa laboral',
+                'type' => 'text',
+            ],
+
+            'control_unidad_laboral' => [
+                'label' => 'Unidad laboral',
+                'type' => 'text',
+            ],
+    
+            'control_turno' => [
+                'label' => 'Turno',
+                'type' => 'text',
+            ],
+    
+            'control_tipo_trabajo' => [
+                'label' => 'Tipo de trabajo',
+                'type' => 'text',
+            ],
+    
+            'control_kiosco' => [
+                'label' => 'Kiosco',
+                'type' => 'text',
+            ],
+    
+            'control_vigencia' => [
+                'label' => 'Vigencia de Control de acceso',
+                'type' => 'text',
+            ],
+    
+            'activo' => [
+                'label' => 'Estado',
+                'type' => 'boolean',
+            ],
         ];
     }
 
@@ -563,6 +933,318 @@ class UsersController extends Controller
         }
 
         return $changes;
+    }
+
+    private function findCurrentControlAcceso($items)
+    {
+        $today = now('America/Mexico_City')
+            ->toDateString();
+    
+        return collect($items)->first(function ($item) use ($today) {
+            $fechaInicio = $item->fecha_inicio
+                ? $item->fecha_inicio->format('Y-m-d')
+                : null;
+    
+            $fechaFin = $item->fecha_fin
+                ? $item->fecha_fin->format('Y-m-d')
+                : null;
+    
+            if (!$fechaInicio) {
+                return false;
+            }
+    
+            return $fechaInicio <= $today
+                && ($fechaFin === null || $fechaFin >= $today);
+        });
+    }
+    
+    private function formatControlAcceso($config): ?array
+    {
+        if (!$config) {
+            return null;
+        }
+    
+        return [
+            'id' => $config->id,
+        
+            'empresa_id' => $config->empresa_id,
+        
+            'unidad_servicio_id' => $config->unidad_servicio_id,
+        
+            'turno_id' => $config->turno_id,
+            
+            'tipo_trabajo' => $config->tipo_trabajo,
+    
+            'kiosco_habilitado' => (bool) $config->kiosco_habilitado,
+    
+            'fecha_inicio' => $config->fecha_inicio
+                ? $config->fecha_inicio->format('Y-m-d')
+                : null,
+    
+            'fecha_fin' => $config->fecha_fin
+                ? $config->fecha_fin->format('Y-m-d')
+                : null,
+    
+            'empresa_laboral' => $config->empresa
+                ? [
+                    'id' => $config->empresa->id,
+                    'nombre' => $config->empresa->nombre,
+                    'razon_social' => $config->empresa->razon_social,
+                    'activo' => (bool) $config->empresa->activo,
+                ]
+                : null,
+
+            'unidad_laboral' => $config->unidadServicio
+                ? [
+                    'id' => $config->unidadServicio->id,
+                    'nombre' => $config->unidadServicio->nombre,
+                    'descripcion' => $config->unidadServicio->descripcion,
+                    'activo' => (bool) $config->unidadServicio->activo,
+                ]
+                : null,
+    
+            'turno' => $config->turno
+                ? [
+                    'id' => $config->turno->id,
+                    'nombre' => $config->turno->nombre,
+                    'descripcion' => $config->turno->descripcion,
+                    'hora_inicio' => $config->turno->hora_inicio,
+                    'hora_fin' => $config->turno->hora_fin,
+                    'horas_jornada' => $config->turno->horas_jornada,
+                    'minutos_comida' => $config->turno->minutos_comida,
+                    'comida_cuenta_jornada' => (bool) $config->turno->comida_cuenta_jornada,
+                    'activo' => (bool) $config->turno->activo,
+                ]
+                : null,
+        ];
+    }
+
+    private function createControlAcceso(
+        User $user,
+        array $data
+    ): UserControlAcceso {
+        $this->validateControlAccesoOverlap(
+            $user,
+            $data
+        );
+    
+        return UserControlAcceso::create([
+            'user_id' => $user->id,
+        
+            'empresa_id' =>
+                $data['empresa_id'],
+        
+            'unidad_servicio_id' =>
+                $data['unidad_servicio_id'],
+    
+            'turno_id' =>
+                $data['turno_id'],
+    
+            'tipo_trabajo' =>
+                $data['tipo_trabajo'],
+    
+            'kiosco_habilitado' =>
+                (bool) $data['kiosco_habilitado'],
+    
+            'fecha_inicio' =>
+                $data['fecha_inicio'],
+    
+            'fecha_fin' =>
+                $data['fecha_fin'] ?? null,
+        ]);
+    }
+    
+    private function updateControlAcceso(
+        User $user,
+        array $data
+    ): UserControlAcceso {
+        $actual = null;
+        
+        /*
+         * Si el formulario nos indicó exactamente qué
+         * configuración estamos editando, usamos esa.
+         */
+        if (!empty($data['id'])) {
+            $actual = UserControlAcceso::query()
+                ->where('id', $data['id'])
+                ->where('user_id', $user->id)
+                ->first();
+        
+            if (!$actual) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'control_acceso.id' =>
+                        'La configuración de Control de acceso no pertenece a este usuario.',
+                ]);
+            }
+        }
+        
+        /*
+         * Compatibilidad por si alguna petición antigua
+         * todavía no envía el ID.
+         */
+        if (!$actual) {
+            $actual = UserControlAcceso::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('fecha_inicio')
+                ->orderByDesc('id')
+                ->first();
+        }
+    
+        /*
+         * Si todavía no existe configuración,
+         * simplemente creamos la primera.
+         */
+        if (!$actual) {
+            return $this->createControlAcceso(
+                $user,
+                $data
+            );
+        }
+    
+        $nuevaFechaInicio =
+            $data['fecha_inicio'];
+    
+        $fechaInicioActual =
+            $actual->fecha_inicio
+                ->format('Y-m-d');
+    
+        /*
+         * Si mantiene exactamente la misma fecha inicial,
+         * interpretamos que está corrigiendo esa misma
+         * configuración y actualizamos el registro.
+         */
+        if (
+            $nuevaFechaInicio ===
+            $fechaInicioActual
+        ) {
+            $this->validateControlAccesoOverlap(
+                $user,
+                $data,
+                $actual->id
+            );
+    
+            $actual->update([
+                'empresa_id' =>
+                    $data['empresa_id'],
+            
+                'unidad_servicio_id' =>
+                    $data['unidad_servicio_id'],
+            
+                'turno_id' =>
+                    $data['turno_id'],
+    
+                'tipo_trabajo' =>
+                    $data['tipo_trabajo'],
+    
+                'kiosco_habilitado' =>
+                    (bool) $data['kiosco_habilitado'],
+    
+                'fecha_inicio' =>
+                    $data['fecha_inicio'],
+    
+                'fecha_fin' =>
+                    $data['fecha_fin'] ?? null,
+            ]);
+    
+            return $actual->fresh();
+        }
+    
+        /*
+         * Para conservar historial, una nueva configuración
+         * debe iniciar después de la configuración vigente.
+         */
+        if (
+            $nuevaFechaInicio <
+            $fechaInicioActual
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'control_acceso.fecha_inicio' =>
+                    'La nueva configuración no puede comenzar antes de la configuración laboral vigente.',
+            ]);
+        }
+    
+        /*
+         * Cerramos automáticamente la configuración anterior
+         * un día antes de que empiece la nueva.
+         */
+        $finAnterior = \Carbon\Carbon::parse(
+            $nuevaFechaInicio,
+            'America/Mexico_City'
+        )
+            ->subDay()
+            ->toDateString();
+    
+        $actual->fecha_fin =
+            $finAnterior;
+    
+        $actual->save();
+    
+        return $this->createControlAcceso(
+            $user,
+            $data
+        );
+    }
+    
+    private function validateControlAccesoOverlap(
+        User $user,
+        array $data,
+        ?int $ignoreId = null
+    ): void {
+        $inicio =
+            $data['fecha_inicio'];
+    
+        $fin =
+            $data['fecha_fin'] ?? null;
+    
+        $query = UserControlAcceso::query()
+            ->where(
+                'user_id',
+                $user->id
+            );
+    
+        if ($ignoreId) {
+            $query->where(
+                'id',
+                '!=',
+                $ignoreId
+            );
+        }
+    
+        /*
+         * Dos periodos se cruzan cuando:
+         *
+         * inicio_existente <= fin_nuevo
+         * Y
+         * fin_existente >= inicio_nuevo
+         *
+         * considerando NULL como "sin fecha final".
+         */
+        $query->where(function ($q) use ($inicio, $fin) {
+            if ($fin) {
+                $q->whereDate(
+                    'fecha_inicio',
+                    '<=',
+                    $fin
+                );
+            }
+    
+            $q->where(function ($qq) use ($inicio) {
+                $qq
+                    ->whereNull('fecha_fin')
+                    ->orWhereDate(
+                        'fecha_fin',
+                        '>=',
+                        $inicio
+                    );
+            });
+        });
+    
+        if ($query->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'control_acceso.fecha_inicio' =>
+                    'La vigencia de esta configuración se cruza con otra configuración laboral del usuario.',
+            ]);
+        }
     }
 
     private function recordUserHistory(

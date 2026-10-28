@@ -170,7 +170,34 @@ export default function Login() {
     clearOfflineSession();
   };
 
-  const getRedirectPath = () => {
+  const getRedirectPath = (user) => {
+    if (
+      hasPermission(
+        user,
+        "formularios.view"
+      )
+    ) {
+      return "/forms";
+    }
+  
+    if (
+      hasPermission(
+        user,
+        "asistencias.view"
+      )
+    ) {
+      return "/asistencias";
+    }
+  
+    if (
+      hasPermission(
+        user,
+        "admin.panel.view"
+      )
+    ) {
+      return "/admin";
+    }
+  
     return "/forms";
   };
 
@@ -193,7 +220,9 @@ export default function Login() {
             );
 
             window.location.href =
-              "/forms";
+              getRedirectPath(
+                offlineUser
+              );
 
             return;
           }
@@ -232,7 +261,7 @@ export default function Login() {
          * Esta redirección corresponde a una sesión que ya existía.
          */
         window.location.href =
-          getRedirectPath();
+          getRedirectPath(user);
       } catch {
         if (!navigator.onLine) {
           const offlineUser =
@@ -247,7 +276,9 @@ export default function Login() {
             );
 
             window.location.href =
-              "/forms";
+              getRedirectPath(
+                offlineUser
+              );
 
             return;
           }
@@ -312,7 +343,9 @@ export default function Login() {
       }
 
       window.location.href =
-        getRedirectPath();
+        getRedirectPath(
+          user
+        );
     } catch (error) {
       clearSession();
 

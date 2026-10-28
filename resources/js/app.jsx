@@ -33,6 +33,7 @@ import Login from "./pages/Login";
 // Panel normal
 import AppLayout from "./layouts/AppLayout";
 import FormsIndex from "./pages/user/FormsIndex";
+import Asistencias from "./pages/user/Asistencias";
 
 // Admin
 import AdminLayout from "./layouts/AdminLayout";
@@ -43,6 +44,9 @@ import AdminUnidadesServicio from "./pages/admin/AdminUnidadesServicio";
 import AdminEmpresas from "./pages/admin/AdminEmpresas";
 import AdminGrupos from "./pages/admin/AdminGrupos";
 import AdminForms from "./pages/admin/AdminForms";
+import AdminControlAcceso from "./pages/admin/AdminControlAcceso";
+import AdminAsistencias from "./pages/admin/AdminAsistencias";
+import AdminAsistenciaIncidencias from "./pages/admin/AdminAsistenciaIncidencias";
 
 // PWA SW register (vite-plugin-pwa)
 import { registerSW } from "virtual:pwa-register";
@@ -230,6 +234,41 @@ function hasPermission(
   );
 }
 
+function getUserPanelPath(user) {
+  if (!user) {
+    return "/login";
+  }
+
+  if (
+    hasPermission(
+      user,
+      "formularios.view"
+    )
+  ) {
+    return "/forms";
+  }
+
+  if (
+    hasPermission(
+      user,
+      "asistencias.view"
+    )
+  ) {
+    return "/asistencias";
+  }
+
+  if (
+    hasPermission(
+      user,
+      "admin.panel.view"
+    )
+  ) {
+    return "/admin";
+  }
+
+  return "/login";
+}
+
 /*
 |--------------------------------------------------------------------------
 | Acceso offline
@@ -314,7 +353,7 @@ function RequireAdminPanelAccess({
 
   return (
     <Navigate
-      to="/forms"
+      to={getUserPanelPath(user)}
       replace
     />
   );
@@ -353,6 +392,59 @@ function RequireModulePermission({
   );
 }
 
+function RequireUserModulePermission({
+  permission,
+  children,
+}) {
+  const user = getStoredUser();
+
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
+
+  if (
+    isAdmin(user) ||
+    hasPermission(
+      user,
+      permission
+    )
+  ) {
+    return children;
+  }
+
+  return (
+    <Navigate
+      to={getUserPanelPath(user)}
+      replace
+    />
+  );
+}
+
+function UserIndexRedirect() {
+  const user =
+    getStoredUser();
+
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
+
+  return (
+    <Navigate
+      to={getUserPanelPath(user)}
+      replace
+    />
+  );
+}
 
 function AdminIndexRedirect() {
   const user = getStoredUser();
@@ -406,6 +498,19 @@ function AdminIndexRedirect() {
       permission:
         "formularios.admin.view",
     },
+    {
+      path: "/admin/control-acceso",
+      permission: "turnos.view",
+    },
+    {
+      path: "/admin/asistencias",
+      permission: "asistencias.view",
+    },
+    {
+      path: "/admin/asistencia-incidencias",
+      permission:
+        "asistencias.incidencias.view",
+    },
   ];
 
   const firstAllowed =
@@ -425,11 +530,22 @@ function AdminIndexRedirect() {
     );
   }
 
+  const userPanelPath =
+    getUserPanelPath(user);
+  
+  if (userPanelPath !== "/admin") {
+    return (
+      <Navigate
+        to={userPanelPath}
+        replace
+      />
+    );
+  }
+  
   return (
-    <Navigate
-      to="/forms"
-      replace
-    />
+    <div style={{ padding: 16 }}>
+      No cuentas con permisos para acceder a ningún módulo administrativo.
+    </div>
   );
 }
 
@@ -1130,18 +1246,31 @@ function App() {
           <Route
             index
             element={
-              <Navigate
-                to="/forms"
-                replace
-              />
+              <UserIndexRedirect />
             }
           />
 
           <Route
             path="forms"
-            element={<FormsIndex />}
+            element={
+              <RequireUserModulePermission
+                permission="formularios.view"
+              >
+                <FormsIndex />
+              </RequireUserModulePermission>
+            }
           />
 
+          <Route
+            path="asistencias"
+            element={
+              <RequireUserModulePermission
+                permission="asistencias.view"
+              >
+                <Asistencias />
+              </RequireUserModulePermission>
+            }
+          />
         </Route>
 
         {/* Admin con layout + subrutas */}
@@ -1239,6 +1368,38 @@ function App() {
             }
           />
 
+          <Route
+            path="control-acceso"
+            element={
+              <RequireModulePermission
+                permission="turnos.view"
+              >
+                <AdminControlAcceso />
+              </RequireModulePermission>
+            }
+          />
+
+          <Route
+            path="asistencias"
+            element={
+              <RequireModulePermission
+                permission="asistencias.view"
+              >
+                <AdminAsistencias />
+              </RequireModulePermission>
+            }
+          />
+
+          <Route
+            path="asistencia-incidencias"
+            element={
+              <RequireModulePermission
+                permission="asistencias.incidencias.view"
+              >
+                <AdminAsistenciaIncidencias />
+              </RequireModulePermission>
+            }
+          />
         </Route>
 
         {/* Fallback */}
