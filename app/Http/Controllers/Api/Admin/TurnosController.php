@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Turno;
+use App\Models\TurnoHistory;
+use App\Models\UserControlAcceso;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -44,14 +46,89 @@ class TurnosController extends Controller
     }
 
     /**
+     * Historial de un turno.
+     */
+    public function history(Turno $turno)
+    {
+        $history = TurnoHistory::query()
+            ->where(
+                'turno_id',
+                $turno->id
+            )
+            ->with([
+                'actor:id,name,email',
+            ])
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->map(function (TurnoHistory $item) {
+                return [
+                    'id' =>
+                        $item->id,
+    
+                    'action' =>
+                        $item->action,
+    
+                    'changes' =>
+                        $item->changes ?? [],
+    
+                    'snapshot' =>
+                        $item->snapshot,
+    
+                    'created_at' =>
+                        $item->created_at
+                            ?->format(
+                                'Y-m-d H:i:s'
+                            ),
+    
+                    'actor' =>
+                        $item->actor
+                            ? [
+                                'id' =>
+                                    $item->actor->id,
+    
+                                'name' =>
+                                    $item->actor->name,
+    
+                                'email' =>
+                                    $item->actor->email,
+                            ]
+                            : null,
+                ];
+            })
+            ->values();
+    
+        return response()->json([
+            'turno' => [
+                'id' =>
+                    $turno->id,
+    
+                'nombre' =>
+                    $turno->nombre,
+            ],
+    
+            'history' =>
+                $history,
+        ]);
+    }
+
+    /**
      * Crear turno.
      */
     public function store(Request $request)
     {
         $data = $this->validateData($request);
-
+    
         $turno = Turno::create($data);
-
+    
+        TurnoHistory::create([
+            'turno_id' => $turno->id,
+            'action' => 'created',
+            'changes' => null,
+            'snapshot' => $this->buildSnapshot($turno),
+            'actor_user_id' => $request->user()?->id,
+        ]);
+    
         return response()->json([
             'message' => 'Turno creado correctamente.',
             'turno' => $turno,
@@ -66,12 +143,33 @@ class TurnosController extends Controller
         Turno $turno
     ) {
         $data = $this->validateData($request);
-
+    
+        $before = $this->buildSnapshot($turno);
+    
         $turno->update($data);
-
+    
+        $turno->refresh();
+    
+        $after = $this->buildSnapshot($turno);
+    
+        $changes = $this->buildChanges(
+            $before,
+            $after
+        );
+    
+        if (!empty($changes)) {
+            TurnoHistory::create([
+                'turno_id' => $turno->id,
+                'action' => 'updated',
+                'changes' => $changes,
+                'snapshot' => $after,
+                'actor_user_id' => $request->user()?->id,
+            ]);
+        }
+    
         return response()->json([
             'message' => 'Turno actualizado correctamente.',
-            'turno' => $turno->fresh(),
+            'turno' => $turno,
         ]);
     }
 
@@ -80,11 +178,80 @@ class TurnosController extends Controller
      */
     public function destroy(Turno $turno)
     {
+        $estaEnUso = UserControlAcceso::where(
+            'turno_id',
+            $turno->id
+        )->exists();
+    
+        if ($estaEnUso) {
+            return response()->json([
+                'message' =>
+                    'No se puede eliminar este turno porque está asociado a uno o más registros de control de acceso. Puedes desactivarlo si ya no deseas utilizarlo.',
+            ], 422);
+        }
+    
         $turno->delete();
-
+    
         return response()->json([
-            'message' => 'Turno eliminado correctamente.',
+            'message' =>
+                'Turno eliminado correctamente.',
         ]);
+    }
+
+    /**
+     * Estado completo de un turno para historial.
+     */
+    private function buildSnapshot(Turno $turno): array
+    {
+        return [
+            'nombre' => $turno->nombre,
+            'descripcion' => $turno->descripcion,
+            'hora_inicio' => $turno->hora_inicio,
+            'hora_fin' => $turno->hora_fin,
+            'horas_jornada' => $turno->horas_jornada,
+            'minutos_comida' => $turno->minutos_comida,
+            'comida_cuenta_jornada' =>
+                (bool) $turno->comida_cuenta_jornada,
+    
+            'lunes' => (bool) $turno->lunes,
+            'martes' => (bool) $turno->martes,
+            'miercoles' => (bool) $turno->miercoles,
+            'jueves' => (bool) $turno->jueves,
+            'viernes' => (bool) $turno->viernes,
+            'sabado' => (bool) $turno->sabado,
+            'domingo' => (bool) $turno->domingo,
+    
+            'vigente_desde' =>
+                $turno->vigente_desde?->format('Y-m-d'),
+    
+            'vigente_hasta' =>
+                $turno->vigente_hasta?->format('Y-m-d'),
+    
+            'activo' => (bool) $turno->activo,
+        ];
+    }
+    
+    /**
+     * Obtener únicamente los campos modificados.
+     */
+    private function buildChanges(
+        array $before,
+        array $after
+    ): array {
+        $changes = [];
+    
+        foreach ($after as $field => $newValue) {
+            $oldValue = $before[$field] ?? null;
+    
+            if ($oldValue !== $newValue) {
+                $changes[$field] = [
+                    'before' => $oldValue,
+                    'after' => $newValue,
+                ];
+            }
+        }
+    
+        return $changes;
     }
 
     /**

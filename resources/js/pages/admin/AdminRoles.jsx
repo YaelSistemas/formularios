@@ -755,6 +755,27 @@ export default function AdminRoles() {
       return `${actionLabelMap[action] || action} formularios admin`;
     }
 
+    if (permission.startsWith("asistencias.incidencias.")) {
+      const action = permission.split(".")[2];
+      return `${actionLabelMap[action] || action} incidencias`;
+    }
+
+    if (permission === "asistencias.firma.view") {
+      return "Ver firma de asistencias";
+    }
+    
+    if (permission === "asistencias.foto.view") {
+      return "Ver foto de asistencias";
+    }
+    
+    if (permission === "asistencias.ubicacion.view") {
+      return "Ver ubicación de asistencias";
+    }
+    
+    if (permission === "asistencias.kiosco") {
+      return "Kiosco de asistencias";
+    }
+
     const parts = String(permission).split(".");
     const [module, action, third] = parts;
 
@@ -810,6 +831,7 @@ export default function AdminRoles() {
       userPanel: {
         formularios: [],
       },
+    
       adminPanel: {
         admin: [],
         usuarios: [],
@@ -820,6 +842,13 @@ export default function AdminRoles() {
         unidades_servicio: [],
         formularios_admin: [],
       },
+    
+      controlAcceso: {
+        asistencias: [],
+        incidencias: [],
+        turnos: [],
+      },
+    
       other: [],
     };
 
@@ -876,6 +905,21 @@ export default function AdminRoles() {
         return;
       }
 
+      if (p.startsWith("asistencias.incidencias.")) {
+        groups.controlAcceso.incidencias.push(p);
+        return;
+      }
+      
+      if (p.startsWith("asistencias.")) {
+        groups.controlAcceso.asistencias.push(p);
+        return;
+      }
+      
+      if (p.startsWith("turnos.")) {
+        groups.controlAcceso.turnos.push(p);
+        return;
+      }
+
       groups.other.push(p);
     });
 
@@ -885,6 +929,10 @@ export default function AdminRoles() {
 
     Object.keys(groups.adminPanel).forEach((key) => {
       groups.adminPanel[key] = sortPermissions(groups.adminPanel[key]);
+    });
+
+    Object.keys(groups.controlAcceso).forEach((key) => {
+      groups.controlAcceso[key] = sortPermissions(groups.controlAcceso[key]);
     });
 
     groups.other = sortPermissions(groups.other);
@@ -1741,6 +1789,101 @@ export default function AdminRoles() {
                               roleIsAdmin={roleIsAdmin}
                               formatPermissionLabel={formatPermissionLabel}
                               formatPermissionHint={formatPermissionHint}
+                            />
+                          </div>
+
+                          <div style={S.permsGroup}>
+                            <div
+                              style={
+                                S.permsGroupTitle
+                              }
+                            >
+                              Permisos control de acceso
+                            </div>
+                          
+                            <div
+                              style={
+                                S.permsGroupDesc
+                              }
+                            >
+                              Accesos relacionados con
+                              asistencias, incidencias y
+                              turnos.
+                            </div>
+                          
+                            <PermissionModuleGroup
+                              title="Asistencias"
+                              permissions={
+                                groupedPermissions
+                                  .controlAcceso
+                                  .asistencias
+                              }
+                              styles={S}
+                              selectedPermissions={
+                                selectedPermissions
+                              }
+                              togglePermission={
+                                togglePermission
+                              }
+                              roleIsAdmin={
+                                roleIsAdmin
+                              }
+                              formatPermissionLabel={
+                                formatPermissionLabel
+                              }
+                              formatPermissionHint={
+                                formatPermissionHint
+                              }
+                            />
+                          
+                            <PermissionModuleGroup
+                              title="Incidencias"
+                              permissions={
+                                groupedPermissions
+                                  .controlAcceso
+                                  .incidencias
+                              }
+                              styles={S}
+                              selectedPermissions={
+                                selectedPermissions
+                              }
+                              togglePermission={
+                                togglePermission
+                              }
+                              roleIsAdmin={
+                                roleIsAdmin
+                              }
+                              formatPermissionLabel={
+                                formatPermissionLabel
+                              }
+                              formatPermissionHint={
+                                formatPermissionHint
+                              }
+                            />
+                          
+                            <PermissionModuleGroup
+                              title="Turnos"
+                              permissions={
+                                groupedPermissions
+                                  .controlAcceso
+                                  .turnos
+                              }
+                              styles={S}
+                              selectedPermissions={
+                                selectedPermissions
+                              }
+                              togglePermission={
+                                togglePermission
+                              }
+                              roleIsAdmin={
+                                roleIsAdmin
+                              }
+                              formatPermissionLabel={
+                                formatPermissionLabel
+                              }
+                              formatPermissionHint={
+                                formatPermissionHint
+                              }
                             />
                           </div>
 

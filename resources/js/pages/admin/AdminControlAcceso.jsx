@@ -137,13 +137,16 @@ export default function AdminControlAcceso() {
 
   const canCreate =
     hasPermission("turnos.create");
-
+  
   const canEdit =
     hasPermission("turnos.edit");
-
+  
   const canDelete =
     hasPermission("turnos.delete");
-
+  
+  const canViewHistory =
+    hasPermission("turnos.view");
+  
   const canShowActionsColumn =
     canEdit || canDelete;
 
@@ -326,6 +329,31 @@ export default function AdminControlAcceso() {
     setFieldErrors,
   ] = useState({});
 
+  const [
+    openHistoryModal,
+    setOpenHistoryModal,
+  ] = useState(false);
+  
+  const [
+    historyTurno,
+    setHistoryTurno,
+  ] = useState(null);
+  
+  const [
+    historyLoading,
+    setHistoryLoading,
+  ] = useState(false);
+  
+  const [
+    historyItems,
+    setHistoryItems,
+  ] = useState([]);
+  
+  const [
+    historyError,
+    setHistoryError,
+  ] = useState("");
+
   /*
   |--------------------------------------------------------------------------
   | Carga
@@ -362,6 +390,23 @@ export default function AdminControlAcceso() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!err) {
+      return undefined;
+    }
+  
+    const timer =
+      window.setTimeout(
+        () => {
+          setErr("");
+        },
+        5000
+      );
+  
+    return () =>
+      window.clearTimeout(timer);
+  }, [err]);
 
   useEffect(() => {
     const timer =
@@ -517,6 +562,49 @@ export default function AdminControlAcceso() {
     setSaving(false);
     setErr("");
     setFieldErrors({});
+  };
+
+  const closeHistoryModal = () => {
+    setOpenHistoryModal(false);
+    setHistoryTurno(null);
+    setHistoryItems([]);
+    setHistoryError("");
+    setHistoryLoading(false);
+  };
+  
+  const openHistory = async (row) => {
+    if (!canViewHistory) {
+      setErr(
+        "No tienes permiso para ver el historial de turnos."
+      );
+      return;
+    }
+  
+    setHistoryTurno(row);
+    setHistoryItems([]);
+    setHistoryError("");
+    setOpenHistoryModal(true);
+    setHistoryLoading(true);
+  
+    try {
+      const data =
+        await apiGet(
+          `/admin/turnos/${row.id}/history`
+        );
+  
+      setHistoryItems(
+        Array.isArray(data?.history)
+          ? data.history
+          : []
+      );
+    } catch (e) {
+      setHistoryError(
+        e?.message ||
+          "Error cargando el historial del turno."
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const setField = (
@@ -862,6 +950,216 @@ export default function AdminControlAcceso() {
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
+  const formatHistoryDateTime = (
+    value
+  ) => {
+    if (!value) return "—";
+  
+    const raw =
+      String(value);
+  
+    const [
+      datePart,
+      timePart = "",
+    ] = raw.split(" ");
+  
+    const parts =
+      datePart.split("-");
+  
+    if (
+      parts.length !== 3
+    ) {
+      return raw;
+    }
+  
+    return (
+      `${parts[2]}/${parts[1]}/${parts[0]}` +
+      (timePart
+        ? ` ${timePart}`
+        : "")
+    );
+  };
+  
+  const historyFieldLabel = (
+    field
+  ) => {
+    const labels = {
+      nombre:
+        "Nombre",
+  
+      descripcion:
+        "Descripción",
+  
+      hora_inicio:
+        "Hora inicio",
+  
+      hora_fin:
+        "Hora final",
+  
+      horas_jornada:
+        "Horas de jornada",
+  
+      minutos_comida:
+        "Minutos de comida",
+  
+      comida_cuenta_jornada:
+        "Tiempo de comida",
+  
+      lunes:
+        "Lunes",
+  
+      martes:
+        "Martes",
+  
+      miercoles:
+        "Miércoles",
+  
+      jueves:
+        "Jueves",
+  
+      viernes:
+        "Viernes",
+  
+      sabado:
+        "Sábado",
+  
+      domingo:
+        "Domingo",
+  
+      vigente_desde:
+        "Vigente desde",
+  
+      vigente_hasta:
+        "Vigente hasta",
+  
+      activo:
+        "Estado",
+    };
+  
+    return (
+      labels[field] ||
+      field
+    );
+  };
+  
+  const historyValue = (
+    field,
+    value
+  ) => {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "—";
+    }
+  
+    if (
+      field === "hora_inicio" ||
+      field === "hora_fin"
+    ) {
+      return formatTime(value);
+    }
+  
+    if (
+      field === "vigente_desde" ||
+      field === "vigente_hasta"
+    ) {
+      return formatDate(value);
+    }
+  
+    if (
+      field === "horas_jornada"
+    ) {
+      return `${Number(value).toFixed(
+        2
+      )} h`;
+    }
+  
+    if (
+      field === "minutos_comida"
+    ) {
+      return `${value} min`;
+    }
+  
+    if (
+      field ===
+      "comida_cuenta_jornada"
+    ) {
+      return value
+        ? "Cuenta en jornada"
+        : "Se descuenta";
+    }
+  
+    if (
+      field === "activo"
+    ) {
+      return value
+        ? "Activo"
+        : "Inactivo";
+    }
+  
+    if (
+      [
+        "lunes",
+        "martes",
+        "miercoles",
+        "jueves",
+        "viernes",
+        "sabado",
+        "domingo",
+      ].includes(field)
+    ) {
+      return value
+        ? "Sí"
+        : "No";
+    }
+  
+    if (
+      typeof value ===
+      "boolean"
+    ) {
+      return value
+        ? "Sí"
+        : "No";
+    }
+  
+    return String(value);
+  };
+  
+  const historyActionInfo = (
+    action
+  ) => {
+    if (
+      action === "created"
+    ) {
+      return {
+        label: "Creado",
+        color: "#166534",
+        background: "#ecfdf5",
+        border: "#86efac",
+      };
+    }
+  
+    if (
+      action === "deleted"
+    ) {
+      return {
+        label: "Eliminado",
+        color: "#b91c1c",
+        background: "#fef2f2",
+        border: "#fecaca",
+      };
+    }
+  
+    return {
+      label: "Modificado",
+      color: "#1d4ed8",
+      background: "#eff6ff",
+      border: "#93c5fd",
+    };
+  };
+
   const getDays = (
     row
   ) => {
@@ -1204,9 +1502,15 @@ export default function AdminControlAcceso() {
     table: {
       width: "100%",
       minWidth:
+        canViewHistory &&
         canShowActionsColumn
-          ? 1250
-          : 1150,
+          ? 1350
+          : (
+              canViewHistory ||
+              canShowActionsColumn
+                ? 1250
+                : 1150
+            ),
       borderCollapse:
         "separate",
       borderSpacing: 0,
@@ -1488,7 +1792,7 @@ export default function AdminControlAcceso() {
                 color: "#0f172a",
               }}
             >
-              Control de acceso
+              Turnos
             </h2>
 
             <div
@@ -1721,7 +2025,18 @@ export default function AdminControlAcceso() {
                     >
                       Estado
                     </th>
-
+                    
+                    {canViewHistory ? (
+                      <th
+                        style={{
+                          ...S.th,
+                          width: 120,
+                        }}
+                      >
+                        Historial
+                      </th>
+                    ) : null}
+                    
                     {canShowActionsColumn ? (
                       <th
                         style={{
@@ -1918,6 +2233,34 @@ export default function AdminControlAcceso() {
                               </Badge>
                             </td>
 
+                            {canViewHistory ? (
+                              <td
+                                style={
+                                  S.td
+                                }
+                              >
+                                <Btn
+                                  type="button"
+                                  onClick={() =>
+                                    openHistory(
+                                      row
+                                    )
+                                  }
+                                  title="Ver historial"
+                                  style={{
+                                    padding:
+                                      "6px 10px",
+                                    fontSize: 12,
+                                    borderRadius: 9,
+                                    gap: 5,
+                                  }}
+                                >
+                                  <i className="fa-solid fa-clock-rotate-left" />
+                                  Historial
+                                </Btn>
+                              </td>
+                            ) : null}
+
                             {canShowActionsColumn ? (
                               <td
                                 style={
@@ -1979,9 +2322,12 @@ export default function AdminControlAcceso() {
                         }
                         colSpan={
                           7 +
-                          (canShowActionsColumn
-                            ? 1
-                            : 0)
+                            (canViewHistory
+                              ? 1
+                              : 0) +
+                            (canShowActionsColumn
+                              ? 1
+                              : 0)
                         }
                       >
                         Sin turnos
@@ -2794,6 +3140,402 @@ export default function AdminControlAcceso() {
                 </Btn>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {openHistoryModal ? (
+        <div
+          style={S.modalOverlay}
+          onClick={
+            closeHistoryModal
+          }
+        >
+          <div
+            style={{
+              ...S.modal,
+              maxWidth: 850,
+            }}
+            className="turnos-modal-full"
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+          >
+            <div
+              style={S.modalHeader}
+            >
+              <div>
+                <h3
+                  style={
+                    S.modalTitle
+                  }
+                >
+                  Historial del turno
+                </h3>
+      
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 13,
+                    color: "#64748b",
+                    fontWeight: 700,
+                  }}
+                >
+                  {historyTurno?.nombre ||
+                    "—"}
+                </div>
+              </div>
+      
+              <button
+                type="button"
+                style={S.xBtn}
+                onClick={
+                  closeHistoryModal
+                }
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+      
+            <div
+              style={S.modalBody}
+            >
+              {historyError ? (
+                <div
+                  style={{
+                    color: "#b91c1c",
+                    fontWeight: 800,
+                  }}
+                >
+                  {historyError}
+                </div>
+              ) : null}
+      
+              {historyLoading ? (
+                <div
+                  style={{
+                    color: "#475569",
+                    fontWeight: 700,
+                  }}
+                >
+                  Cargando historial...
+                </div>
+              ) : null}
+      
+              {!historyLoading &&
+              !historyError &&
+              historyItems.length ===
+                0 ? (
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontWeight: 700,
+                  }}
+                >
+                  Este turno todavía no
+                  tiene movimientos
+                  registrados en el
+                  historial.
+                </div>
+              ) : null}
+      
+              {!historyLoading &&
+              historyItems.map(
+                (item) => {
+                  const actionInfo =
+                    historyActionInfo(
+                      item.action
+                    );
+      
+                  const changes =
+                    Object.entries(
+                      item.changes ||
+                        {}
+                    );
+      
+                  const snapshot =
+                    Object.entries(
+                      item.snapshot ||
+                        {}
+                    );
+      
+                  const fields =
+                    item.action ===
+                      "created" ||
+                    item.action ===
+                      "deleted"
+                      ? snapshot
+                      : changes;
+      
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        border:
+                          "1px solid #e2e8f0",
+                        borderRadius: 14,
+                        padding: 14,
+                        background:
+                          "#fff",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display:
+                            "flex",
+                          alignItems:
+                            "center",
+                          justifyContent:
+                            "space-between",
+                          gap: 12,
+                          flexWrap:
+                            "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            display:
+                              "inline-flex",
+                            alignItems:
+                              "center",
+                            padding:
+                              "5px 9px",
+                            borderRadius:
+                              999,
+                            border:
+                              `1px solid ${actionInfo.border}`,
+                            background:
+                              actionInfo.background,
+                            color:
+                              actionInfo.color,
+                            fontSize: 12,
+                            fontWeight:
+                              900,
+                          }}
+                        >
+                          {
+                            actionInfo.label
+                          }
+                        </span>
+      
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color:
+                              "#64748b",
+                            fontWeight:
+                              700,
+                          }}
+                        >
+                          {formatHistoryDateTime(
+                            item.created_at
+                          )}
+                        </div>
+                      </div>
+      
+                      <div
+                        style={{
+                          marginTop: 10,
+                          fontSize: 13,
+                          color:
+                            "#334155",
+                        }}
+                      >
+                        <b>
+                          Realizado por:
+                        </b>{" "}
+                        {item.actor?.name ||
+                          "Usuario no disponible"}
+      
+                        {item.actor?.email
+                          ? ` (${item.actor.email})`
+                          : ""}
+                      </div>
+      
+                      {fields.length >
+                      0 ? (
+                        <div
+                          style={{
+                            marginTop: 12,
+                            display:
+                              "flex",
+                            flexDirection:
+                              "column",
+                            gap: 8,
+                          }}
+                        >
+                          {fields.map(
+                            ([
+                              field,
+                              value,
+                            ]) => {
+                              const isChange =
+                                item.action ===
+                                "updated";
+      
+                              const before =
+                                isChange
+                                  ? value
+                                      ?.before
+                                  : null;
+      
+                              const after =
+                                isChange
+                                  ? value
+                                      ?.after
+                                  : value;
+      
+                              return (
+                                <div
+                                  key={
+                                    field
+                                  }
+                                  style={{
+                                    border:
+                                      "1px solid #f1f5f9",
+                                    borderRadius:
+                                      10,
+                                    padding:
+                                      "10px 12px",
+                                    background:
+                                      "#f8fafc",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize:
+                                        12,
+                                      fontWeight:
+                                        900,
+                                      color:
+                                        "#334155",
+                                      marginBottom:
+                                        6,
+                                    }}
+                                  >
+                                    {historyFieldLabel(
+                                      field
+                                    )}
+                                  </div>
+      
+                                  {isChange ? (
+                                    <div
+                                      style={{
+                                        display:
+                                          "grid",
+                                        gridTemplateColumns:
+                                          "1fr 1fr",
+                                        gap: 10,
+                                      }}
+                                    >
+                                      <div>
+                                        <div
+                                          style={{
+                                            fontSize:
+                                              11,
+                                            color:
+                                              "#64748b",
+                                            fontWeight:
+                                              800,
+                                          }}
+                                        >
+                                          Antes
+                                        </div>
+      
+                                        <div
+                                          style={{
+                                            marginTop:
+                                              3,
+                                            fontWeight:
+                                              700,
+                                          }}
+                                        >
+                                          {historyValue(
+                                            field,
+                                            before
+                                          )}
+                                        </div>
+                                      </div>
+      
+                                      <div>
+                                        <div
+                                          style={{
+                                            fontSize:
+                                              11,
+                                            color:
+                                              "#64748b",
+                                            fontWeight:
+                                              800,
+                                          }}
+                                        >
+                                          Después
+                                        </div>
+      
+                                        <div
+                                          style={{
+                                            marginTop:
+                                              3,
+                                            fontWeight:
+                                              700,
+                                          }}
+                                        >
+                                          {historyValue(
+                                            field,
+                                            after
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      style={{
+                                        fontWeight:
+                                          700,
+                                      }}
+                                    >
+                                      {historyValue(
+                                        field,
+                                        after
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            fontSize: 13,
+                            color:
+                              "#64748b",
+                          }}
+                        >
+                          Sin cambios de
+                          campos registrados.
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+              )}
+            </div>
+      
+            <div
+              style={S.modalFooter}
+            >
+              <Btn
+                type="button"
+                onClick={
+                  closeHistoryModal
+                }
+              >
+                Cerrar
+              </Btn>
+            </div>
           </div>
         </div>
       ) : null}

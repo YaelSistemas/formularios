@@ -637,7 +637,10 @@ export default function Asistencias() {
 
   const [message, setMessage] =
     useState("");
-
+  
+  const [messageTone, setMessageTone] =
+    useState("success");
+  
   const [tick, setTick] =
     useState(Date.now());
 
@@ -873,6 +876,24 @@ export default function Asistencias() {
     return () =>
       window.clearInterval(timer);
   }, [actual]);
+
+  useEffect(() => {
+    if (!message) {
+      return undefined;
+    }
+  
+    const timer =
+      window.setTimeout(
+        () => {
+          setMessage("");
+          setMessageTone("success");
+        },
+        5000
+      );
+  
+    return () =>
+      window.clearTimeout(timer);
+  }, [message]);
 
   async function loadData() {
     if (!navigator.onLine) {
@@ -1788,6 +1809,8 @@ export default function Asistencias() {
           );
       }
   
+      setMessageTone("success");
+
       setMessage(
         data?.message ||
           "Entrada registrada correctamente."
@@ -1874,6 +1897,8 @@ export default function Asistencias() {
           {}
         );
 
+      setMessageTone("danger");
+
       setMessage(
         data?.message ||
           "Hora de salida registrada."
@@ -1912,6 +1937,8 @@ export default function Asistencias() {
           {}
         );
   
+      setMessageTone("meal");
+
       setMessage(
         data?.message ||
           "Inicio de comida registrado."
@@ -1950,6 +1977,8 @@ export default function Asistencias() {
           {}
         );
   
+      setMessageTone("meal");
+
       setMessage(
         data?.message ||
           "Fin de comida registrado."
@@ -2034,6 +2063,8 @@ export default function Asistencias() {
           {}
         );
   
+      setMessageTone("meal");
+
       setMessage(
         data?.message ||
           "Inicio de comida registrado correctamente."
@@ -2082,6 +2113,8 @@ export default function Asistencias() {
           {}
         );
   
+      setMessageTone("meal");
+
       setMessage(
         data?.message ||
           "Fin de comida registrado correctamente."
@@ -2130,6 +2163,8 @@ export default function Asistencias() {
           {}
         );
   
+      setMessageTone("danger");
+
       setMessage(
         data?.message ||
           "Salida registrada correctamente."
@@ -2384,6 +2419,28 @@ export default function Asistencias() {
         "1px solid #bbf7d0",
       background: "#f0fdf4",
       color: "#166534",
+      padding: "10px 12px",
+      borderRadius: 10,
+      fontSize: 13,
+      fontWeight: 700,
+    },
+
+    alertMeal: {
+      border:
+        "1px solid #fed7aa",
+      background: "#fff7ed",
+      color: "#9a3412",
+      padding: "10px 12px",
+      borderRadius: 10,
+      fontSize: 13,
+      fontWeight: 700,
+    },
+    
+    alertExit: {
+      border:
+        "1px solid #fecaca",
+      background: "#fef2f2",
+      color: "#991b1b",
       padding: "10px 12px",
       borderRadius: 10,
       fontSize: 13,
@@ -2726,7 +2783,15 @@ export default function Asistencias() {
       ) : null}
 
       {message ? (
-        <div style={S.alertSuccess}>
+        <div
+          style={
+            messageTone === "meal"
+              ? S.alertMeal
+              : messageTone === "danger"
+                ? S.alertExit
+                : S.alertSuccess
+          }
+        >
           {message}
         </div>
       ) : null}

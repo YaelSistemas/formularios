@@ -126,9 +126,9 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/users', [UsersController::class, 'index'])
             ->middleware('perm:usuarios.view');
 
-            // Historial de Usuarios
-            Route::get('/users/{user}/history', [UsersController::class, 'history'])
-                ->middleware('perm:usuarios.view');
+        // Historial de Usuarios
+        Route::get('/users/{user}/history', [UsersController::class, 'history'])
+            ->middleware('perm:usuarios.view');
 
         Route::post('/users', [UsersController::class, 'store'])
             ->middleware('perm:usuarios.create');
@@ -143,9 +143,9 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/roles-list', [RolesController::class, 'index'])
             ->middleware('perm:roles.view');
 
-            // Historial de Roles
-            Route::get('/roles-list/{role}/history', [RolesController::class, 'history'])
-                ->middleware('perm:roles.view');
+        // Historial de Roles
+        Route::get('/roles-list/{role}/history', [RolesController::class, 'history'])
+            ->middleware('perm:roles.view');
 
         Route::get('/roles-list/{role}', [RolesController::class, 'show'])
             ->middleware('perm:roles.edit');
@@ -163,9 +163,9 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/permissions', [PermissionsController::class, 'index'])
             ->middleware('perm:permisos.view');
 
-            // Historial de Permisos
-            Route::get('/permissions/{permission}/history', [PermissionsController::class, 'history'])
-                ->middleware('perm:permisos.view');
+        // Historial de Permisos
+        Route::get('/permissions/{permission}/history', [PermissionsController::class, 'history'])
+            ->middleware('perm:permisos.view');
 
         Route::post('/permissions', [PermissionsController::class, 'store'])
             ->middleware('perm:permisos.create');
@@ -187,9 +187,9 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/empresas', [EmpresasController::class, 'index'])
             ->middleware('perm:empresas.view');
 
-            // Historial de Empresas
-            Route::get('/empresas/{empresa}/history', [EmpresasController::class, 'history'])
-                ->middleware('perm:empresas.view');
+        // Historial de Empresas
+        Route::get('/empresas/{empresa}/history', [EmpresasController::class, 'history'])
+            ->middleware('perm:empresas.view');
 
         Route::post('/empresas', [EmpresasController::class, 'store'])
             ->middleware('perm:empresas.create');
@@ -204,9 +204,9 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/grupos', [GruposController::class, 'index'])
             ->middleware('perm:grupos.view');
 
-            // Historial de Grupos
-            Route::get('/grupos/{grupo}/history', [GruposController::class, 'history'])
-                ->middleware('perm:grupos.view');
+        // Historial de Grupos
+        Route::get('/grupos/{grupo}/history', [GruposController::class, 'history'])
+            ->middleware('perm:grupos.view');
 
         Route::post('/grupos', [GruposController::class, 'store'])
             ->middleware('perm:grupos.create');
@@ -221,9 +221,9 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/unidades-servicio', [UnidadesServicioController::class, 'index'])
             ->middleware('perm:unidades_servicio.view');
 
-            // Historial de Unidades de Servicio
-            Route::get('/unidades-servicio/{unidades_servicio}/history', [UnidadesServicioController::class, 'history'])
-                ->middleware('perm:unidades_servicio.view');
+        // Historial de Unidades de Servicio
+        Route::get('/unidades-servicio/{unidades_servicio}/history', [UnidadesServicioController::class, 'history'])
+            ->middleware('perm:unidades_servicio.view');
 
         Route::post('/unidades-servicio', [UnidadesServicioController::class, 'store'])
             ->middleware('perm:unidades_servicio.create');
@@ -234,11 +234,15 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::delete('/unidades-servicio/{unidades_servicio}', [UnidadesServicioController::class, 'destroy'])
             ->middleware('perm:unidades_servicio.delete');
 
-                // ---------------- CONTROL DE ACCESO / TURNOS ----------------
+        // ---------------- CONTROL DE ACCESO / TURNOS ----------------
 
         Route::get('/turnos', [TurnosController::class, 'index'])
             ->middleware('perm:turnos.view');
-
+        
+        // Historial de Turnos
+        Route::get('/turnos/{turno}/history', [TurnosController::class, 'history'])
+            ->middleware('perm:turnos.view');
+        
         Route::get('/turnos/{turno}', [TurnosController::class, 'show'])
             ->middleware('perm:turnos.view');
 
@@ -280,12 +284,37 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
             ->middleware('perm:asistencias.delete');
 
         // ---------------- INCIDENCIAS DE ASISTENCIA ----------------
-        
+
         Route::get('/asistencia-incidencias', [AsistenciaIncidenciasController::class, 'index'])
+            ->middleware('perm:asistencias.incidencias.view');
+        
+        // Exportaciones
+        Route::get('/asistencia-incidencias/export/excel', [AsistenciaIncidenciasController::class, 'exportExcel'])
+            ->middleware('perm:asistencias.incidencias.view');
+        
+        Route::get('/asistencia-incidencias/export/pdf', [AsistenciaIncidenciasController::class, 'exportPdf'])
+            ->middleware('perm:asistencias.incidencias.view');
+
+        /*
+         * Historial general.
+         *
+         * IMPORTANTE:
+         * Esta ruta debe ir antes de
+         * /asistencia-incidencias/{grupoUuid}
+         * para que "history" no sea interpretado
+         * como un grupo_uuid.
+         */
+        Route::get('/asistencia-incidencias/history', [AsistenciaIncidenciasController::class, 'generalHistory'])
             ->middleware('perm:asistencias.incidencias.view');
         
         Route::post('/asistencia-incidencias', [AsistenciaIncidenciasController::class, 'store'])
             ->middleware('perm:asistencias.incidencias.create');
+        
+        /*
+         * Historial individual de una incidencia.
+         */
+        Route::get('/asistencia-incidencias/{grupoUuid}/history', [AsistenciaIncidenciasController::class, 'history'])
+            ->middleware('perm:asistencias.incidencias.view');
         
         Route::get('/asistencia-incidencias/{grupoUuid}', [AsistenciaIncidenciasController::class, 'show'])
             ->middleware('perm:asistencias.incidencias.view');

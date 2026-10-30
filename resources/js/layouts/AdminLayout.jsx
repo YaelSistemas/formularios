@@ -118,73 +118,120 @@ export default function AdminLayout() {
 
   const visibleAdminLinks = [
     canViewUsers && {
+      section: "Datos Sistema",
       to: "/admin/users",
       title: "Usuarios",
       label: "Usuarios",
       icon: "fa-solid fa-user",
-      active: location.pathname.startsWith("/admin/users"),
+      active:
+        location.pathname.startsWith(
+          "/admin/users"
+        ),
     },
+  
     canViewRoles && {
+      section: "Datos Sistema",
       to: "/admin/roles",
       title: "Roles",
       label: "Roles",
       icon: "fa-solid fa-shield",
-      active: location.pathname.startsWith("/admin/roles"),
+      active:
+        location.pathname.startsWith(
+          "/admin/roles"
+        ),
     },
+  
     canViewPermissions && {
+      section: "Datos Sistema",
       to: "/admin/permissions",
       title: "Permisos",
       label: "Permisos",
       icon: "fa-solid fa-lock",
-      active: location.pathname.startsWith("/admin/permissions"),
+      active:
+        location.pathname.startsWith(
+          "/admin/permissions"
+        ),
     },
+  
     canViewUnidadesServicio && {
+      section: "Datos Sistema",
       to: "/admin/unidades-servicio",
       title: "Unidades de servicio",
       label: "Unidades de servicio",
-      icon: "fa-solid fa-building-user",
-      active: location.pathname.startsWith("/admin/unidades-servicio"),
+      icon:
+        "fa-solid fa-building-user",
+      active:
+        location.pathname.startsWith(
+          "/admin/unidades-servicio"
+        ),
     },
+  
     canViewEmpresas && {
+      section: "Datos Sistema",
       to: "/admin/empresas",
       title: "Empresas",
       label: "Empresas",
       icon: "fa-solid fa-building",
-      active: location.pathname.startsWith("/admin/empresas"),
+      active:
+        location.pathname.startsWith(
+          "/admin/empresas"
+        ),
     },
+  
     canViewGrupos && {
+      section: "Datos Sistema",
       to: "/admin/grupos",
       title: "Grupos",
       label: "Grupos",
-      icon: "fa-solid fa-people-group",
-      active: location.pathname.startsWith("/admin/grupos"),
+      icon:
+        "fa-solid fa-people-group",
+      active:
+        location.pathname.startsWith(
+          "/admin/grupos"
+        ),
     },
+  
     canViewFormsAdmin && {
+      section: "Formularios",
       to: "/admin/forms",
       title: "Formularios",
       label: "Formularios",
-      icon: "fa-brands fa-wpforms",
-      active: location.pathname.startsWith("/admin/forms"),
+      icon:
+        "fa-brands fa-wpforms",
+      active:
+        location.pathname.startsWith(
+          "/admin/forms"
+        ),
     },
+  
     canViewControlAcceso && {
+      section: "Control de acceso",
       to: "/admin/control-acceso",
-      title: "Control de acceso",
-      label: "Control de acceso",
+      title: "Turnos",
+      label: "Turnos",
       icon: "fa-solid fa-clock",
-      active: location.pathname.startsWith(
-        "/admin/control-acceso"
-      ),
+      active:
+        location.pathname.startsWith(
+          "/admin/control-acceso"
+        ),
     },
+  
     canViewAsistencias && {
+      section: "Control de acceso",
       to: "/admin/asistencias",
-      title: "Gestión de asistencias",
+      title:
+        "Gestión de asistencias",
       label: "Asistencias",
-      icon: "fa-solid fa-clipboard-user",
-      active: location.pathname.startsWith(
-        "/admin/asistencias"
-      ),
+      icon:
+        "fa-solid fa-clipboard-user",
+      active:
+        location.pathname.startsWith(
+          "/admin/asistencias"
+        ),
     },
+  
     canViewIncidencias && {
+      section: "Control de acceso",
       to:
         "/admin/asistencia-incidencias",
       title:
@@ -198,6 +245,41 @@ export default function AdminLayout() {
         ),
     },
   ].filter(Boolean);
+
+  const visibleAdminSections = [
+    {
+      title: "Datos Sistema",
+      items:
+        visibleAdminLinks.filter(
+          (item) =>
+            item.section ===
+            "Datos Sistema"
+        ),
+    },
+  
+    {
+      title: "Formularios",
+      items:
+        visibleAdminLinks.filter(
+          (item) =>
+            item.section ===
+            "Formularios"
+        ),
+    },
+  
+    {
+      title: "Control de acceso",
+      items:
+        visibleAdminLinks.filter(
+          (item) =>
+            item.section ===
+            "Control de acceso"
+        ),
+    },
+  ].filter(
+    (section) =>
+      section.items.length > 0
+  );
 
   const currentModuleAccess = [
     {
@@ -396,6 +478,32 @@ export default function AdminLayout() {
     lineHeight: label === "Unidades de servicio" ? "16px" : "normal",
     fontSize: label === "Unidades de servicio" ? 13 : 14,
     letterSpacing: label === "Unidades de servicio" ? "-0.1px" : "normal",
+  });
+
+  const navSectionTitleStyle = (
+    first = false
+  ) => ({
+    display:
+      showDesktopText
+        ? "block"
+        : "none",
+  
+    padding:
+      first
+        ? "4px 12px 6px"
+        : "14px 12px 6px",
+  
+    marginTop:
+      first
+        ? 0
+        : 4,
+  
+    fontSize: 11,
+    fontWeight: 900,
+    color: "#94a3b8",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    whiteSpace: "nowrap",
   });
 
   const bottomNavScrollItemStyle = (active) => ({
@@ -750,19 +858,66 @@ export default function AdminLayout() {
 
           <div style={S.navWrap}>
             <nav style={S.navTop}>
-              {visibleAdminLinks.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  title={item.title}
-                  style={({ isActive }) => navItemStyle(isActive)}
-                >
-                  <span style={navIconWrapStyle}>
-                    <i className={item.icon} />
-                  </span>
-                  <span style={navTextStyle(item.label)}>{item.label}</span>
-                </NavLink>
-              ))}
+              {visibleAdminSections.map(
+                (section, sectionIndex) => (
+                  <div
+                    key={
+                      section.title
+                    }
+                  >
+                    <div
+                      style={
+                        navSectionTitleStyle(
+                          sectionIndex === 0
+                        )
+                      }
+                    >
+                      {section.title}
+                    </div>
+            
+                    {section.items.map(
+                      (item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          title={
+                            item.title
+                          }
+                          style={({
+                            isActive,
+                          }) =>
+                            navItemStyle(
+                              isActive
+                            )
+                          }
+                        >
+                          <span
+                            style={
+                              navIconWrapStyle
+                            }
+                          >
+                            <i
+                              className={
+                                item.icon
+                              }
+                            />
+                          </span>
+            
+                          <span
+                            style={
+                              navTextStyle(
+                                item.label
+                              )
+                            }
+                          >
+                            {item.label}
+                          </span>
+                        </NavLink>
+                      )
+                    )}
+                  </div>
+                )
+              )}
             </nav>
 
             <div style={S.navBottom}>

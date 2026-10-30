@@ -156,6 +156,101 @@ function getTipoStyle(value) {
   };
 }
 
+function formatHistoryDateTime(
+  value
+) {
+  if (!value) {
+    return "—";
+  }
+
+  const raw =
+    String(value);
+
+  const [
+    datePart,
+    timePart,
+  ] = raw.split(" ");
+
+  return `${formatDate(
+    datePart
+  )}${timePart ? ` ${timePart}` : ""}`;
+}
+
+function getHistoryActionLabel(
+  action
+) {
+  const labels = {
+    created: "Creación",
+    updated: "Edición",
+    deleted: "Eliminación",
+  };
+
+  return (
+    labels[action] ||
+    action ||
+    "Movimiento"
+  );
+}
+
+function getHistoryFieldLabel(
+  field
+) {
+  const labels = {
+    empleado: "Empleado",
+    tipo: "Tipo",
+    fecha_desde: "Desde",
+    fecha_hasta: "Hasta",
+    dias: "Días",
+    observaciones:
+      "Observaciones",
+  };
+
+  return (
+    labels[field] ||
+    field
+  );
+}
+
+function formatHistoryValue(
+  field,
+  value
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  if (field === "tipo") {
+    return getTipoLabel(value);
+  }
+
+  if (
+    field === "fecha_desde" ||
+    field === "fecha_hasta"
+  ) {
+    return formatDate(value);
+  }
+
+  if (
+    typeof value === "object"
+  ) {
+    if (value?.name) {
+      return value.email
+        ? `${value.name} (${value.email})`
+        : value.name;
+    }
+
+    return JSON.stringify(
+      value
+    );
+  }
+
+  return String(value);
+}
+
 const EMPTY_FORM = {
   user_id: "",
   tipo: "",
@@ -204,14 +299,19 @@ export default function AdminAsistenciaIncidencias() {
   ] = useState(false);
 
   const [
+    exportLoading,
+    setExportLoading,
+  ] = useState("");
+
+  const [
     error,
     setError,
   ] = useState("");
 
   const [
-    message,
-    setMessage,
-  ] = useState("");
+    successMessage,
+    setSuccessMessage,
+  ] = useState(null);
 
   const [
     filters,
@@ -249,6 +349,61 @@ export default function AdminAsistenciaIncidencias() {
     setModalError,
   ] = useState("");
 
+  const [
+    historyItem,
+    setHistoryItem,
+  ] = useState(null);
+  
+  const [
+    historyItems,
+    setHistoryItems,
+  ] = useState([]);
+  
+  const [
+    historyLoading,
+    setHistoryLoading,
+  ] = useState(false);
+  
+  const [
+    historyError,
+    setHistoryError,
+  ] = useState("");
+  
+  const [
+    generalHistoryOpen,
+    setGeneralHistoryOpen,
+  ] = useState(false);
+  
+  const [
+    generalHistoryRows,
+    setGeneralHistoryRows,
+  ] = useState([]);
+  
+  const [
+    generalHistoryLoading,
+    setGeneralHistoryLoading,
+  ] = useState(false);
+  
+  const [
+    generalHistoryError,
+    setGeneralHistoryError,
+  ] = useState("");
+  
+  const [
+    generalHistoryPage,
+    setGeneralHistoryPage,
+  ] = useState(1);
+  
+  const [
+    generalHistoryPagination,
+    setGeneralHistoryPagination,
+  ] = useState({
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+    per_page: 25,
+  });
+
   const canCreate =
     hasPermission(
       me,
@@ -266,6 +421,23 @@ export default function AdminAsistenciaIncidencias() {
       me,
       "asistencias.incidencias.delete"
     );
+
+  const canViewHistory =
+    isAdministrator(me);
+
+  function showSuccessMessage(
+    message,
+    type = "create"
+  ) {
+    setSuccessMessage({
+      message,
+      type,
+    });
+  
+    window.setTimeout(() => {
+      setSuccessMessage(null);
+    }, 5000);
+  }
 
   useEffect(() => {
     function handleUserUpdated(
@@ -339,6 +511,138 @@ export default function AdminAsistenciaIncidencias() {
     }
 
     return params.toString();
+  }
+
+  async function exportIncidencias(
+    type
+  ) {
+    if (exportLoading) {
+      return;
+    }
+  
+    const isExcel =
+      type === "excel";
+  
+    setExportLoading(type);
+    setError("");
+  
+    try {
+      const query =
+        buildQuery(
+          appliedFilters
+        );
+  
+      const endpoint =
+        isExcel
+          ? "/admin/asistencia-incidencias/export/excel"
+          : "/admin/asistencia-incidencias/export/pdf";
+  
+      const url =
+        `/api${endpoint}` +
+        (
+          query
+            ? `?${query}`
+            : ""
+        );
+  
+      const response =
+        await fetch(
+          url,
+          {
+            headers: {
+              Accept:
+                isExcel
+                  ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  : "application/pdf",
+  
+              Authorization:
+                `Bearer ${localStorage.getItem(
+                  "token"
+                )}`,
+            },
+          }
+        );
+  
+      if (!response.ok) {
+        let message =
+          "No se pudo generar la exportación.";
+  
+        try {
+          const data =
+            await response.json();
+  
+          message =
+            data?.message ||
+            message;
+        } catch {
+          // Mantener mensaje genérico.
+        }
+  
+        throw new Error(
+          message
+        );
+      }
+  
+      const blob =
+        await response.blob();
+  
+      const blobUrl =
+        URL.createObjectURL(
+          blob
+        );
+  
+      const disposition =
+        response.headers.get(
+          "Content-Disposition"
+        ) || "";
+  
+      let fileName =
+        isExcel
+          ? "incidencias_asistencia.xlsx"
+          : "incidencias_asistencia.pdf";
+  
+      const fileNameMatch =
+        disposition.match(
+          /filename="?([^"]+)"?/i
+        );
+  
+      if (
+        fileNameMatch?.[1]
+      ) {
+        fileName =
+          fileNameMatch[1];
+      }
+  
+      const link =
+        document.createElement(
+          "a"
+        );
+  
+      link.href =
+        blobUrl;
+  
+      link.download =
+        fileName;
+  
+      document.body.appendChild(
+        link
+      );
+  
+      link.click();
+  
+      link.remove();
+  
+      URL.revokeObjectURL(
+        blobUrl
+      );
+    } catch (err) {
+      setError(
+        err?.message ||
+          "No se pudo generar la exportación."
+      );
+    } finally {
+      setExportLoading("");
+    }
   }
 
   async function load(
@@ -441,7 +745,7 @@ export default function AdminAsistenciaIncidencias() {
 
     setModalError("");
     setError("");
-    setMessage("");
+    setSuccessMessage(null);
     setModalOpen(true);
   }
 
@@ -457,7 +761,7 @@ export default function AdminAsistenciaIncidencias() {
 
     setModalError("");
     setError("");
-    setMessage("");
+    setSuccessMessage(null);
     setSaving(true);
 
     try {
@@ -596,10 +900,15 @@ export default function AdminAsistenciaIncidencias() {
           : null,
     };
 
+    const isEditing =
+      Boolean(
+        editingGrupoUuid
+      );
+
     setSaving(true);
     setModalError("");
     setError("");
-    setMessage("");
+    setSuccessMessage(null);
 
     try {
       let data;
@@ -620,13 +929,16 @@ export default function AdminAsistenciaIncidencias() {
           );
       }
 
-      setMessage(
+      showSuccessMessage(
         data?.message ||
           (
-            editingGrupoUuid
+            isEditing
               ? "Incidencia actualizada correctamente."
               : "Incidencia registrada correctamente."
-          )
+          ),
+        isEditing
+          ? "edit"
+          : "create"
       );
 
       setModalOpen(false);
@@ -679,7 +991,7 @@ export default function AdminAsistenciaIncidencias() {
     }
 
     setError("");
-    setMessage("");
+    setSuccessMessage(null);
 
     try {
       const data =
@@ -687,9 +999,10 @@ export default function AdminAsistenciaIncidencias() {
           `/admin/asistencia-incidencias/${row.grupo_uuid}`
         );
 
-      setMessage(
+      showSuccessMessage(
         data?.message ||
-          "Incidencia eliminada correctamente."
+          "Incidencia eliminada correctamente.",
+        "delete"
       );
 
       await load(
@@ -703,6 +1016,279 @@ export default function AdminAsistenciaIncidencias() {
     }
   }
 
+  async function openHistory(
+    row
+  ) {
+    if (
+      !canViewHistory ||
+      !row?.grupo_uuid
+    ) {
+      return;
+    }
+  
+    setHistoryItem({
+      grupo_uuid:
+        row.grupo_uuid,
+  
+      empleado:
+        row.user
+          ? {
+              id:
+                row.user.id,
+  
+              name:
+                row.user.name,
+  
+              email:
+                row.user.email,
+            }
+          : null,
+  
+      tipo:
+        row.tipo,
+  
+      fecha_desde:
+        row.fecha_desde,
+  
+      fecha_hasta:
+        row.fecha_hasta,
+  
+      dias:
+        row.dias,
+  
+      observaciones:
+        row.observaciones,
+  
+      registrado_por:
+        row.registrado_por,
+    });
+  
+    setHistoryItems([]);
+    setHistoryError("");
+    setHistoryLoading(true);
+  
+    try {
+      const data =
+        await apiGet(
+          `/admin/asistencia-incidencias/${row.grupo_uuid}/history`
+        );
+  
+      if (data?.incidencia) {
+        setHistoryItem(
+          data.incidencia
+        );
+      }
+  
+      setHistoryItems(
+        Array.isArray(
+          data?.history
+        )
+          ? data.history
+          : []
+      );
+    } catch (err) {
+      setHistoryError(
+        err?.message ||
+          "No se pudo cargar el historial de la incidencia."
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+  
+  function closeHistory() {
+    if (historyLoading) {
+      return;
+    }
+  
+    setHistoryItem(null);
+    setHistoryItems([]);
+    setHistoryError("");
+  }
+  
+  async function loadGeneralHistory(
+    requestedPage = 1
+  ) {
+    setGeneralHistoryLoading(
+      true
+    );
+  
+    setGeneralHistoryError("");
+  
+    try {
+      const data =
+        await apiGet(
+          `/admin/asistencia-incidencias/history?page=${requestedPage}&per_page=25`
+        );
+  
+      const registros =
+        data?.registros || {};
+  
+      setGeneralHistoryRows(
+        Array.isArray(
+          registros?.data
+        )
+          ? registros.data
+          : []
+      );
+  
+      setGeneralHistoryPagination({
+        current_page:
+          Number(
+            registros?.current_page ||
+              1
+          ),
+  
+        last_page:
+          Number(
+            registros?.last_page ||
+              1
+          ),
+  
+        total:
+          Number(
+            registros?.total ||
+              0
+          ),
+  
+        per_page:
+          Number(
+            registros?.per_page ||
+              25
+          ),
+      });
+  
+      setGeneralHistoryPage(
+        Number(
+          registros?.current_page ||
+            1
+        )
+      );
+    } catch (err) {
+      setGeneralHistoryError(
+        err?.message ||
+          "No se pudo cargar el historial general de incidencias."
+      );
+    } finally {
+      setGeneralHistoryLoading(
+        false
+      );
+    }
+  }
+  
+  function openGeneralHistory() {
+    if (!canViewHistory) {
+      return;
+    }
+  
+    setGeneralHistoryOpen(
+      true
+    );
+  
+    setGeneralHistoryRows(
+      []
+    );
+  
+    setGeneralHistoryError(
+      ""
+    );
+  
+    setGeneralHistoryPage(
+      1
+    );
+  
+    loadGeneralHistory(1);
+  }
+  
+  function closeGeneralHistory() {
+    if (
+      generalHistoryLoading
+    ) {
+      return;
+    }
+  
+    setGeneralHistoryOpen(
+      false
+    );
+  
+    setGeneralHistoryRows(
+      []
+    );
+  
+    setGeneralHistoryError(
+      ""
+    );
+  
+    setGeneralHistoryPage(
+      1
+    );
+  
+    setGeneralHistoryPagination({
+      current_page: 1,
+      last_page: 1,
+      total: 0,
+      per_page: 25,
+    });
+  }
+  
+  function openHistoryFromGeneral(
+    row
+  ) {
+    if (
+      !row?.grupo_uuid
+    ) {
+      return;
+    }
+  
+    /*
+     * El historial general ya trae todos
+     * los movimientos, por lo que no es
+     * necesario hacer otra petición.
+     *
+     * Esto funciona también para una
+     * incidencia eliminada.
+     */
+    setHistoryItem({
+      grupo_uuid:
+        row.grupo_uuid,
+  
+      empleado:
+        row.empleado,
+  
+      tipo:
+        row.tipo,
+  
+      fecha_desde:
+        row.fecha_desde,
+  
+      fecha_hasta:
+        row.fecha_hasta,
+  
+      dias:
+        row.dias,
+  
+      observaciones:
+        row.observaciones,
+  
+      registrado_por:
+        row.registrado_por,
+  
+      deleted:
+        row.deleted,
+    });
+  
+    setHistoryItems(
+      Array.isArray(
+        row.history
+      )
+        ? row.history
+        : []
+    );
+  
+    setHistoryError("");
+    setHistoryLoading(false);
+  }
+
   const S = {
     page: {
       display: "flex",
@@ -712,57 +1298,55 @@ export default function AdminAsistenciaIncidencias() {
     },
 
     card: {
-      padding: 18,
-      border:
-        "1px solid #e2e8f0",
-      borderRadius: 16,
-      background: "#ffffff",
+      background: "#fff",
+      border: "1px solid #e2e8f0",
+      borderRadius: 18,
+      padding: 16,
       boxShadow:
-        "0 4px 14px rgba(15,23,42,.04)",
+        "0 8px 24px rgba(15,23,42,.05)",
     },
-
+    
     title: {
       margin: 0,
-      fontSize: 22,
-      fontWeight: 900,
+      fontSize: 24,
       color: "#0f172a",
     },
-
+    
     muted: {
-      marginTop: 5,
-      color: "#64748b",
+      marginTop: 4,
       fontSize: 13,
+      color: "#64748b",
     },
-
+    
     filters: {
       display: "grid",
       gridTemplateColumns:
-        "repeat(auto-fit, minmax(180px, 1fr))",
+        "repeat(auto-fit, minmax(190px, 1fr))",
       gap: 12,
       marginTop: 16,
     },
-
+    
     field: {
       display: "flex",
       flexDirection: "column",
-      gap: 5,
     },
-
+    
     label: {
       fontSize: 12,
-      fontWeight: 900,
-      color: "#475569",
+      fontWeight: 800,
+      color: "#64748b",
+      marginBottom: 6,
     },
-
+    
     input: {
       width: "100%",
-      boxSizing: "border-box",
       minHeight: 42,
+      padding: "9px 10px",
+      borderRadius: 10,
       border:
         "1px solid #cbd5e1",
-      borderRadius: 9,
-      padding: "8px 10px",
-      background: "#ffffff",
+      boxSizing: "border-box",
+      background: "#fff",
       color: "#0f172a",
       fontSize: 14,
     },
@@ -781,34 +1365,46 @@ export default function AdminAsistenciaIncidencias() {
       fontSize: 14,
     },
 
-    buttonPrimary: {
-      border: "none",
-      borderRadius: 9,
+    buttonCreate: {
       minHeight: 42,
       padding: "9px 14px",
-      background: "#2563eb",
-      color: "#ffffff",
-      cursor: "pointer",
-      fontWeight: 900,
-    },
-
-    buttonNeutral: {
-      border:
-        "1px solid #cbd5e1",
-      borderRadius: 9,
-      minHeight: 42,
-      padding: "9px 14px",
-      background: "#ffffff",
-      color: "#334155",
-      cursor: "pointer",
-      fontWeight: 800,
-    },
-
-    buttonEdit: {
+      borderRadius: 10,
       border:
         "1px solid #bfdbfe",
       background: "#eff6ff",
       color: "#1d4ed8",
+      fontWeight: 800,
+      cursor: "pointer",
+    },
+
+    buttonPrimary: {
+      minHeight: 42,
+      padding: "9px 14px",
+      borderRadius: 10,
+      border: "none",
+      background: "#2563eb",
+      color: "#fff",
+      fontWeight: 900,
+      cursor: "pointer",
+    },
+
+    buttonNeutral: {
+      minHeight: 42,
+      padding: "9px 14px",
+      borderRadius: 10,
+      border:
+        "1px solid #cbd5e1",
+      background: "#fff",
+      color: "#334155",
+      fontWeight: 800,
+      cursor: "pointer",
+    },
+
+    buttonEdit: {
+      border:
+        "1px solid #fde68a",
+      background: "#fffbeb",
+      color: "#b45309",
       width: 35,
       height: 35,
       borderRadius: 8,
@@ -848,27 +1444,52 @@ export default function AdminAsistenciaIncidencias() {
       fontWeight: 800,
     },
 
+    alertEdit: {
+      padding: "11px 13px",
+      borderRadius: 10,
+      background: "#fffbeb",
+      border:
+        "1px solid #fde68a",
+      color: "#92400e",
+      fontSize: 13,
+      fontWeight: 800,
+    },
+    
+    alertDelete: {
+      padding: "11px 13px",
+      borderRadius: 10,
+      background: "#fef2f2",
+      border:
+        "1px solid #fecaca",
+      color: "#991b1b",
+      fontSize: 13,
+      fontWeight: 800,
+    },
+
     tableWrap: {
       width: "100%",
       overflowX: "auto",
-      marginTop: 14,
+      border:
+        "1px solid #e2e8f0",
+      borderRadius: 14,
     },
 
     table: {
       width: "100%",
       borderCollapse:
         "collapse",
-      minWidth: 920,
+      minWidth: 1040,
     },
 
     th: {
-      padding: "10px 9px",
+      padding: "12px 9px",
+      background: "#f8fafc",
       borderBottom:
-        "1px solid #cbd5e1",
-      textAlign: "left",
+        "1px solid #e2e8f0",
+      color: "#475569",
       fontSize: 12,
       fontWeight: 900,
-      color: "#475569",
+      textAlign: "center",
       whiteSpace: "nowrap",
     },
 
@@ -879,6 +1500,7 @@ export default function AdminAsistenciaIncidencias() {
       fontSize: 13,
       color: "#0f172a",
       verticalAlign: "middle",
+      textAlign: "center",
     },
 
     modalBackdrop: {
@@ -915,34 +1537,29 @@ export default function AdminAsistenciaIncidencias() {
         <div
           style={{
             display: "flex",
-            alignItems:
-              "flex-start",
             justifyContent:
               "space-between",
             gap: 12,
             flexWrap: "wrap",
+            alignItems: "center",
           }}
         >
           <div>
             <h1 style={S.title}>
               Incidencias de asistencia
             </h1>
-
+      
             <div style={S.muted}>
-              Vacaciones,
-              incapacidades y días
-              festivos de los
-              empleados.
+              Vacaciones, incapacidades y
+              días festivos de los empleados.
             </div>
           </div>
-
+      
           {canCreate ? (
             <button
               type="button"
               onClick={openCreate}
-              style={
-                S.buttonPrimary
-              }
+              style={S.buttonCreate}
             >
               <i
                 className="fa-solid fa-plus"
@@ -950,46 +1567,18 @@ export default function AdminAsistenciaIncidencias() {
                   marginRight: 7,
                 }}
               />
-
+      
               Nueva incidencia
             </button>
           ) : null}
         </div>
-      </div>
-
-      {error ? (
-        <div
-          style={S.alertError}
-        >
-          {error}
-        </div>
-      ) : null}
-
-      {message ? (
-        <div
-          style={S.alertSuccess}
-        >
-          {message}
-        </div>
-      ) : null}
-
-      <div style={S.card}>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 900,
-            color: "#0f172a",
-          }}
-        >
-          Filtros
-        </div>
-
+      
         <div style={S.filters}>
           <div style={S.field}>
             <label style={S.label}>
               Desde
             </label>
-
+      
             <input
               type="date"
               value={
@@ -1007,12 +1596,12 @@ export default function AdminAsistenciaIncidencias() {
               style={S.input}
             />
           </div>
-
+      
           <div style={S.field}>
             <label style={S.label}>
               Hasta
             </label>
-
+      
             <input
               type="date"
               value={
@@ -1030,12 +1619,12 @@ export default function AdminAsistenciaIncidencias() {
               style={S.input}
             />
           </div>
-
+      
           <div style={S.field}>
             <label style={S.label}>
               Empleado
             </label>
-
+      
             <select
               value={
                 filters.user_id
@@ -1054,14 +1643,12 @@ export default function AdminAsistenciaIncidencias() {
               <option value="">
                 Todos
               </option>
-
+      
               {usuarios.map(
                 (user) => (
                   <option
                     key={user.id}
-                    value={
-                      user.id
-                    }
+                    value={user.id}
                   >
                     {user.name}
                   </option>
@@ -1069,12 +1656,12 @@ export default function AdminAsistenciaIncidencias() {
               )}
             </select>
           </div>
-
+      
           <div style={S.field}>
             <label style={S.label}>
               Tipo
             </label>
-
+      
             <select
               value={
                 filters.tipo
@@ -1093,7 +1680,7 @@ export default function AdminAsistenciaIncidencias() {
               <option value="">
                 Todos
               </option>
-
+      
               {tipos.map(
                 (tipo) => (
                   <option
@@ -1110,12 +1697,12 @@ export default function AdminAsistenciaIncidencias() {
               )}
             </select>
           </div>
-
+      
           <div style={S.field}>
             <label style={S.label}>
               Buscar
             </label>
-
+      
             <input
               type="search"
               placeholder="Nombre o correo"
@@ -1135,7 +1722,7 @@ export default function AdminAsistenciaIncidencias() {
             />
           </div>
         </div>
-
+      
         <div
           style={{
             display: "flex",
@@ -1151,9 +1738,7 @@ export default function AdminAsistenciaIncidencias() {
             style={{
               ...S.buttonPrimary,
               opacity:
-                loading
-                  ? 0.6
-                  : 1,
+                loading ? 0.6 : 1,
             }}
           >
             <i
@@ -1162,10 +1747,10 @@ export default function AdminAsistenciaIncidencias() {
                 marginRight: 7,
               }}
             />
-
+      
             Consultar
           </button>
-
+      
           <button
             type="button"
             onClick={limpiar}
@@ -1174,11 +1759,53 @@ export default function AdminAsistenciaIncidencias() {
               S.buttonNeutral
             }
           >
-            Limpiar
+            Limpiar filtros
           </button>
         </div>
       </div>
-
+      
+      {error ? (
+        <div style={S.alertError}>
+          {error}
+        </div>
+      ) : null}
+      
+      {successMessage ? (
+        <div
+          style={{
+            ...(
+              successMessage.type ===
+              "edit"
+                ? S.alertEdit
+                : successMessage.type ===
+                    "delete"
+                  ? S.alertDelete
+                  : S.alertSuccess
+            ),
+      
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+          }}
+        >
+          <i
+            className={
+              successMessage.type ===
+              "edit"
+                ? "fa-solid fa-pen"
+                : successMessage.type ===
+                    "delete"
+                  ? "fa-solid fa-trash"
+                  : "fa-solid fa-circle-check"
+            }
+          />
+      
+          <span>
+            {successMessage.message}
+          </span>
+        </div>
+      ) : null}
+      
       <div style={S.card}>
         <div
           style={{
@@ -1187,35 +1814,143 @@ export default function AdminAsistenciaIncidencias() {
             justifyContent:
               "space-between",
             gap: 10,
+            marginBottom: 12,
+            flexWrap: "wrap",
           }}
         >
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 900,
-            }}
-          >
-            Incidencias registradas
+          <div>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 900,
+              }}
+            >
+              Incidencias registradas
+            </div>
+          
+            <div style={S.muted}>
+              Total encontrado:{" "}
+              <b>
+                {incidencias.length}
+              </b>
+            </div>
           </div>
 
-          <button
-            type="button"
-            title="Actualizar"
-            onClick={() =>
-              load(
-                appliedFilters
-              )
-            }
-            disabled={loading}
+          <div
             style={{
-              ...S.buttonNeutral,
-              minHeight: 36,
-              width: 40,
-              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
             }}
           >
-            <i className="fa-solid fa-rotate" />
-          </button>
+            <button
+              type="button"
+              onClick={() =>
+                exportIncidencias(
+                  "excel"
+                )
+              }
+              disabled={
+                !!exportLoading
+              }
+              style={{
+                ...S.buttonNeutral,
+                color: "#166534",
+                borderColor:
+                  "#bbf7d0",
+                background:
+                  "#f0fdf4",
+              }}
+            >
+              <i
+                className="fa-solid fa-file-excel"
+                style={{
+                  marginRight: 7,
+                }}
+              />
+      
+              {exportLoading ===
+              "excel"
+                ? "Generando..."
+                : "Excel"}
+            </button>
+      
+            <button
+              type="button"
+              onClick={() =>
+                exportIncidencias(
+                  "pdf"
+                )
+              }
+              disabled={
+                !!exportLoading
+              }
+              style={{
+                ...S.buttonNeutral,
+                color: "#b91c1c",
+                borderColor:
+                  "#fecaca",
+                background:
+                  "#fef2f2",
+              }}
+            >
+              <i
+                className="fa-solid fa-file-pdf"
+                style={{
+                  marginRight: 7,
+                }}
+              />
+      
+              {exportLoading ===
+              "pdf"
+                ? "Generando..."
+                : "PDF"}
+            </button>
+      
+            {canViewHistory ? (
+              <button
+                type="button"
+                onClick={
+                  openGeneralHistory
+                }
+                style={
+                  S.buttonNeutral
+                }
+              >
+                <i
+                  className="fa-solid fa-clock-rotate-left"
+                  style={{
+                    marginRight: 7,
+                  }}
+                />
+      
+                Historial general
+              </button>
+            ) : null}
+      
+            <button
+              type="button"
+              onClick={() =>
+                load(
+                  appliedFilters
+                )
+              }
+              disabled={loading}
+              style={
+                S.buttonNeutral
+              }
+            >
+              <i
+                className="fa-solid fa-rotate"
+                style={{
+                  marginRight: 7,
+                }}
+              />
+      
+              Actualizar
+            </button>
+          </div>
         </div>
 
         <div style={S.tableWrap}>
@@ -1249,7 +1984,13 @@ export default function AdminAsistenciaIncidencias() {
                 <th style={S.th}>
                   Registrado por
                 </th>
-
+                
+                {canViewHistory ? (
+                  <th style={S.th}>
+                    Historial
+                  </th>
+                ) : null}
+                
                 {canEdit ||
                 canDelete ? (
                   <th style={S.th}>
@@ -1263,7 +2004,15 @@ export default function AdminAsistenciaIncidencias() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={
+                      7 +
+                      (canViewHistory
+                        ? 1
+                        : 0) +
+                      (canEdit || canDelete
+                        ? 1
+                        : 0)
+                    }
                     style={{
                       ...S.td,
                       textAlign:
@@ -1282,7 +2031,15 @@ export default function AdminAsistenciaIncidencias() {
                 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={
+                      7 +
+                      (canViewHistory
+                        ? 1
+                        : 0) +
+                      (canEdit || canDelete
+                        ? 1
+                        : 0)
+                    }
                     style={{
                       ...S.td,
                       textAlign:
@@ -1412,7 +2169,45 @@ export default function AdminAsistenciaIncidencias() {
                             ?.name ||
                             "—"}
                         </td>
-
+                        
+                        {canViewHistory ? (
+                          <td style={S.td}>
+                            <button
+                              type="button"
+                              title="Ver historial"
+                              onClick={() =>
+                                openHistory(row)
+                              }
+                              style={{
+                                minHeight: 32,
+                                padding:
+                                  "6px 10px",
+                                borderRadius: 9,
+                                border:
+                                  "1px solid #cbd5e1",
+                                background:
+                                  "#ffffff",
+                                color:
+                                  "#334155",
+                                fontSize: 12,
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                display:
+                                  "inline-flex",
+                                alignItems:
+                                  "center",
+                                justifyContent:
+                                  "center",
+                                gap: 5,
+                              }}
+                            >
+                              <i className="fa-solid fa-clock-rotate-left" />
+                        
+                              Historial
+                            </button>
+                          </td>
+                        ) : null}
+                        
                         {canEdit ||
                         canDelete ? (
                           <td
@@ -1423,6 +2218,10 @@ export default function AdminAsistenciaIncidencias() {
                                 display:
                                   "flex",
                                 gap: 7,
+                                justifyContent:
+                                  "center",
+                                alignItems:
+                                  "center",
                               }}
                             >
                               {canEdit ? (
@@ -1844,6 +2643,1010 @@ export default function AdminAsistenciaIncidencias() {
           </div>
         </div>
       ) : null}
+
+      {generalHistoryOpen ? (
+        <div
+          style={
+            S.modalBackdrop
+          }
+          onMouseDown={(e) => {
+            if (
+              e.target ===
+              e.currentTarget
+            ) {
+              closeGeneralHistory();
+            }
+          }}
+        >
+          <div
+            style={{
+              ...S.modal,
+              maxWidth: 1050,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "flex-start",
+                gap: 12,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 19,
+                    fontWeight: 900,
+                    color: "#0f172a",
+                  }}
+                >
+                  Historial general de incidencias
+                </div>
+      
+                <div
+                  style={S.muted}
+                >
+                  Consulta las creaciones,
+                  modificaciones y eliminaciones
+                  registradas.
+                </div>
+              </div>
+      
+              <button
+                type="button"
+                onClick={
+                  closeGeneralHistory
+                }
+                disabled={
+                  generalHistoryLoading
+                }
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border:
+                    "1px solid #e2e8f0",
+                  background:
+                    "#ffffff",
+                  cursor:
+                    generalHistoryLoading
+                      ? "default"
+                      : "pointer",
+                }}
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+      
+            <div
+              style={{
+                marginTop: 16,
+                padding:
+                  "10px 12px",
+                border:
+                  "1px solid #e2e8f0",
+                borderRadius: 10,
+                background:
+                  "#f8fafc",
+                fontSize: 13,
+                color:
+                  "#475569",
+                fontWeight: 700,
+              }}
+            >
+              Total de incidencias con historial:{" "}
+              <b>
+                {generalHistoryPagination
+                  .total}
+              </b>
+            </div>
+      
+            {generalHistoryError ? (
+              <div
+                style={{
+                  ...S.alertError,
+                  marginTop: 14,
+                }}
+              >
+                {generalHistoryError}
+              </div>
+            ) : null}
+      
+            {generalHistoryLoading ? (
+              <div
+                style={{
+                  padding: 30,
+                  textAlign:
+                    "center",
+                  color: "#64748b",
+                  fontWeight: 800,
+                }}
+              >
+                Cargando historial...
+              </div>
+            ) : generalHistoryRows.length ===
+              0 ? (
+              <div
+                style={{
+                  padding: 30,
+                  textAlign:
+                    "center",
+                  color: "#64748b",
+                }}
+              >
+                No hay movimientos
+                registrados.
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: "100%",
+                  overflowX: "auto",
+                  marginTop: 16,
+                }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse:
+                      "collapse",
+                    minWidth: 900,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={S.th}>
+                        Empleado
+                      </th>
+      
+                      <th style={S.th}>
+                        Tipo
+                      </th>
+      
+                      <th style={S.th}>
+                        Periodo
+                      </th>
+      
+                      <th style={S.th}>
+                        Estado
+                      </th>
+      
+                      <th style={S.th}>
+                        Movimientos
+                      </th>
+      
+                      <th style={S.th}>
+                        Último movimiento
+                      </th>
+      
+                      <th style={S.th}>
+                        Historial
+                      </th>
+                    </tr>
+                  </thead>
+      
+                  <tbody>
+                    {generalHistoryRows.map(
+                      (row) => {
+                        const tipoStyle =
+                          getTipoStyle(
+                            row.tipo
+                          );
+      
+                        return (
+                          <tr
+                            key={
+                              row.grupo_uuid
+                            }
+                          >
+                            <td
+                              style={S.td}
+                            >
+                              <b>
+                                {row
+                                  ?.empleado
+                                  ?.name ||
+                                  "—"}
+                              </b>
+      
+                              {row
+                                ?.empleado
+                                ?.email ? (
+                                <div
+                                  style={{
+                                    marginTop:
+                                      3,
+                                    fontSize:
+                                      11,
+                                    color:
+                                      "#64748b",
+                                  }}
+                                >
+                                  {
+                                    row
+                                      .empleado
+                                      .email
+                                  }
+                                </div>
+                              ) : null}
+                            </td>
+      
+                            <td
+                              style={S.td}
+                            >
+                              <span
+                                style={{
+                                  display:
+                                    "inline-flex",
+                                  padding:
+                                    "5px 8px",
+                                  borderRadius:
+                                    999,
+                                  border:
+                                    `1px solid ${tipoStyle.border}`,
+                                  background:
+                                    tipoStyle.background,
+                                  color:
+                                    tipoStyle.color,
+                                  fontSize:
+                                    12,
+                                  fontWeight:
+                                    900,
+                                }}
+                              >
+                                {getTipoLabel(
+                                  row.tipo
+                                )}
+                              </span>
+                            </td>
+      
+                            <td
+                              style={S.td}
+                            >
+                              <div>
+                                {formatDate(
+                                  row.fecha_desde
+                                )}
+                              </div>
+      
+                              <div
+                                style={{
+                                  marginTop:
+                                    3,
+                                  fontSize:
+                                    11,
+                                  color:
+                                    "#64748b",
+                                }}
+                              >
+                                hasta{" "}
+                                {formatDate(
+                                  row.fecha_hasta
+                                )}
+                              </div>
+                            </td>
+      
+                            <td
+                              style={S.td}
+                            >
+                              {row.deleted ? (
+                                <span
+                                  style={{
+                                    display:
+                                      "inline-flex",
+                                    padding:
+                                      "5px 8px",
+                                    borderRadius:
+                                      999,
+                                    border:
+                                      "1px solid #fecaca",
+                                    background:
+                                      "#fef2f2",
+                                    color:
+                                      "#dc2626",
+                                    fontSize:
+                                      12,
+                                    fontWeight:
+                                      900,
+                                  }}
+                                >
+                                  Eliminada
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    display:
+                                      "inline-flex",
+                                    padding:
+                                      "5px 8px",
+                                    borderRadius:
+                                      999,
+                                    border:
+                                      "1px solid #bbf7d0",
+                                    background:
+                                      "#f0fdf4",
+                                    color:
+                                      "#15803d",
+                                    fontSize:
+                                      12,
+                                    fontWeight:
+                                      900,
+                                  }}
+                                >
+                                  Activa
+                                </span>
+                              )}
+                            </td>
+      
+                            <td
+                              style={{
+                                ...S.td,
+                                textAlign:
+                                  "center",
+                              }}
+                            >
+                              {row.movimientos ??
+                                0}
+                            </td>
+      
+                            <td
+                              style={S.td}
+                            >
+                              {formatHistoryDateTime(
+                                row.last_action_at
+                              )}
+                            </td>
+      
+                            <td
+                              style={S.td}
+                            >
+                              <button
+                                type="button"
+                                title="Ver historial"
+                                onClick={() =>
+                                  openHistoryFromGeneral(
+                                    row
+                                  )
+                                }
+                                style={{
+                                  minHeight:
+                                    32,
+                                  padding:
+                                    "6px 10px",
+                                  borderRadius:
+                                    9,
+                                  border:
+                                    "1px solid #cbd5e1",
+                                  background:
+                                    "#ffffff",
+                                  color:
+                                    "#334155",
+                                  fontSize:
+                                    12,
+                                  fontWeight:
+                                    800,
+                                  cursor:
+                                    "pointer",
+                                  display:
+                                    "inline-flex",
+                                  alignItems:
+                                    "center",
+                                  justifyContent:
+                                    "center",
+                                  gap: 5,
+                                }}
+                              >
+                                <i className="fa-solid fa-clock-rotate-left" />
+      
+                                Ver historial
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      }
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+      
+            <div
+              style={{
+                display: "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+                marginTop: 18,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "#64748b",
+                }}
+              >
+                Página{" "}
+                <b>
+                  {generalHistoryPagination
+                    .current_page}
+                </b>{" "}
+                de{" "}
+                <b>
+                  {generalHistoryPagination
+                    .last_page}
+                </b>
+              </div>
+      
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={
+                    generalHistoryLoading ||
+                    generalHistoryPage <=
+                      1
+                  }
+                  onClick={() =>
+                    loadGeneralHistory(
+                      Math.max(
+                        1,
+                        generalHistoryPage -
+                          1
+                      )
+                    )
+                  }
+                  style={{
+                    ...S.buttonNeutral,
+                    opacity:
+                      generalHistoryLoading ||
+                      generalHistoryPage <=
+                        1
+                        ? 0.5
+                        : 1,
+                  }}
+                >
+                  Anterior
+                </button>
+      
+                <button
+                  type="button"
+                  disabled={
+                    generalHistoryLoading ||
+                    generalHistoryPage >=
+                      generalHistoryPagination
+                        .last_page
+                  }
+                  onClick={() =>
+                    loadGeneralHistory(
+                      Math.min(
+                        generalHistoryPagination
+                          .last_page,
+                        generalHistoryPage +
+                          1
+                      )
+                    )
+                  }
+                  style={{
+                    ...S.buttonNeutral,
+                    opacity:
+                      generalHistoryLoading ||
+                      generalHistoryPage >=
+                        generalHistoryPagination
+                          .last_page
+                        ? 0.5
+                        : 1,
+                  }}
+                >
+                  Siguiente
+                </button>
+      
+                <button
+                  type="button"
+                  onClick={
+                    closeGeneralHistory
+                  }
+                  disabled={
+                    generalHistoryLoading
+                  }
+                  style={
+                    S.buttonNeutral
+                  }
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {historyItem ? (
+        <div
+          style={
+            S.modalBackdrop
+          }
+          onMouseDown={(e) => {
+            if (
+              e.target ===
+              e.currentTarget
+            ) {
+              closeHistory();
+            }
+          }}
+        >
+          <div
+            style={{
+              ...S.modal,
+              maxWidth: 760,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems:
+                  "flex-start",
+                gap: 12,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 19,
+                    fontWeight: 900,
+                    color: "#0f172a",
+                  }}
+                >
+                  Historial de incidencia
+                </div>
+      
+                <div
+                  style={S.muted}
+                >
+                  {historyItem
+                    ?.empleado
+                    ?.name ||
+                    "Empleado"}
+      
+                  {historyItem
+                    ?.empleado
+                    ?.email
+                    ? ` · ${historyItem.empleado.email}`
+                    : ""}
+                </div>
+              </div>
+      
+              <button
+                type="button"
+                onClick={
+                  closeHistory
+                }
+                disabled={
+                  historyLoading
+                }
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border:
+                    "1px solid #e2e8f0",
+                  background:
+                    "#ffffff",
+                  cursor:
+                    historyLoading
+                      ? "default"
+                      : "pointer",
+                }}
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+      
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 10,
+                marginTop: 18,
+              }}
+            >
+              <div
+                style={{
+                  padding: 11,
+                  border:
+                    "1px solid #e2e8f0",
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={S.label}
+                >
+                  Tipo
+                </div>
+      
+                <div
+                  style={{
+                    marginTop: 5,
+                    fontWeight: 800,
+                  }}
+                >
+                  {getTipoLabel(
+                    historyItem.tipo
+                  )}
+                </div>
+              </div>
+      
+              <div
+                style={{
+                  padding: 11,
+                  border:
+                    "1px solid #e2e8f0",
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={S.label}
+                >
+                  Periodo
+                </div>
+      
+                <div
+                  style={{
+                    marginTop: 5,
+                    fontWeight: 800,
+                  }}
+                >
+                  {formatDate(
+                    historyItem.fecha_desde
+                  )}
+      
+                  {" al "}
+      
+                  {formatDate(
+                    historyItem.fecha_hasta
+                  )}
+                </div>
+              </div>
+      
+              <div
+                style={{
+                  padding: 11,
+                  border:
+                    "1px solid #e2e8f0",
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={S.label}
+                >
+                  Días
+                </div>
+      
+                <div
+                  style={{
+                    marginTop: 5,
+                    fontWeight: 800,
+                  }}
+                >
+                  {historyItem.dias ??
+                    "—"}
+                </div>
+              </div>
+            </div>
+      
+            {historyItem.deleted ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding:
+                    "9px 11px",
+                  borderRadius: 9,
+                  border:
+                    "1px solid #fecaca",
+                  background:
+                    "#fef2f2",
+                  color:
+                    "#b91c1c",
+                  fontWeight: 800,
+                  fontSize: 13,
+                }}
+              >
+                <i
+                  className="fa-solid fa-trash"
+                  style={{
+                    marginRight: 7,
+                  }}
+                />
+      
+                Esta incidencia fue eliminada.
+              </div>
+            ) : null}
+      
+            {historyError ? (
+              <div
+                style={{
+                  ...S.alertError,
+                  marginTop: 14,
+                }}
+              >
+                {historyError}
+              </div>
+            ) : null}
+      
+            <div
+              style={{
+                marginTop: 18,
+                fontSize: 15,
+                fontWeight: 900,
+                color: "#0f172a",
+              }}
+            >
+              Movimientos
+            </div>
+      
+            {historyLoading ? (
+              <div
+                style={{
+                  padding: 24,
+                  textAlign:
+                    "center",
+                  color: "#64748b",
+                  fontWeight: 800,
+                }}
+              >
+                Cargando historial...
+              </div>
+            ) : historyItems.length ===
+              0 ? (
+              <div
+                style={{
+                  padding: 24,
+                  textAlign:
+                    "center",
+                  color: "#64748b",
+                }}
+              >
+                No hay movimientos
+                registrados.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection:
+                    "column",
+                  gap: 10,
+                  marginTop: 12,
+                }}
+              >
+                {historyItems.map(
+                  (item) => {
+                    const changes =
+                      Object.entries(
+                        item?.changes ||
+                          {}
+                      );
+      
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: 13,
+                          border:
+                            "1px solid #e2e8f0",
+                          borderRadius:
+                            12,
+                          background:
+                            "#f8fafc",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            justifyContent:
+                              "space-between",
+                            gap: 10,
+                            flexWrap:
+                              "wrap",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight:
+                                900,
+                              color:
+                                "#0f172a",
+                            }}
+                          >
+                            {getHistoryActionLabel(
+                              item.action
+                            )}
+                          </div>
+      
+                          <div
+                            style={{
+                              fontSize:
+                                12,
+                              color:
+                                "#64748b",
+                            }}
+                          >
+                            {formatHistoryDateTime(
+                              item.created_at
+                            )}
+                          </div>
+                        </div>
+      
+                        <div
+                          style={{
+                            marginTop: 5,
+                            fontSize: 12,
+                            color:
+                              "#64748b",
+                          }}
+                        >
+                          Realizado por:{" "}
+                          <b>
+                            {item?.actor
+                              ?.name ||
+                              "Usuario no disponible"}
+                          </b>
+                        </div>
+      
+                        {changes.length >
+                        0 ? (
+                          <div
+                            style={{
+                              marginTop:
+                                12,
+                              display:
+                                "flex",
+                              flexDirection:
+                                "column",
+                              gap: 8,
+                            }}
+                          >
+                            {changes.map(
+                              ([
+                                field,
+                                values,
+                              ]) => (
+                                <div
+                                  key={
+                                    field
+                                  }
+                                  style={{
+                                    padding:
+                                      10,
+                                    border:
+                                      "1px solid #e2e8f0",
+                                    borderRadius:
+                                      9,
+                                    background:
+                                      "#ffffff",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize:
+                                        12,
+                                      fontWeight:
+                                        900,
+                                      color:
+                                        "#334155",
+                                    }}
+                                  >
+                                    {getHistoryFieldLabel(
+                                      field
+                                    )}
+                                  </div>
+      
+                                  <div
+                                    style={{
+                                      marginTop:
+                                        6,
+                                      fontSize:
+                                        12,
+                                    }}
+                                  >
+                                    <b>
+                                      Antes:
+                                    </b>{" "}
+                                    {formatHistoryValue(
+                                      field,
+                                      values
+                                        ?.before
+                                    )}
+                                  </div>
+      
+                                  <div
+                                    style={{
+                                      marginTop:
+                                        4,
+                                      fontSize:
+                                        12,
+                                    }}
+                                  >
+                                    <b>
+                                      Después:
+                                    </b>{" "}
+                                    {formatHistoryValue(
+                                      field,
+                                      values
+                                        ?.after
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              marginTop:
+                                10,
+                              fontSize:
+                                12,
+                              color:
+                                "#64748b",
+                            }}
+                          >
+                            {item.action ===
+                            "created"
+                              ? "Se creó la incidencia."
+                              : item.action ===
+                                  "deleted"
+                                ? "Se eliminó la incidencia."
+                                : "Sin cambios detallados."}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            )}
+      
+            <div
+              style={{
+                display: "flex",
+                justifyContent:
+                  "flex-end",
+                marginTop: 18,
+              }}
+            >
+              <button
+                type="button"
+                onClick={
+                  closeHistory
+                }
+                disabled={
+                  historyLoading
+                }
+                style={
+                  S.buttonNeutral
+                }
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   );
 }
