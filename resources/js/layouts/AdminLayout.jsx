@@ -115,6 +115,7 @@ export default function AdminLayout() {
   const canViewControlAcceso = hasPermission("turnos.view");
   const canViewAsistencias = hasPermission("asistencias.view");
   const canViewIncidencias = hasPermission("asistencias.incidencias.view");
+  const canRevisarEntradasIncidencia = hasPermission("asistencias.incidencias.entrada.revisar");
 
   const visibleAdminLinks = [
     canViewUsers && {
@@ -230,6 +231,15 @@ export default function AdminLayout() {
         ),
     },
   
+    canRevisarEntradasIncidencia && {
+      section: "Control de acceso",
+      to: "/admin/entradas-con-incidencia",
+      title: "Entradas extraordinarias con incidencia",
+      label: "Entradas extraordinarias",
+      icon: "fa-solid fa-clipboard-check",
+      active: location.pathname.startsWith("/admin/entradas-con-incidencia"),
+    },
+
     canViewIncidencias && {
       section: "Control de acceso",
       to:
@@ -321,6 +331,10 @@ export default function AdminLayout() {
     {
       prefix: "/admin/asistencia-incidencias",
       allowed: canViewIncidencias,
+    },
+    {
+      prefix: "/admin/entradas-con-incidencia",
+      allowed: canRevisarEntradasIncidencia,
     },
   ].find((item) =>
     location.pathname.startsWith(

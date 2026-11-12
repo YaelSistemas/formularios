@@ -157,6 +157,17 @@ function getIncidenciaLabel(tipo) {
   return labels[tipo] || "Incidencia";
 }
 
+function getRevisionLabel(estado) {
+  const labels = {
+    pendiente: "Pendiente",
+    visto_bueno: "Visto bueno",
+    observada: "Observada",
+    no_avalada: "No avalada",
+  };
+
+  return labels[estado] || estado || "—";
+}
+
 function formatTime(value) {
   if (!value) return "—";
 
@@ -610,6 +621,47 @@ function EstadoBadge({
   );
 }
 
+function PillBadge({ value, tone = "neutral" }) {
+  const tones = {
+    warning: {
+      background: "#fffbeb",
+      border: "#fde68a",
+      color: "#92400e",
+    },
+    info: {
+      background: "#eff6ff",
+      border: "#bfdbfe",
+      color: "#1d4ed8",
+    },
+    neutral: {
+      background: "#f8fafc",
+      border: "#cbd5e1",
+      color: "#475569",
+    },
+  };
+
+  const selected = tones[tone] || tones.neutral;
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "4px 10px",
+        borderRadius: 999,
+        background: selected.background,
+        border: `1px solid ${selected.border}`,
+        color: selected.color,
+        fontSize: 11,
+        fontWeight: 800,
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 export default function Asistencias() {
   const [me, setMe] = useState(
     () => getStoredUser()
@@ -623,8 +675,12 @@ export default function Asistencias() {
     setIncidenciaHoy,
   ] = useState(null);
   
+  const [diaNoLaborableHoy, setDiaNoLaborableHoy] = useState(false);
+
   const [registros, setRegistros] =
     useState([]);
+
+  const [motivoEntradaIncidencia, setMotivoEntradaIncidencia] = useState("");
 
   const [loading, setLoading] =
     useState(true);
@@ -914,9 +970,8 @@ export default function Asistencias() {
         data?.actual || null
       );
 
-      setIncidenciaHoy(
-        data?.incidencia_hoy || null
-      );
+      setIncidenciaHoy(data?.incidencia_hoy || null);
+      setDiaNoLaborableHoy(!!data?.dia_no_laborable_hoy);
 
       setRegistros(
         Array.isArray(
@@ -1322,7 +1377,10 @@ export default function Asistencias() {
     setEntradaModal({
       mode,
       user,
+      incidencia: mode === "kiosco" ? user?.incidencia_hoy : incidenciaHoy,
+      diaNoLaborable: mode === "kiosco" ? !!user?.dia_no_laborable_hoy : diaNoLaborableHoy,
     });
+    setMotivoEntradaIncidencia("");
   
     setFirmaRealizada(false);
     setFirmaCapturadaAt("");
@@ -1707,6 +1765,11 @@ export default function Asistencias() {
       return;
     }
   
+    if ((entradaModal.incidencia || entradaModal.diaNoLaborable) && motivoEntradaIncidencia.trim().length < 10) {
+      setEntradaError("Debes indicar el motivo operativo (mínimo 10 caracteres).");
+      return;
+    }
+
     if (!firmaRealizada) {
       setEntradaError(
         "Debes firmar antes de registrar la entrada."
@@ -1771,6 +1834,9 @@ export default function Asistencias() {
       );
   
       const payload = {
+        motivo_entrada_incidencia: (entradaModal.incidencia || entradaModal.diaNoLaborable)
+          ? motivoEntradaIncidencia.trim()
+          : undefined,
         firma_entrada:
           firmaBase64,
       
@@ -1851,17 +1917,7 @@ export default function Asistencias() {
     ) {
       return;
     }
-  
-    if (incidenciaHoy) {
-      setError(
-        `Hoy tienes registrada la incidencia: ${getIncidenciaLabel(
-          incidenciaHoy.tipo
-        )}. No necesitas registrar entrada.`
-      );
-  
-      return;
-    }
-  
+
     if (yaRegistroEntradaHoy) {
       setError(
         "Ya registraste una entrada el día de hoy. No puedes registrar otra entrada."
@@ -2003,16 +2059,6 @@ export default function Asistencias() {
       kioscoSavingUserId ||
       entradaSaving
     ) {
-      return;
-    }
-  
-    if (user?.incidencia_hoy) {
-      setError(
-        `${user.name} tiene registrada la incidencia ${getIncidenciaLabel(
-          user.incidencia_hoy.tipo
-        )} para el día de hoy. No necesita registrar entrada.`
-      );
-  
       return;
     }
   
@@ -2923,15 +2969,13 @@ export default function Asistencias() {
               </div>
             ) : null}
           </>
-        ) : incidenciaHoy ? (
+        ) : (incidenciaHoy || diaNoLaborableHoy) ? (
           <>
             <span
               style={S.statusInactive}
             >
               <span>●</span>
-              {getIncidenciaLabel(
-                incidenciaHoy.tipo
-              )}
+              {incidenciaHoy ? getIncidenciaLabel(incidenciaHoy.tipo) : "Día no laborable"}
             </span>
         
             <div
@@ -2942,11 +2986,9 @@ export default function Asistencias() {
                 color: "#334155",
               }}
             >
-              Hoy tienes registrada la
-              incidencia{" "}
-              {getIncidenciaLabel(
-                incidenciaHoy.tipo
-              )}.
+              {incidenciaHoy
+                ? `Hoy tienes registrada la incidencia ${getIncidenciaLabel(incidenciaHoy.tipo)}${diaNoLaborableHoy ? " y tu turno indica día no laborable" : ""}.`
+                : "Hoy es un día no laborable de tu turno."}
             </div>
         
             <div
@@ -2960,7 +3002,14 @@ export default function Asistencias() {
               el día de hoy.
             </div>
         
-            {incidenciaHoy.observaciones ? (
+            {canCreate && !yaRegistroEntradaHoy ? (
+              <button type="button" onClick={handleEntrada} disabled={saving || entradaSaving}
+                style={{...S.buttonPrimary, marginTop: 16}}>
+                Registrar entrada extraordinaria
+              </button>
+            ) : null}
+
+            {incidenciaHoy?.observaciones ? (
               <div
                 style={{
                   marginTop: 10,
@@ -3175,6 +3224,45 @@ export default function Asistencias() {
               ) : (
                 registros.map(
                   (item) => {
+                    if (item.tipo_registro === "descanso") {
+                      return (
+                        <tr
+                          key={item.id}
+                          style={{ background: "#f8fafc" }}
+                        >
+                          <td style={S.td}>{formatDate(item.fecha)}</td>
+                          <td style={S.td}>—</td>
+                          <td style={S.td}>—</td>
+                          <td style={S.td}>—</td>
+                          <td style={S.td}>—</td>
+                          <td style={S.td}>—</td>
+                          <td style={S.td}>
+                            <PillBadge value="Descanso" tone="neutral" />
+                          </td>
+                          <td style={S.td}>—</td>
+                        </tr>
+                      );
+                    }
+
+                    if (item.tipo_registro === "incidencia") {
+                      return (
+                        <tr key={item.id} style={{background: "#eff6ff"}}>
+                          <td style={S.td}>{formatDate(item.fecha)}</td>
+                          <td style={S.td}>—</td><td style={S.td}>—</td>
+                          <td style={S.td}>—</td><td style={S.td}>—</td>
+                          <td style={S.td}>—</td>
+                          <td style={S.td}>
+                            <PillBadge
+                              value={getIncidenciaLabel(item.incidencia?.tipo)}
+                              tone="info"
+                            />
+                          </td>
+                          <td style={S.td} title={item.incidencia?.observaciones || "Sin observaciones"}>
+                            {item.incidencia?.observaciones || "—"}
+                          </td>
+                        </tr>
+                      );
+                    }
                     const tieneSalida =
                       !!item.hora_salida;
 
@@ -3247,7 +3335,45 @@ export default function Asistencias() {
                         </td>
 
                         <td style={S.td}>
-                          <EstadoBadge
+                          {item.entrada_con_incidencia ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 4,
+                              }}
+                            >
+                              <PillBadge
+                                tone="warning"
+                                value={
+                                  item.entrada_con_incidencia.tipo_excepcion === "dia_no_laborable"
+                                    ? "Descanso · Trabajado"
+                                    : `${getIncidenciaLabel(
+                                        item.entrada_con_incidencia.tipo
+                                      )}${
+                                        item.entrada_con_incidencia.tipo_excepcion === "ambas"
+                                          ? " + Descanso"
+                                          : ""
+                                      } · Trabajado`
+                                }
+                              />
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "#6b7280",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Revisión: {getRevisionLabel(item.entrada_con_incidencia.estado)}
+                              </span>
+                              <EstadoBadge
+                                label="Jornada"
+                                value={estados.jornada.value}
+                                tone={estados.jornada.tone}
+                              />
+                            </div>
+                          ) : <EstadoBadge
                             label="Jornada"
                             value={
                               estados
@@ -3259,7 +3385,7 @@ export default function Asistencias() {
                                 .jornada
                                 .tone
                             }
-                          />
+                          />}
                         </td>
 
                         <td style={S.td}>
@@ -3715,15 +3841,13 @@ export default function Asistencias() {
                                 : "Registrar salida"}
                             </button>
                           </>
-                        ) : incidenciaHoyKiosco ? (
+                        ) : (incidenciaHoyKiosco || user.dia_no_laborable_hoy) ? (
                           <>
                             <span
                               style={S.statusInactive}
                             >
                               <span>●</span>
-                              {getIncidenciaLabel(
-                                incidenciaHoyKiosco.tipo
-                              )}
+                              {incidenciaHoyKiosco ? getIncidenciaLabel(incidenciaHoyKiosco.tipo) : "Día no laborable"}
                             </span>
                         
                             <div
@@ -3734,11 +3858,9 @@ export default function Asistencias() {
                                 fontWeight: 800,
                               }}
                             >
-                              Este empleado tiene registrada
-                              la incidencia{" "}
-                              {getIncidenciaLabel(
-                                incidenciaHoyKiosco.tipo
-                              )}.
+                              {incidenciaHoyKiosco
+                                ? `Este empleado tiene la incidencia ${getIncidenciaLabel(incidenciaHoyKiosco.tipo)}${user.dia_no_laborable_hoy ? " y hoy es un día no laborable" : ""}.`
+                                : "Hoy es un día no laborable del turno de este empleado."}
                             </div>
                         
                             <div
@@ -3753,8 +3875,17 @@ export default function Asistencias() {
                               el día de hoy.
                             </div>
                         
+                            {canKiosco && !yaRegistroEntradaHoyKiosco ? (
+                              <button type="button"
+                                onClick={() => handleKioscoEntrada(user)}
+                                disabled={!!kioscoSavingUserId || entradaSaving}
+                                style={{...S.buttonPrimary, width: "100%", marginTop: 12}}>
+                                Registrar entrada extraordinaria
+                              </button>
+                            ) : null}
+
                             {incidenciaHoyKiosco
-                              .observaciones ? (
+                              ?.observaciones ? (
                               <div
                                 style={{
                                   marginTop: 8,
@@ -5153,6 +5284,28 @@ export default function Asistencias() {
               ) : null}
             </div>
       
+            {(entradaModal.incidencia || entradaModal.diaNoLaborable) ? (
+              <div style={{padding: 12, marginTop: 14, borderRadius: 9,
+                border: "1px solid #fcd34d", background: "#fffbeb"}}>
+                <strong>Entrada extraordinaria: {entradaModal.incidencia
+                  ? `${getIncidenciaLabel(entradaModal.incidencia.tipo)}${entradaModal.diaNoLaborable ? " + día no laborable" : ""}`
+                  : "Día no laborable del turno"}</strong>
+                <p style={{fontSize: 12, margin: "7px 0"}}>
+                  La entrada se registrará sin autorización previa y quedará pendiente de revisión por RH/Nóminas.
+                  La incidencia original, si existe, no se eliminará.
+                </p>
+                <label style={{fontSize: 12, fontWeight: 800}} htmlFor="motivo-incidencia-entrada">
+                  Motivo operativo obligatorio
+                </label>
+                <textarea id="motivo-incidencia-entrada" value={motivoEntradaIncidencia}
+                  onChange={e => setMotivoEntradaIncidencia(e.target.value)}
+                  maxLength={2000} rows={3} disabled={entradaSaving}
+                  placeholder="Ej. Solicitud de apoyo operativo de mi supervisor..."
+                  style={{display: "block", width: "100%", marginTop: 6, padding: 10,
+                    border: "1px solid #cbd5e1", borderRadius: 8, boxSizing: "border-box"}} />
+              </div>
+            ) : null}
+
             {entradaEstado ? (
               <div
                 style={{

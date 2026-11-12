@@ -7,9 +7,11 @@ use App\Models\Asistencia;
 use App\Models\AsistenciaHistory;
 use App\Models\UserControlAcceso;
 use App\Models\AsistenciaIncidencia;
+use App\Models\AsistenciaEntradaIncidencia;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -82,6 +84,14 @@ class AsistenciasController extends Controller
 
         return [
             'id' => $asistencia->id,
+            'tipo_registro' => 'asistencia',
+            'entrada_con_incidencia' => $asistencia->entradaIncidencia ? [
+                'tipo' => $asistencia->entradaIncidencia->incidencia_tipo,
+                'tipo_excepcion' => $asistencia->entradaIncidencia->tipo_excepcion ?? 'incidencia',
+                'motivo' => $asistencia->entradaIncidencia->motivo,
+                'estado' => $asistencia->entradaIncidencia->estado,
+                'observaciones_revision' => $asistencia->entradaIncidencia->observaciones_revision,
+            ] : null,
             'user_id' => $asistencia->user_id,
             'user_control_acceso_id' => $asistencia->user_control_acceso_id,
 
@@ -325,6 +335,13 @@ class AsistenciasController extends Controller
                 )
                 ->first();
         
+        // Sólo el turno vigente define si hoy es laborable.
+        $configHoy = $this->getCurrentControlAcceso($user->id);
+        $turnoHoy = $configHoy?->turno;
+        $diaNoLaborableHoy = $turnoHoy
+            ? $this->getEstadoDia(now(self::TIMEZONE), $turnoHoy) === 'fuera_dia_laborable'
+            : false;
+
         $actual = Asistencia::query()
             ->where('user_id', $user->id)
             ->whereNull('hora_salida')
@@ -332,15 +349,119 @@ class AsistenciasController extends Controller
             ->first();
 
         $registros = Asistencia::query()
+            ->with('entradaIncidencia')
             ->where('user_id', $user->id)
             ->orderByDesc('hora_entrada')
             ->limit(100)
             ->get();
 
+        // Combinar días con incidencia sin asistencia con el historial existente.
+        // Si coincide con una asistencia real, mostrar una única fila.
+        $fechasConEntrada = $registros->map(fn ($a) => $a->fecha?->toDateString())->filter()->all();
+        $diasIncidencia = AsistenciaIncidencia::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('fecha')->limit(100)->get()
+            ->reject(fn ($inc) => in_array($inc->fecha->toDateString(), $fechasConEntrada, true))
+            ->map(fn ($inc) => [
+                'id' => 'incidencia-' . $inc->id,
+                'tipo_registro' => 'incidencia',
+                'fecha' => $inc->fecha->toDateString(),
+                'incidencia' => [
+                    'id' => $inc->id,
+                    'tipo' => $inc->tipo,
+                    'observaciones' => $inc->observaciones,
+                ],
+            ]);
+        /*
+         * Mostrar los días no laborables sin entrada ni incidencia.
+         * Son filas virtuales del historial, no registros de asistencia.
+         * Se considera la configuración laboral asignada a cada fecha.
+         */
+        $inicioHistorial = now(self::TIMEZONE)
+            ->startOfDay()
+            ->subDays(99);
+
+        $configuraciones = UserControlAcceso::query()
+            ->with('turno')
+            ->where('user_id', $user->id)
+            ->whereDate('fecha_inicio', '<=', $fechaActual)
+            ->where(function ($query) use ($inicioHistorial) {
+                $query->whereNull('fecha_fin')
+                    ->orWhereDate('fecha_fin', '>=', $inicioHistorial->toDateString());
+            })
+            ->orderByDesc('fecha_inicio')
+            ->orderByDesc('id')
+            ->get();
+
+        $fechasOcupadas = collect($fechasConEntrada)
+            ->concat($diasIncidencia->pluck('fecha'))
+            ->flip();
+
+        $diasDescanso = collect();
+
+        for (
+            $fecha = $inicioHistorial->copy();
+            $fecha->toDateString() <= $fechaActual;
+            $fecha->addDay()
+        ) {
+            $dia = $fecha->toDateString();
+
+            if ($fechasOcupadas->has($dia)) {
+                continue;
+            }
+
+            $configuracion = $configuraciones->first(function ($item) use ($dia) {
+                $desde = Carbon::parse($item->fecha_inicio)->toDateString();
+                $hasta = $item->fecha_fin
+                    ? Carbon::parse($item->fecha_fin)->toDateString()
+                    : null;
+
+                return $desde <= $dia && ($hasta === null || $hasta >= $dia);
+            });
+
+            $turno = $configuracion?->turno;
+
+            if (!$turno) {
+                continue;
+            }
+
+            $vigenteDesde = $turno->vigente_desde
+                ? Carbon::parse($turno->vigente_desde)->toDateString()
+                : null;
+            $vigenteHasta = $turno->vigente_hasta
+                ? Carbon::parse($turno->vigente_hasta)->toDateString()
+                : null;
+
+            if (
+                ($vigenteDesde && $dia < $vigenteDesde)
+                || ($vigenteHasta && $dia > $vigenteHasta)
+            ) {
+                continue;
+            }
+
+            if ($this->getEstadoDia($fecha, $turno) === 'fuera_dia_laborable') {
+                $diasDescanso->push([
+                    'id' => 'descanso-' . $dia,
+                    'tipo_registro' => 'descanso',
+                    'fecha' => $dia,
+                ]);
+            }
+        }
+
+        $historial = $registros
+            ->map(fn (Asistencia $a) => $this->formatAsistencia($a))
+            ->concat($diasIncidencia)
+            ->concat($diasDescanso)
+            ->sortByDesc('fecha')
+            ->take(150)
+            ->values();
+
         return response()->json([
             'actual' => $actual
                 ? $this->formatAsistencia($actual)
                 : null,
+
+            'dia_no_laborable_hoy' => $diaNoLaborableHoy,
 
             'incidencia_hoy' =>
                 $incidenciaHoy
@@ -362,12 +483,7 @@ class AsistenciasController extends Controller
                     ]
                     : null,
 
-            'registros' => $registros
-                ->map(
-                    fn (Asistencia $asistencia) =>
-                        $this->formatAsistencia($asistencia)
-                )
-                ->values(),
+            'registros' => $historial,
         ]);
     }
 
@@ -766,6 +882,7 @@ class AsistenciasController extends Controller
                 'between:-180,180',
             ],
         
+            'motivo_entrada_incidencia' => ['nullable', 'string', 'min:10', 'max:2000'],
             'entrada_precision_metros' => [
                 'required',
                 'numeric',
@@ -839,30 +956,7 @@ class AsistenciasController extends Controller
                 )
                 ->first();
         
-        if ($incidenciaHoy) {
-            $tipoLabel =
-                match (
-                    $incidenciaHoy->tipo
-                ) {
-                    'vacaciones' =>
-                        'Vacaciones',
-        
-                    'incapacidad' =>
-                        'Incapacidad',
-        
-                    'festivo' =>
-                        'Día festivo',
-        
-                    default =>
-                        'Incidencia',
-                };
-        
-            return response()->json([
-                'message' =>
-                    "No puedes registrar entrada el día de hoy porque tienes registrada la incidencia: {$tipoLabel}.",
-            ], 409);
-        }
-        
+
         /*
          * No permitir más de una entrada
          * por usuario en el mismo día.
@@ -957,6 +1051,13 @@ class AsistenciasController extends Controller
                 $turno
             );
         
+        $requiereRevision = $incidenciaHoy || $estadoDia === 'fuera_dia_laborable';
+        if ($requiereRevision && mb_strlen(trim($data['motivo_entrada_incidencia'] ?? '')) < 10) {
+            throw ValidationException::withMessages([
+                'motivo_entrada_incidencia' => 'Describe el motivo operativo de la entrada extraordinaria (mínimo 10 caracteres).',
+            ]);
+        }
+
         $firmaEntradaPath =
             $this->guardarFirmaEntrada(
                 $data['firma_entrada']
@@ -967,6 +1068,8 @@ class AsistenciasController extends Controller
                 $data['foto_entrada']
             );
 
+        DB::beginTransaction();
+        try {
         $asistencia = Asistencia::create([
             'user_id' => $user->id,
 
@@ -1104,7 +1207,22 @@ class AsistenciasController extends Controller
             'metodo_salida' => null,
         ]);
 
-        $asistencia = $asistencia->fresh();
+        if ($requiereRevision) {
+            AsistenciaEntradaIncidencia::create([
+                'asistencia_id' => $asistencia->id,
+                'user_id' => $user->id,
+                'fecha' => $fechaActual,
+                'tipo_excepcion' => $incidenciaHoy
+                    ? ($estadoDia === 'fuera_dia_laborable' ? 'ambas' : 'incidencia')
+                    : 'dia_no_laborable',
+                'incidencia_id' => $incidenciaHoy?->id,
+                'incidencia_tipo' => $incidenciaHoy?->tipo,
+                'incidencia_observaciones' => $incidenciaHoy?->observaciones,
+                'motivo' => trim($data['motivo_entrada_incidencia']),
+                'estado' => 'pendiente',
+            ]);
+        }
+        $asistencia = $asistencia->fresh('entradaIncidencia');
 
         /*
          * Registrar creación en el historial
@@ -1133,8 +1251,14 @@ class AsistenciasController extends Controller
                 ),
         ]);
 
+        DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
         return response()->json([
-            'message' => 'Hora de entrada registrada correctamente.',
+            'message' => $requiereRevision ? 'Entrada extraordinaria registrada. Pendiente de revisión por RH/Nóminas.' : 'Hora de entrada registrada correctamente.',
             'asistencia' => $this->formatAsistencia($asistencia),
         ], 201);
     }

@@ -138,84 +138,29 @@ class AsistenciaIncidenciasController extends Controller
          * Agrupar registros pertenecientes
          * a la misma captura por rango.
          */
-        $grupos =
-            $registros
-                ->groupBy(
-                    function (
-                        AsistenciaIncidencia $item
-                    ) {
-                        return
-                            $item->grupo_uuid
-                            ?: 'registro-'
-                                . $item->id;
-                    }
-                )
-                ->map(
-                    function ($items) {
-                        $primero =
-                            $items
-                                ->sortBy('fecha')
-                                ->first();
-
-                        $ultimo =
-                            $items
-                                ->sortBy('fecha')
-                                ->last();
-
-                        return [
-                            'grupo_uuid' =>
-                                $primero->grupo_uuid,
-
-                            'user_id' =>
-                                $primero->user_id,
-
-                            'user' =>
-                                $primero->user,
-
-                            'tipo' =>
-                                $primero->tipo,
-
-                            'observaciones' =>
-                                $primero->observaciones,
-
-                            'fecha_desde' =>
-                                $primero->fecha
-                                    ? Carbon::parse(
-                                        $primero->fecha
-                                    )->format(
-                                        'Y-m-d'
-                                    )
-                                    : null,
-
-                            'fecha_hasta' =>
-                                $ultimo->fecha
-                                    ? Carbon::parse(
-                                        $ultimo->fecha
-                                    )->format(
-                                        'Y-m-d'
-                                    )
-                                    : null,
-
-                            'dias' =>
-                                $items->count(),
-
-                            'registrado_por' =>
-                                $primero
-                                    ->registradoPor,
-
-                            'created_at' =>
-                                $primero
-                                    ->created_at,
-
-                            'updated_at' =>
-                                $items
-                                    ->max(
-                                        'updated_at'
-                                    ),
-                        ];
-                    }
-                )
-                ->values();
+        $grupos = $registros->groupBy(fn ($item) => $item->grupo_uuid ?: 'registro-'.$item->id)
+            ->map(function ($items) {
+                $primero = $items->sortBy('fecha')->first();
+                $ultimo = $items->sortBy('fecha')->last();
+                $masiva = (bool) $primero->es_masiva;
+                return [
+                    'grupo_uuid' => $primero->grupo_uuid,
+                    'user_id' => $masiva ? null : $primero->user_id,
+                    'user' => $masiva ? null : $primero->user,
+                    'es_masiva' => $masiva,
+                    'alcance' => $primero->alcance,
+                    'empleados' => $items->pluck('user_id')->unique()->count(),
+                    'personalizados' => $items->where('personalizada', true)->pluck('user_id')->unique()->count(),
+                    'tipo' => $items->pluck('tipo')->unique()->count() === 1 ? $primero->tipo : 'mixto',
+                    'observaciones' => $items->pluck('observaciones')->unique()->count() === 1 ? $primero->observaciones : 'Valores diferentes por empleado',
+                    'fecha_desde' => Carbon::parse($primero->fecha)->format('Y-m-d'),
+                    'fecha_hasta' => Carbon::parse($ultimo->fecha)->format('Y-m-d'),
+                    'dias' => $masiva ? $items->pluck('fecha')->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))->unique()->count() : $items->count(),
+                    'registrado_por' => $primero->registradoPor,
+                    'created_at' => $primero->created_at,
+                    'updated_at' => $items->max('updated_at'),
+                ];
+            })->values();
 
         /*
          * Empleados disponibles
@@ -242,6 +187,7 @@ class AsistenciaIncidenciasController extends Controller
 
             'usuarios' =>
                 $usuarios,
+            'unidades' => \App\Models\UnidadServicio::query()->orderBy('nombre')->get(['id', 'nombre']),
 
             'tipos' => [
                 [
@@ -266,460 +212,177 @@ class AsistenciaIncidenciasController extends Controller
         ]);
     }
 
-    public function exportExcel(
-        Request $request
-    ) {
-        $grupos =
-            $this->getFilteredIncidenciaGroups(
-                $request
-            );
-    
-        $spreadsheet =
-            new Spreadsheet();
-    
-        $sheet =
-            $spreadsheet
-                ->getActiveSheet();
-    
-        $sheet->setTitle(
-            'Incidencias'
-        );
-    
-        /*
-         * Título.
-         */
-        $sheet->mergeCells(
-            'A1:H1'
-        );
-    
-        $sheet->setCellValue(
-            'A1',
-            'REPORTE DE INCIDENCIAS DE ASISTENCIA'
-        );
-    
-        $sheet
-            ->getStyle('A1')
-            ->getFont()
-            ->setBold(true)
-            ->setSize(16);
-    
-        $sheet
-            ->getStyle('A1')
-            ->getAlignment()
-            ->setHorizontal(
-                Alignment::HORIZONTAL_CENTER
-            );
-    
-        /*
-         * Fecha de generación.
-         */
-        $sheet->mergeCells(
-            'A2:H2'
-        );
-    
-        $sheet->setCellValue(
-            'A2',
-            'Generado: '
-            . Carbon::now(
-                self::TIMEZONE
-            )->format(
-                'd/m/Y H:i:s'
-            )
-        );
-    
-        $sheet
-            ->getStyle('A2')
-            ->getAlignment()
-            ->setHorizontal(
-                Alignment::HORIZONTAL_CENTER
-            );
-    
-        /*
-         * Encabezados.
-         */
-        $headers = [
-            'Empleado',
-            'Correo',
-            'Tipo',
-            'Desde',
-            'Hasta',
-            'Días',
-            'Observaciones',
-            'Registrado por',
-        ];
-    
-        foreach (
-            $headers as
-            $index => $header
-        ) {
-            $column =
-                chr(
-                    65 + $index
-                );
-    
-            $sheet->setCellValue(
-                "{$column}3",
-                $header
-            );
+    /**
+     * Exportaciones: resumen agrupado o detalle real por empleado.
+     * Las fechas y filtros se aplican sobre los registros individuales.
+     */
+    private function exportRows(Request $request): array
+    {
+        $formato = $request->validate([
+            'formato' => 'nullable|in:resumen,detalle',
+        ])['formato'] ?? 'resumen';
+
+        if ($formato === 'resumen') {
+            $grupos = $this->getFilteredIncidenciaGroups($request);
+            $rows = $grupos->map(function ($grupo) {
+                return [
+                    'empleado' => $grupo['nombre_alcance'] ?? ($grupo['user']?->name ?? ''),
+                    'correo' => $grupo['user']?->email ?? '',
+                    'tipo' => $this->labelTipo($grupo['tipo'] ?? ''),
+                    'fecha_desde' => $this->formatDateExport($grupo['fecha_desde'] ?? null),
+                    'fecha_hasta' => $this->formatDateExport($grupo['fecha_hasta'] ?? null),
+                    'dias' => $grupo['dias'] ?? 0,
+                    'empleados' => $grupo['es_masiva'] ? ($grupo['empleados'] ?? 0) : 1,
+                    'observaciones' => $grupo['observaciones'] ?? '',
+                    'registrado_por' => $grupo['registrado_por']?->name ?? '',
+                ];
+            })->values()->all();
+            return [$formato, $rows];
         }
-    
-        $sheet
-            ->getStyle(
-                'A3:H3'
-            )
-            ->getFont()
-            ->setBold(true);
-    
-        $sheet
-            ->getStyle(
-                'A3:H3'
-            )
-            ->getFill()
-            ->setFillType(
-                Fill::FILL_SOLID
-            )
-            ->getStartColor()
-            ->setRGB(
-                'E2E8F0'
-            );
-    
-        $sheet
-            ->getStyle(
-                'A3:H3'
-            )
-            ->getAlignment()
-            ->setHorizontal(
-                Alignment::HORIZONTAL_CENTER
-            );
-    
-        /*
-         * Registros.
-         */
-        $excelRow = 4;
-    
-        foreach (
-            $grupos as $grupo
-        ) {
-            $tipoLabel =
-                match (
-                    $grupo['tipo']
-                ) {
-                    'vacaciones' =>
-                        'Vacaciones',
-    
-                    'incapacidad' =>
-                        'Incapacidad',
-    
-                    'festivo' =>
-                        'Día festivo',
-    
-                    default =>
-                        $grupo['tipo']
-                        ?? '',
-                };
-    
-            $sheet->setCellValue(
-                "A{$excelRow}",
-                $grupo['user']
-                    ?->name
-                    ?? ''
-            );
-    
-            $sheet->setCellValue(
-                "B{$excelRow}",
-                $grupo['user']
-                    ?->email
-                    ?? ''
-            );
-    
-            $sheet->setCellValue(
-                "C{$excelRow}",
-                $tipoLabel
-            );
-    
-            $sheet->setCellValue(
-                "D{$excelRow}",
-                !empty(
-                    $grupo[
-                        'fecha_desde'
-                    ]
-                )
-                    ? Carbon::parse(
-                        $grupo[
-                            'fecha_desde'
-                        ]
-                    )->format(
-                        'd/m/Y'
-                    )
-                    : ''
-            );
-    
-            $sheet->setCellValue(
-                "E{$excelRow}",
-                !empty(
-                    $grupo[
-                        'fecha_hasta'
-                    ]
-                )
-                    ? Carbon::parse(
-                        $grupo[
-                            'fecha_hasta'
-                        ]
-                    )->format(
-                        'd/m/Y'
-                    )
-                    : ''
-            );
-    
-            $sheet->setCellValue(
-                "F{$excelRow}",
-                $grupo['dias']
-                    ?? 0
-            );
-    
-            $sheet->setCellValue(
-                "G{$excelRow}",
-                $grupo[
-                    'observaciones'
-                ] ?? ''
-            );
-    
-            $sheet->setCellValue(
-                "H{$excelRow}",
-                $grupo[
-                    'registrado_por'
-                ]?->name
-                    ?? ''
-            );
-    
-            $excelRow++;
+
+        $data = $request->validate([
+            'fecha_desde' => 'nullable|date',
+            'fecha_hasta' => 'nullable|date|after_or_equal:fecha_desde',
+            'user_id' => 'nullable|integer|exists:users,id',
+            'tipo' => 'nullable|in:vacaciones,incapacidad,festivo',
+            'search' => 'nullable|string|max:100',
+        ]);
+        $query = AsistenciaIncidencia::query()->with([
+            'user:id,name,email,activo',
+            'registradoPor:id,name,email',
+        ]);
+        if (!empty($data['fecha_desde'])) $query->whereDate('fecha', '>=', $data['fecha_desde']);
+        if (!empty($data['fecha_hasta'])) $query->whereDate('fecha', '<=', $data['fecha_hasta']);
+        if (!empty($data['user_id'])) $query->where('user_id', $data['user_id']);
+        if (!empty($data['tipo'])) $query->where('tipo', $data['tipo']);
+        if (!empty($data['search'])) {
+            $search = trim($data['search']);
+            $query->whereHas('user', function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            });
         }
-    
-        /*
-         * Bordes.
-         */
-        if (
-            $excelRow > 4
-        ) {
-            $sheet
-                ->getStyle(
-                    'A3:H'
-                    . (
-                        $excelRow - 1
-                    )
-                )
-                ->getBorders()
-                ->getAllBorders()
-                ->setBorderStyle(
-                    Border::BORDER_THIN
-                );
+
+        // Un periodo sólo puede reunir fechas consecutivas del mismo empleado,
+        // grupo, tipo, observaciones y registrador. Nunca sumar días de otros usuarios.
+        $records = $query->orderBy('user_id')->orderBy('fecha')->orderBy('id')->get();
+        $rows = [];
+        $lastKey = null;
+        $previousDate = null;
+        foreach ($records as $item) {
+            $date = Carbon::parse($item->fecha)->toDateString();
+            $key = implode('|', [
+                $item->grupo_uuid ?: 'registro-'.$item->id,
+                $item->user_id, $item->tipo,
+                json_encode($item->observaciones, JSON_UNESCAPED_UNICODE),
+                $item->registrado_por_user_id,
+            ]);
+            $consecutive = $previousDate !== null
+                && Carbon::parse($previousDate)->addDay()->toDateString() === $date;
+            if ($rows && $key === $lastKey && $consecutive) {
+                $rows[count($rows) - 1]['fecha_hasta'] = $this->formatDateExport($date);
+                $rows[count($rows) - 1]['dias']++;
+            } else {
+                $rows[] = [
+                    'empleado' => $item->user?->name ?? 'Empleado no disponible',
+                    'correo' => $item->user?->email ?? '',
+                    'tipo' => $this->labelTipo($item->tipo),
+                    'fecha_desde' => $this->formatDateExport($date),
+                    'fecha_hasta' => $this->formatDateExport($date),
+                    'dias' => 1,
+                    'empleados' => 1,
+                    'observaciones' => $item->observaciones ?? '',
+                    'registrado_por' => $item->registradoPor?->name ?? '',
+                ];
+            }
+            $lastKey = $key;
+            $previousDate = $date;
         }
-    
-        /*
-         * Alineación.
-         */
-        $sheet
-            ->getStyle(
-                'C:F'
-            )
-            ->getAlignment()
-            ->setHorizontal(
-                Alignment::HORIZONTAL_CENTER
-            );
-    
-        $sheet
-            ->getStyle(
-                'A:H'
-            )
-            ->getAlignment()
-            ->setVertical(
-                Alignment::VERTICAL_CENTER
-            );
-    
-        /*
-         * Ajustar columnas.
-         */
-        foreach (
-            range(
-                'A',
-                'H'
-            ) as $column
-        ) {
-            $sheet
-                ->getColumnDimension(
-                    $column
-                )
-                ->setAutoSize(
-                    true
-                );
-        }
-    
-        $sheet->freezePane(
-            'A4'
-        );
-    
-        $fileName =
-            'incidencias_asistencia_'
-            . Carbon::now(
-                self::TIMEZONE
-            )->format(
-                'Ymd_His'
-            )
-            . '.xlsx';
-    
-        return response()
-            ->streamDownload(
-                function () use (
-                    $spreadsheet
-                ) {
-                    $writer =
-                        new Xlsx(
-                            $spreadsheet
-                        );
-    
-                    $writer->save(
-                        'php://output'
-                    );
-    
-                    $spreadsheet
-                        ->disconnectWorksheets();
-                },
-                $fileName,
-                [
-                    'Content-Type' =>
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                ]
-            );
+        return [$formato, $rows];
     }
 
-    public function exportPdf(
-        Request $request
-    ) {
-        $grupos =
-            $this->getFilteredIncidenciaGroups(
-                $request
-            );
-    
-        $rows =
-            $grupos
-                ->map(
-                    function ($grupo) {
-                        $tipoLabel =
-                            match (
-                                $grupo['tipo']
-                            ) {
-                                'vacaciones' =>
-                                    'Vacaciones',
-    
-                                'incapacidad' =>
-                                    'Incapacidad',
-    
-                                'festivo' =>
-                                    'Día festivo',
-    
-                                default =>
-                                    $grupo['tipo']
-                                    ?? '',
-                            };
-    
-                        return [
-                            'empleado' =>
-                                $grupo['user']
-                                    ?->name
-                                    ?? '',
-    
-                            'correo' =>
-                                $grupo['user']
-                                    ?->email
-                                    ?? '',
-    
-                            'tipo' =>
-                                $tipoLabel,
-    
-                            'fecha_desde' =>
-                                !empty(
-                                    $grupo[
-                                        'fecha_desde'
-                                    ]
-                                )
-                                    ? Carbon::parse(
-                                        $grupo[
-                                            'fecha_desde'
-                                        ]
-                                    )->format(
-                                        'd/m/Y'
-                                    )
-                                    : '',
-    
-                            'fecha_hasta' =>
-                                !empty(
-                                    $grupo[
-                                        'fecha_hasta'
-                                    ]
-                                )
-                                    ? Carbon::parse(
-                                        $grupo[
-                                            'fecha_hasta'
-                                        ]
-                                    )->format(
-                                        'd/m/Y'
-                                    )
-                                    : '',
-    
-                            'dias' =>
-                                $grupo['dias']
-                                ?? 0,
-    
-                            'observaciones' =>
-                                $grupo[
-                                    'observaciones'
-                                ] ?? '',
-    
-                            'registrado_por' =>
-                                $grupo[
-                                    'registrado_por'
-                                ]?->name
-                                    ?? '',
-                        ];
-                    }
-                )
-                ->values();
-    
-        $generatedAt =
-            Carbon::now(
-                self::TIMEZONE
-            )->format(
-                'd/m/Y H:i:s'
-            );
-    
-        $pdf =
-            Pdf::loadView(
-                'admin.asistencia_incidencias.export_pdf',
-                [
-                    'rows' =>
-                        $rows,
-    
-                    'generatedAt' =>
-                        $generatedAt,
-                ]
-            )
-            ->setPaper(
-                'a4',
-                'landscape'
-            );
-    
-        $fileName =
-            'incidencias_asistencia_'
-            . Carbon::now(
-                self::TIMEZONE
-            )->format(
-                'Ymd_His'
-            )
-            . '.pdf';
-    
-        return $pdf->download(
-            $fileName
-        );
+    private function labelTipo(?string $tipo): string
+    {
+        return match ($tipo) {
+            'vacaciones' => 'Vacaciones',
+            'incapacidad' => 'Incapacidad',
+            'festivo' => 'Día festivo',
+            'mixto' => 'Mixto',
+            default => $tipo ?? '',
+        };
+    }
+
+    private function formatDateExport($date): string
+    {
+        return $date ? Carbon::parse($date)->format('d/m/Y') : '';
+    }
+
+    public function exportExcel(Request $request)
+    {
+        [$formato, $rows] = $this->exportRows($request);
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle($formato === 'detalle' ? 'Detalle empleados' : 'Resumen incidencias');
+        $headers = ['Empleado / alcance', 'Correo', 'Tipo', 'Desde', 'Hasta', 'Días'];
+        if ($formato === 'resumen') $headers[] = 'Empleados';
+        $headers[] = 'Observaciones';
+        $headers[] = 'Registrado por';
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $sheet->mergeCells("A1:{$lastCol}1");
+        $sheet->setCellValue('A1', 'REPORTE DE INCIDENCIAS DE ASISTENCIA - '.strtoupper($formato));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(15);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->mergeCells("A2:{$lastCol}2");
+        $sheet->setCellValue('A2', 'Generado: '.Carbon::now(self::TIMEZONE)->format('d/m/Y H:i:s'));
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        foreach ($headers as $i => $header) {
+            $column = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i + 1);
+            $sheet->setCellValue("{$column}3", $header);
+        }
+        $sheet->getStyle("A3:{$lastCol}3")->getFont()->setBold(true);
+        $sheet->getStyle("A3:{$lastCol}3")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E2E8F0');
+        $sheet->getStyle("A3:{$lastCol}3")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        foreach ($rows as $i => $row) {
+            $values = [$row['empleado'], $row['correo'], $row['tipo'], $row['fecha_desde'], $row['fecha_hasta'], $row['dias']];
+            if ($formato === 'resumen') $values[] = $row['empleados'];
+            $values[] = $row['observaciones'];
+            $values[] = $row['registrado_por'];
+            foreach ($values as $j => $value) {
+                $column = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($j + 1);
+                $cell = "{$column}".($i + 4);
+                if (is_numeric($value) && !is_string($value)) {
+                    $sheet->setCellValue($cell, $value);
+                } else {
+                    $sheet->setCellValueExplicit($cell, (string) $value, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                }
+            }
+        }
+        $lastRow = max(3, count($rows) + 3);
+        $sheet->getStyle("A3:{$lastCol}{$lastRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("A3:{$lastCol}{$lastRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        for ($i = 1; $i <= count($headers); $i++) {
+            $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
+        }
+        $sheet->freezePane('A4');
+        $fileName = 'incidencias_'.$formato.'_'.Carbon::now(self::TIMEZONE)->format('Ymd_His').'.xlsx';
+        return response()->streamDownload(function () use ($spreadsheet) {
+            (new Xlsx($spreadsheet))->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+        }, $fileName, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    public function exportPdf(Request $request)
+    {
+        [$formato, $rows] = $this->exportRows($request);
+        $pdf = Pdf::loadView('admin.asistencia_incidencias.export_pdf', [
+            'rows' => $rows,
+            'formato' => $formato,
+            'generatedAt' => Carbon::now(self::TIMEZONE)->format('d/m/Y H:i:s'),
+        ])->setPaper('a4', 'landscape');
+        $fileName = 'incidencias_'.$formato.'_'.Carbon::now(self::TIMEZONE)->format('Ymd_His').'.pdf';
+        return $pdf->download($fileName);
     }
 
     /**
@@ -728,6 +391,10 @@ class AsistenciaIncidenciasController extends Controller
      */
     public function store(Request $request)
     {
+        if ($request->input('alcance', 'individual') !== 'individual') {
+            return $this->storeMasiva($request);
+        }
+
         $data = $request->validate([
             'user_id' => [
                 'required',
@@ -944,6 +611,11 @@ class AsistenciaIncidenciasController extends Controller
     public function show(
         string $grupoUuid
     ) {
+        $masiva = AsistenciaIncidencia::where('grupo_uuid', $grupoUuid)->where('es_masiva', true)->exists();
+        if ($masiva) {
+            return response()->json($this->getMasivaDetail($grupoUuid));
+        }
+
         $registros =
             AsistenciaIncidencia::query()
                 ->with([
@@ -998,7 +670,7 @@ class AsistenciaIncidenciasController extends Controller
                 ),
 
             'dias' =>
-                $registros->count(),
+                $primero->es_masiva ? $registros->pluck('fecha')->map(fn ($fecha) => Carbon::parse($fecha)->toDateString())->unique()->count() : $registros->count(),
 
             'registrado_por' =>
                 $primero
@@ -1119,11 +791,31 @@ class AsistenciaIncidenciasController extends Controller
                 )
                 ->values();
     
+        $esMasivaHistorica = $history->contains(fn ($h) =>
+            (bool) data_get($h->snapshot, 'es_masiva', false)
+        );
+        $creacion = $history->first(fn ($h) => $h->action === 'created');
+        $snapshotCreacion = $creacion?->snapshot ?? [];
+        $miembrosOriginales = $snapshotCreacion['miembros'] ?? [];
+        $miembrosActuales = $latestSnapshot['miembros'] ?? [];
+        $totalOriginal = $esMasivaHistorica
+            ? ($snapshotCreacion['empleados'] ?? data_get($creacion?->changes, 'empleados'))
+            : null;
+        $totalActual = $esMasivaHistorica
+            ? ($history->last()?->action === 'deleted' ? 0 : ($latestSnapshot['empleados'] ?? null))
+            : null;
+
         return response()->json([
             'incidencia' => [
                 'grupo_uuid' =>
                     $grupoUuid,
     
+                'es_masiva' => $esMasivaHistorica,
+                'empleados' => $latestSnapshot['empleados'] ?? null,
+                'empleados_originales' => $totalOriginal,
+                'empleados_actuales' => $totalActual,
+                'miembros_originales' => $miembrosOriginales,
+                'miembros_actuales' => $miembrosActuales,
                 'empleado' =>
                     $latestSnapshot[
                         'empleado'
@@ -1145,9 +837,9 @@ class AsistenciaIncidenciasController extends Controller
                     ] ?? null,
     
                 'dias' =>
-                    $latestSnapshot[
-                        'dias'
-                    ] ?? null,
+                    ($latestSnapshot['es_masiva'] ?? false) && !empty($latestSnapshot['fecha_desde']) && !empty($latestSnapshot['fecha_hasta'])
+                        ? (int) Carbon::parse($latestSnapshot['fecha_desde'])->diffInDays(Carbon::parse($latestSnapshot['fecha_hasta'])) + 1
+                        : ($latestSnapshot['dias'] ?? null),
     
                 'observaciones' =>
                     $latestSnapshot[
@@ -1314,6 +1006,31 @@ class AsistenciaIncidenciasController extends Controller
                                 }
                             );
     
+                        $esMasiva = $items->contains(fn ($h) =>
+                            (bool) data_get($h->snapshot, 'es_masiva', false)
+                        );
+                        $creacion = $items->first(fn ($h) => $h->action === 'created');
+                        $origen = $creacion?->snapshot ?? [];
+                        $originales = $origen['miembros'] ?? [];
+                        $actuales = $snapshot['miembros'] ?? [];
+                        $cantidadOriginal = $esMasiva
+                            ? ($origen['empleados'] ?? data_get($creacion?->changes, 'empleados'))
+                            : null;
+                        $cantidadActual = $esMasiva
+                            ? ($deleted ? 0 : ($snapshot['empleados'] ?? null))
+                            : null;
+                        // Una edición puede alterar el tipo o periodo de parte
+                        // del grupo: indicar 'mixto' en vez de atribuir el tipo
+                        // o el periodo individual a todos sus integrantes.
+                        $tipos = $items->flatMap(fn ($h) =>
+                            collect(data_get($h->changes, 'detalle_empleados', []))
+                                ->pluck('despues.tipo')
+                        )->filter()->unique();
+                        $tipoResumen = $snapshot['tipo'] ?? null;
+                        if ($esMasiva && $tipos->count() > 1) {
+                            $tipoResumen = 'mixto';
+                        }
+
                         $history =
                             $items
                                 ->map(
@@ -1371,16 +1088,19 @@ class AsistenciaIncidenciasController extends Controller
     
                             'deleted' =>
                                 $deleted,
+                            'es_masiva' => $esMasiva,
+                            'alcance' => $origen['alcance'] ?? $snapshot['alcance'] ?? null,
+                            'empleados_originales' => $cantidadOriginal,
+                            'empleados_actuales' => $cantidadActual,
+                            'miembros_originales' => $originales,
+                            'miembros_actuales' => $actuales,
     
                             'empleado' =>
                                 $snapshot[
                                     'empleado'
                                 ] ?? null,
     
-                            'tipo' =>
-                                $snapshot[
-                                    'tipo'
-                                ] ?? null,
+                            'tipo' => $tipoResumen,
     
                             'fecha_desde' =>
                                 $snapshot[
@@ -1446,6 +1166,10 @@ class AsistenciaIncidenciasController extends Controller
         Request $request,
         string $grupoUuid
     ) {
+        if (AsistenciaIncidencia::where('grupo_uuid', $grupoUuid)->where('es_masiva', true)->exists()) {
+            return response()->json(['message' => 'Usa la edición por empleados para incidencias masivas.'], 422);
+        }
+
         $actuales =
             AsistenciaIncidencia::query()
                 ->where(
@@ -1754,6 +1478,205 @@ class AsistenciaIncidenciasController extends Controller
         ]);
     }
 
+    /** Captura masiva: conserva una fila por empleado y fecha, con UUID común. */
+    private function storeMasiva(Request $request)
+    {
+        $data = $request->validate([
+            'alcance' => 'required|in:todos,unidad,seleccion',
+            'unidad_id' => 'required_if:alcance,unidad|nullable|integer|exists:unidades_servicio,id',
+            'user_ids' => 'required_if:alcance,seleccion|array',
+            'user_ids.*' => 'integer|distinct|exists:users,id',
+            'tipo' => 'required|in:vacaciones,incapacidad,festivo',
+            'fecha_desde' => 'required|date',
+            'fecha_hasta' => 'required|date|after_or_equal:fecha_desde',
+            'observaciones' => 'nullable|string|max:2000',
+        ]);
+        $desde = Carbon::parse($data['fecha_desde'])->startOfDay();
+        $hasta = Carbon::parse($data['fecha_hasta'])->startOfDay();
+        $dias = (int) $desde->diffInDays($hasta) + 1;
+        if ($dias > 366) throw ValidationException::withMessages(['fecha_hasta' => 'Máximo 366 días.']);
+        $usuarios = User::where('activo', true);
+        if ($data['alcance'] === 'unidad') {
+            $usuarios->whereHas('unidadesServicio', fn ($q) => $q->where('unidades_servicio.id', $data['unidad_id']));
+        } elseif ($data['alcance'] === 'seleccion') {
+            $usuarios->whereIn('id', $data['user_ids'] ?? []);
+        }
+        $ids = $usuarios->pluck('id')->all();
+        if (!$ids) throw ValidationException::withMessages(['alcance' => 'No hay empleados activos para el alcance seleccionado.']);
+        $ocupados = AsistenciaIncidencia::whereIn('user_id', $ids)->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->get(['user_id', 'fecha']);
+        $asistencias = Asistencia::whereIn('user_id', $ids)->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->get(['user_id', 'fecha']);
+        // Política segura: no reemplazar registros ni asistencias ya existentes.
+        if ($ocupados->isNotEmpty() || $asistencias->isNotEmpty()) {
+            throw ValidationException::withMessages(['fecha_desde' => 'No se registró ninguna incidencia: existen '. $ocupados->count().' incidencias y '.$asistencias->count().' asistencias en el rango para los empleados seleccionados. Ajusta el alcance o las fechas.']);
+        }
+        $uuid = (string) Str::uuid();
+        DB::transaction(function () use ($ids, $data, $desde, $hasta, $uuid, $request) {
+            $now = now();
+            $rows = [];
+            foreach ($ids as $id) {
+                for ($dia = $desde->copy(); $dia->lte($hasta); $dia->addDay()) {
+                    $rows[] = [
+                        'user_id' => $id, 'grupo_uuid' => $uuid, 'es_masiva' => true,
+                        'alcance' => $data['alcance'], 'personalizada' => false,
+                        'fecha' => $dia->toDateString(), 'tipo' => $data['tipo'],
+                        'observaciones' => $data['observaciones'] ?? null,
+                        'registrado_por_user_id' => $request->user()->id,
+                        'created_at' => $now, 'updated_at' => $now,
+                    ];
+                    if (count($rows) >= 500) { AsistenciaIncidencia::insert($rows); $rows = []; }
+                }
+            }
+            if ($rows) AsistenciaIncidencia::insert($rows);
+            AsistenciaIncidenciaHistory::create([
+                'grupo_uuid' => $uuid, 'action' => 'created', 'changes' => ['alcance' => $data['alcance'], 'empleados' => count($ids)],
+                'snapshot' => $this->buildGroupSnapshot($uuid), 'actor_user_id' => $request->user()->id,
+            ]);
+        });
+        return response()->json(['message' => 'Incidencia masiva registrada para '.count($ids).' empleados.', 'grupo_uuid' => $uuid], 201);
+    }
+
+    private function getMasivaDetail(string $uuid): array
+    {
+        $rows = AsistenciaIncidencia::with('user:id,name,email,activo')->where('grupo_uuid', $uuid)->orderBy('fecha')->get();
+        if ($rows->isEmpty()) abort(404);
+        $first = $rows->first();
+        $members = $rows->groupBy('user_id')->map(function ($entries, $id) {
+            $first = $entries->first();
+            // Los periodos del empleado pueden no ser consecutivos ni tener el mismo tipo.
+            // No presentar simplemente MIN/MAX como un periodo continuo.
+            $periodos = [];
+            foreach ($entries->sortBy('fecha') as $entry) {
+                $fecha = Carbon::parse($entry->fecha)->format('Y-m-d');
+                $lastIndex = count($periodos) - 1;
+                $sePuedeUnir = $lastIndex >= 0
+                    && Carbon::parse($periodos[$lastIndex]['fecha_hasta'])->addDay()->format('Y-m-d') === $fecha
+                    && $periodos[$lastIndex]['tipo'] === $entry->tipo
+                    && $periodos[$lastIndex]['observaciones'] === $entry->observaciones;
+                if ($sePuedeUnir) {
+                    $periodos[$lastIndex]['fecha_hasta'] = $fecha;
+                    $periodos[$lastIndex]['dias']++;
+                } else {
+                    $periodos[] = [
+                        'tipo' => $entry->tipo,
+                        'fecha_desde' => $fecha,
+                        'fecha_hasta' => $fecha,
+                        'dias' => 1,
+                        'observaciones' => $entry->observaciones,
+                    ];
+                }
+            }
+            return [
+                'user_id' => (int) $id, 'user' => $first->user,
+                'periodos' => $periodos,
+                'personalizada' => $entries->contains(fn ($r) => $r->personalizada),
+                'tipo' => $entries->pluck('tipo')->unique()->count() === 1 ? $first->tipo : 'mixto',
+                'fecha_desde' => Carbon::parse($entries->min('fecha'))->format('Y-m-d'),
+                'fecha_hasta' => Carbon::parse($entries->max('fecha'))->format('Y-m-d'),
+                'observaciones' => $first->observaciones,
+            ];
+        })->values();
+        return [
+            'grupo_uuid' => $uuid, 'es_masiva' => true, 'alcance' => $first->alcance,
+            'tipo' => $first->tipo, 'fecha_desde' => Carbon::parse($rows->min('fecha'))->format('Y-m-d'),
+            'fecha_hasta' => Carbon::parse($rows->max('fecha'))->format('Y-m-d'),
+            'observaciones' => $first->observaciones, 'empleados' => $members,
+        ];
+    }
+
+    /** Editar solo miembros seleccionados, todos, o solo miembros sin personalizar. */
+    public function updateMasiva(Request $request, string $grupoUuid)
+    {
+        $data = $request->validate([
+            'modo' => 'required|in:seleccion,todos,originales',
+            'user_ids' => 'required_if:modo,seleccion|array',
+            'user_ids.*' => 'integer|distinct|exists:users,id',
+            'tipo' => 'required|in:vacaciones,incapacidad,festivo',
+            'fecha_desde' => 'required|date',
+            'fecha_hasta' => 'required|date|after_or_equal:fecha_desde',
+            'observaciones' => 'nullable|string|max:2000',
+        ]);
+        $desde = Carbon::parse($data['fecha_desde'])->startOfDay();
+        $hasta = Carbon::parse($data['fecha_hasta'])->startOfDay();
+        if ($desde->diffInDays($hasta) + 1 > 366) throw ValidationException::withMessages(['fecha_hasta' => 'Máximo 366 días.']);
+        $group = AsistenciaIncidencia::where('grupo_uuid', $grupoUuid)->where('es_masiva', true);
+        if (!$group->exists()) abort(404);
+        $memberIds = (clone $group)->when($data['modo'] === 'originales', fn ($q) => $q->where('personalizada', false))
+            ->pluck('user_id')->unique()->values();
+        if ($data['modo'] === 'seleccion') $memberIds = $memberIds->intersect($data['user_ids'] ?? [])->values();
+        if ($memberIds->isEmpty()) throw ValidationException::withMessages(['user_ids' => 'No hay empleados seleccionados para modificar.']);
+        $conflicts = AsistenciaIncidencia::whereIn('user_id', $memberIds)->where('grupo_uuid', '!=', $grupoUuid)
+            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->exists();
+        $attendance = Asistencia::whereIn('user_id', $memberIds)->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->exists();
+        if ($conflicts || $attendance) throw ValidationException::withMessages(['fecha_desde' => 'Hay asistencias u otras incidencias en las fechas elegidas. No se modificó ningún empleado.']);
+        DB::transaction(function () use ($group, $memberIds, $data, $desde, $hasta, $grupoUuid, $request) {
+            $before = $this->buildGroupSnapshot($grupoUuid);
+            $old = (clone $group)->whereIn('user_id', $memberIds)->get()->groupBy('user_id');
+            (clone $group)->whereIn('user_id', $memberIds)->delete();
+            $rows = []; $now = now();
+            foreach ($memberIds as $id) {
+                $initial = $old[$id]->first();
+                for ($day = $desde->copy(); $day->lte($hasta); $day->addDay()) {
+                    $rows[] = [
+                        'user_id' => $id, 'grupo_uuid' => $grupoUuid, 'es_masiva' => true,
+                        'alcance' => $initial->alcance, 'personalizada' => true,
+                        'fecha' => $day->toDateString(), 'tipo' => $data['tipo'],
+                        'observaciones' => $data['observaciones'] ?? null,
+                        'registrado_por_user_id' => $initial->registrado_por_user_id,
+                        'created_at' => $initial->created_at, 'updated_at' => $now,
+                    ];
+                    if (count($rows) >= 500) { AsistenciaIncidencia::insert($rows); $rows = []; }
+                }
+            }
+            if ($rows) AsistenciaIncidencia::insert($rows);
+            // Historial legible por empleado: registrar estado anterior y nuevo.
+            $nombres = User::whereIn('id', $memberIds)->get(['id', 'name'])->keyBy('id');
+            $detalleCambios = [];
+            foreach ($memberIds as $id) {
+                $anteriores = $old->get($id, collect());
+                $detalleCambios[] = [
+                    'user_id' => (int) $id,
+                    'empleado' => $nombres->get($id)?->name ?? ('Empleado #'.$id),
+                    'antes' => [
+                        'tipo' => $anteriores->first()?->tipo,
+                        'fecha_desde' => $anteriores->min('fecha'),
+                        'fecha_hasta' => $anteriores->max('fecha'),
+                        'observaciones' => $anteriores->first()?->observaciones,
+                    ],
+                    'despues' => [
+                        'tipo' => $data['tipo'],
+                        'fecha_desde' => $desde->toDateString(),
+                        'fecha_hasta' => $hasta->toDateString(),
+                        'observaciones' => $data['observaciones'] ?? null,
+                    ],
+                ];
+            }
+            AsistenciaIncidenciaHistory::create([
+                'grupo_uuid' => $grupoUuid, 'action' => 'updated',
+                'changes' => ['modo' => $data['modo'], 'empleados_modificados' => $memberIds->count(), 'user_ids' => $memberIds->all(), 'detalle_empleados' => $detalleCambios],
+                'snapshot' => $this->buildGroupSnapshot($grupoUuid), 'actor_user_id' => $request->user()->id,
+            ]);
+        });
+        return response()->json(['message' => 'Se actualizaron '. $memberIds->count().' empleados sin modificar los demás.']);
+    }
+
+    /** Quitar uno o más miembros de una captura masiva, manteniendo el resto. */
+    public function deleteMiembros(Request $request, string $grupoUuid)
+    {
+        $data = $request->validate(['user_ids' => 'required|array|min:1', 'user_ids.*' => 'integer|distinct|exists:users,id']);
+        $query = AsistenciaIncidencia::where('grupo_uuid', $grupoUuid)->where('es_masiva', true)->whereIn('user_id', $data['user_ids']);
+        if (!$query->exists()) abort(404);
+        DB::transaction(function () use ($query, $grupoUuid, $data, $request) {
+            $removed = (clone $query)->pluck('user_id')->unique()->values()->all();
+            $query->delete();
+            AsistenciaIncidenciaHistory::create([
+                'grupo_uuid' => $grupoUuid, 'action' => 'updated',
+                'changes' => ['empleados_retirados' => count($removed), 'user_ids' => $removed, 'nombres_empleados' => User::whereIn('id', $removed)->pluck('name')->all()],
+                'snapshot' => $this->buildGroupSnapshot($grupoUuid), 'actor_user_id' => $request->user()->id,
+            ]);
+        });
+        return response()->json(['message' => 'Empleados retirados de la incidencia masiva.']);
+    }
+
     private function getFilteredIncidenciaGroups(
         Request $request
     ) {
@@ -1887,86 +1810,27 @@ class AsistenciaIncidenciasController extends Controller
                 )
                 ->get();
     
-        return $registros
-            ->groupBy(
-                function (
-                    AsistenciaIncidencia $item
-                ) {
-                    return
-                        $item->grupo_uuid
-                        ?: 'registro-'
-                            . $item->id;
-                }
-            )
-            ->map(
-                function ($items) {
-                    $ordenados =
-                        $items
-                            ->sortBy(
-                                'fecha'
-                            )
-                            ->values();
-    
-                    $primero =
-                        $ordenados
-                            ->first();
-    
-                    $ultimo =
-                        $ordenados
-                            ->last();
-    
-                    return [
-                        'grupo_uuid' =>
-                            $primero
-                                ->grupo_uuid,
-    
-                        'user_id' =>
-                            $primero
-                                ->user_id,
-    
-                        'user' =>
-                            $primero
-                                ->user,
-    
-                        'tipo' =>
-                            $primero
-                                ->tipo,
-    
-                        'observaciones' =>
-                            $primero
-                                ->observaciones,
-    
-                        'fecha_desde' =>
-                            $primero->fecha
-                                ? Carbon::parse(
-                                    $primero
-                                        ->fecha
-                                )->format(
-                                    'Y-m-d'
-                                )
-                                : null,
-    
-                        'fecha_hasta' =>
-                            $ultimo->fecha
-                                ? Carbon::parse(
-                                    $ultimo
-                                        ->fecha
-                                )->format(
-                                    'Y-m-d'
-                                )
-                                : null,
-    
-                        'dias' =>
-                            $items
-                                ->count(),
-    
-                        'registrado_por' =>
-                            $primero
-                                ->registradoPor,
-                    ];
-                }
-            )
-            ->values();
+        return $registros->groupBy(fn ($item) => $item->grupo_uuid ?: 'registro-'.$item->id)
+            ->map(function ($items) {
+                $first = $items->sortBy('fecha')->first();
+                $last = $items->sortBy('fecha')->last();
+                $bulk = (bool) $first->es_masiva;
+                $memberCount = $items->pluck('user_id')->unique()->count();
+                return [
+                    'grupo_uuid' => $first->grupo_uuid,
+                    'user_id' => $bulk ? null : $first->user_id,
+                    'user' => $bulk ? null : $first->user,
+                    'empleados' => $memberCount,
+                    'nombre_alcance' => $bulk ? ($first->alcance === 'todos' ? 'Todos los empleados' : ($first->alcance === 'unidad' ? 'Unidad de servicio' : 'Empleados seleccionados')).' ('.$memberCount.')' : null,
+                    'es_masiva' => $bulk,
+                    'tipo' => $items->pluck('tipo')->unique()->count() === 1 ? $first->tipo : 'mixto',
+                    'observaciones' => $items->pluck('observaciones')->unique()->count() === 1 ? $first->observaciones : 'Valores diferentes por empleado',
+                    'fecha_desde' => Carbon::parse($first->fecha)->format('Y-m-d'),
+                    'fecha_hasta' => Carbon::parse($last->fecha)->format('Y-m-d'),
+                    'dias' => $bulk ? $items->pluck('fecha')->map(fn ($date) => Carbon::parse($date)->format('Y-m-d'))->unique()->count() : $items->count(),
+                    'registrado_por' => $first->registradoPor,
+                ];
+            })->values();
     }
 
     /**
@@ -2002,6 +1866,19 @@ class AsistenciaIncidenciasController extends Controller
         return [
             'grupo_uuid' =>
                 $grupoUuid,
+            'es_masiva' => (bool) $primero->es_masiva,
+            'alcance' => $primero->alcance,
+            'empleados' => $registros->pluck('user_id')->unique()->count(),
+            'personalizados' => $registros->where('personalizada', true)->pluck('user_id')->unique()->count(),
+            // Guardar la nómina en cada snapshot masivo permite recuperar
+            // los integrantes aunque posteriormente se eliminen sus filas.
+            'miembros' => (bool) $primero->es_masiva
+                ? $registros->unique('user_id')->map(fn ($r) => [
+                    'id' => (int) $r->user_id,
+                    'name' => $r->user?->name,
+                    'email' => $r->user?->email,
+                ])->values()->all()
+                : [],
     
             'empleado' => [
                 'id' =>
@@ -2036,7 +1913,7 @@ class AsistenciaIncidenciasController extends Controller
                 ),
     
             'dias' =>
-                $registros->count(),
+                $primero->es_masiva ? $registros->pluck('fecha')->map(fn ($fecha) => Carbon::parse($fecha)->toDateString())->unique()->count() : $registros->count(),
     
             'observaciones' =>
                 $primero->observaciones,

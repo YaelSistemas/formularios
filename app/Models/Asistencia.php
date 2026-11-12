@@ -109,4 +109,10 @@ class Asistencia extends Model
             'user_control_acceso_id'
         );
     }
+
+    public function entradaIncidencia()
+    {
+        return $this->hasOne(AsistenciaEntradaIncidencia::class, 'asistencia_id');
+    }
+
 }

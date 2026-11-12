@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Admin\TurnosController;
 use App\Http\Controllers\Api\KioscoAsistenciasController;
 use App\Http\Controllers\Api\Admin\AsistenciasAdminController;
 use App\Http\Controllers\Api\Admin\AsistenciaIncidenciasController;
+use App\Http\Controllers\Api\Admin\EntradasConIncidenciaController;
 use App\Http\Controllers\Api\AdminFormVersionsController;
 
 /*
@@ -285,6 +286,11 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
 
         // ---------------- INCIDENCIAS DE ASISTENCIA ----------------
 
+        Route::get('/entradas-con-incidencia', [EntradasConIncidenciaController::class, 'index'])
+            ->middleware('perm:asistencias.incidencias.entrada.revisar');
+        Route::put('/entradas-con-incidencia/{entradaIncidencia}/revision', [EntradasConIncidenciaController::class, 'revisar'])
+            ->middleware('perm:asistencias.incidencias.entrada.revisar');
+
         Route::get('/asistencia-incidencias', [AsistenciaIncidenciasController::class, 'index'])
             ->middleware('perm:asistencias.incidencias.view');
         
@@ -319,6 +325,11 @@ Route::middleware(['auth:sanctum', 'perm:admin.panel.view'])
         Route::get('/asistencia-incidencias/{grupoUuid}', [AsistenciaIncidenciasController::class, 'show'])
             ->middleware('perm:asistencias.incidencias.view');
         
+        Route::put('/asistencia-incidencias/{grupoUuid}/masiva', [AsistenciaIncidenciasController::class, 'updateMasiva'])
+            ->middleware('perm:asistencias.incidencias.edit');
+        Route::post('/asistencia-incidencias/{grupoUuid}/retirar-empleados', [AsistenciaIncidenciasController::class, 'deleteMiembros'])
+            ->middleware('perm:asistencias.incidencias.delete');
+
         Route::put('/asistencia-incidencias/{grupoUuid}', [AsistenciaIncidenciasController::class, 'update'])
             ->middleware('perm:asistencias.incidencias.edit');
         

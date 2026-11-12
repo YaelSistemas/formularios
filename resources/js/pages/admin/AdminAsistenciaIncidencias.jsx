@@ -201,6 +201,14 @@ function getHistoryFieldLabel(
     fecha_desde: "Desde",
     fecha_hasta: "Hasta",
     dias: "Días",
+    alcance: "Alcance",
+    empleados: "Empleados incluidos",
+    empleados_modificados: "Empleados modificados",
+    empleados_retirados: "Empleados retirados",
+    nombres_empleados: "Nombres de empleados retirados",
+    user_ids: "Identificadores de empleados",
+    modo: "Modalidad de edición",
+    detalle_empleados: "Cambios por empleado",
     observaciones:
       "Observaciones",
   };
@@ -223,8 +231,18 @@ function formatHistoryValue(
     return "—";
   }
 
+  if (field === "nombres_empleados" && Array.isArray(value)) {
+    return value.length ? value.join(", ") : "—";
+  }
+
   if (field === "tipo") {
     return getTipoLabel(value);
+  }
+  if (field === "modo") {
+    return { todos: "Todos los empleados", seleccion: "Sólo empleados seleccionados", originales: "Sólo empleados sin cambios previos" }[value] || String(value);
+  }
+  if (field === "alcance") {
+    return { todos: "Todos los empleados", unidad: "Unidad de servicio", seleccion: "Empleados seleccionados" }[value] || String(value);
   }
 
   if (
@@ -257,6 +275,7 @@ const EMPTY_FORM = {
   fecha_desde: "",
   fecha_hasta: "",
   observaciones: "",
+  alcance: "individual", unidad_id: "", user_ids: [],
 };
 
 const EMPTY_FILTERS = {
@@ -287,6 +306,12 @@ export default function AdminAsistenciaIncidencias() {
     tipos,
     setTipos,
   ] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [bulkDetail, setBulkDetail] = useState(null);
+  const [bulkSelected, setBulkSelected] = useState([]);
+  const [bulkMode, setBulkMode] = useState("seleccion");
+  const [bulkSearch, setBulkSearch] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const [
     loading,
@@ -297,6 +322,8 @@ export default function AdminAsistenciaIncidencias() {
     saving,
     setSaving,
   ] = useState(false);
+
+  const [exportFormat, setExportFormat] = useState("detalle");
 
   const [
     exportLoading,
@@ -527,10 +554,9 @@ export default function AdminAsistenciaIncidencias() {
     setError("");
   
     try {
-      const query =
-        buildQuery(
-          appliedFilters
-        );
+      const params = new URLSearchParams(buildQuery(appliedFilters));
+      params.set("formato", exportFormat);
+      const query = params.toString();
   
       const endpoint =
         isExcel
@@ -685,13 +711,8 @@ export default function AdminAsistenciaIncidencias() {
           : []
       );
 
-      setTipos(
-        Array.isArray(
-          data?.tipos
-        )
-          ? data.tipos
-          : []
-      );
+      setTipos(Array.isArray(data?.tipos) ? data.tipos : []);
+      setUnidades(Array.isArray(data?.unidades) ? data.unidades : []);
     } catch (err) {
       setError(
         err?.message ||
@@ -735,9 +756,10 @@ export default function AdminAsistenciaIncidencias() {
       return;
     }
 
-    setEditingGrupoUuid(
-      null
-    );
+    setEditingGrupoUuid(null);
+    setBulkDetail(null);
+    setBulkSelected([]);
+    setBulkMode("seleccion");
 
     setForm({
       ...EMPTY_FORM,
@@ -770,15 +792,16 @@ export default function AdminAsistenciaIncidencias() {
           `/admin/asistencia-incidencias/${row.grupo_uuid}`
         );
 
-      setEditingGrupoUuid(
-        row.grupo_uuid
-      );
+      setEditingGrupoUuid(row.grupo_uuid);
+      setBulkDetail(data?.es_masiva ? data : null);
+      setBulkSelected([]);
+      setBulkMode("seleccion");
 
       setForm({
-        user_id:
-          String(
-            data?.user_id || ""
-          ),
+        user_id: String(data?.user_id || ""),
+        alcance: data?.es_masiva ? (data?.alcance || "todos") : "individual",
+        unidad_id: "",
+        user_ids: [],
 
         tipo:
           data?.tipo || "",
@@ -811,6 +834,8 @@ export default function AdminAsistenciaIncidencias() {
     }
 
     setModalOpen(false);
+    setBulkDetail(null);
+    setBulkSelected([]);
     setEditingGrupoUuid(
       null
     );
@@ -843,10 +868,20 @@ export default function AdminAsistenciaIncidencias() {
       return;
     }
 
-    if (!form.user_id) {
-      setModalError(
-        "Selecciona un empleado."
-      );
+    if (!editingGrupoUuid && form.alcance === "individual" && !form.user_id) {
+      setModalError("Selecciona un empleado.");
+      return;
+    }
+    if (!editingGrupoUuid && form.alcance === "unidad" && !form.unidad_id) {
+      setModalError("Selecciona una unidad de servicio.");
+      return;
+    }
+    if (!editingGrupoUuid && form.alcance === "seleccion" && !form.user_ids.length) {
+      setModalError("Selecciona al menos un empleado.");
+      return;
+    }
+    if (bulkDetail && bulkMode === "seleccion" && !bulkSelected.length) {
+      setModalError("Selecciona los empleados que deseas modificar.");
       return;
     }
 
@@ -882,8 +917,12 @@ export default function AdminAsistenciaIncidencias() {
     }
 
     const payload = {
-      user_id:
-        Number(form.user_id),
+      ...(bulkDetail ? {modo: bulkMode, user_ids: bulkSelected} :
+         form.alcance === "individual" ? {user_id: Number(form.user_id)} : {
+           alcance: form.alcance,
+           unidad_id: form.unidad_id ? Number(form.unidad_id) : null,
+           user_ids: form.user_ids.map(Number),
+         }),
 
       tipo:
         form.tipo,
@@ -899,6 +938,15 @@ export default function AdminAsistenciaIncidencias() {
           ? form.observaciones.trim()
           : null,
     };
+
+    if (bulkDetail) {
+      const affected = bulkMode === "seleccion" ? bulkSelected.length :
+        bulkMode === "originales" ? bulkDetail.empleados.filter(e => !e.personalizada).length : bulkDetail.empleados.length;
+      if (!affected) { setModalError("No hay empleados que cumplan la selección."); return; }
+      if (!window.confirm(`Vas a modificar ${affected} empleado(s). ¿Deseas continuar?`)) return;
+    } else if (!editingGrupoUuid && form.alcance !== "individual") {
+      if (!window.confirm("La incidencia se registrará para todos los empleados activos dentro del alcance elegido. ¿Deseas continuar?")) return;
+    }
 
     const isEditing =
       Boolean(
@@ -918,7 +966,7 @@ export default function AdminAsistenciaIncidencias() {
       ) {
         data =
           await apiPut(
-            `/admin/asistencia-incidencias/${editingGrupoUuid}`,
+            `/admin/asistencia-incidencias/${editingGrupoUuid}${bulkDetail ? "/masiva" : ""}`,
             payload
           );
       } else {
@@ -942,9 +990,9 @@ export default function AdminAsistenciaIncidencias() {
       );
 
       setModalOpen(false);
-      setEditingGrupoUuid(
-        null
-      );
+      setEditingGrupoUuid(null);
+      setBulkDetail(null);
+      setBulkSelected([]);
 
       setForm({
         ...EMPTY_FORM,
@@ -963,6 +1011,92 @@ export default function AdminAsistenciaIncidencias() {
     }
   }
 
+  async function viewBulk(row) {
+    setBulkLoading(true);
+    setError("");
+    try {
+      const data = await apiGet(`/admin/asistencia-incidencias/${row.grupo_uuid}`);
+      setBulkDetail(data);
+      setBulkSelected([]);
+      setBulkSearch("");
+    } catch (err) {
+      setError(err?.message || "No se pudieron cargar los empleados.");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  async function removeBulkSelected() {
+    if (!bulkDetail || !bulkSelected.length || !canDelete) return;
+    if (!window.confirm(`¿Retirar la incidencia únicamente a ${bulkSelected.length} empleados seleccionados?`)) return;
+    setBulkLoading(true);
+    try {
+      const resp = await apiPost(`/admin/asistencia-incidencias/${bulkDetail.grupo_uuid}/retirar-empleados`, {user_ids: bulkSelected});
+      setBulkDetail(null);
+      setBulkSelected([]);
+      showSuccessMessage(resp?.message || "Empleados retirados.", "delete");
+      await load(appliedFilters);
+    } catch (err) {
+      setError(err?.message || "No fue posible retirar empleados.");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  function toggleBulkMember(id) {
+    setBulkSelected(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]);
+  }
+
+  function bulkMemberPicker() {
+    if (!bulkDetail) return null;
+    const members = bulkDetail.empleados || [];
+    const visible = members.filter(member => `${member.user?.name || ""} ${member.user?.email || ""}`.toLowerCase().includes(bulkSearch.toLowerCase()));
+    return (
+      <div style={{...S.field, gridColumn: "1 / -1", marginTop: 8}}>
+        <label style={S.label}>Empleados incluidos ({members.length})</label>
+        <input style={S.input} placeholder="Buscar nombre o correo..." value={bulkSearch} onChange={e => setBulkSearch(e.target.value)} />
+        <div style={{maxHeight: 330, overflowY: "auto", border: "1px solid #cbd5e1", borderRadius: 9, padding: 8, marginTop: 6}}>
+          {visible.length === 0 ? <p style={{...S.muted, padding: 10}}>No hay empleados que coincidan con la búsqueda.</p> : null}
+          {visible.map(member => {
+            const periodos = member.periodos?.length ? member.periodos : [{
+              tipo: member.tipo,
+              fecha_desde: member.fecha_desde,
+              fecha_hasta: member.fecha_hasta,
+              observaciones: member.observaciones,
+            }];
+            return (
+              <div key={member.user_id} style={{border: "1px solid #e2e8f0", borderRadius: 9, padding: "10px 12px", marginBottom: 8, background: bulkSelected.includes(member.user_id) ? "#f8faff" : "#fff"}}>
+                <label style={{display: "flex", alignItems: "flex-start", gap: 9, cursor: "pointer", fontSize: 13}}>
+                  <input type="checkbox" style={{marginTop: 3}} checked={bulkSelected.includes(member.user_id)} onChange={() => toggleBulkMember(member.user_id)} />
+                  <span style={{flex: 1, minWidth: 0}}>
+                    <strong style={{display: "block", overflowWrap: "anywhere"}}>{member.user?.name || `Empleado ${member.user_id}`}</strong>
+                    <small style={{color: "#64748b", overflowWrap: "anywhere"}}>{member.user?.email}</small>
+                  </span>
+                  <span style={{fontSize: 11, fontWeight: 700, color: member.personalizada ? "#9a3412" : "#166534", whiteSpace: "nowrap"}}>{member.personalizada ? "Modificado" : "Original"}</span>
+                </label>
+                <div style={{marginLeft: 24, marginTop: 9, display: "grid", gap: 6}}>
+                  {periodos.map((periodo, i) => (
+                    <div key={`${member.user_id}-${i}`} style={{display: "grid", gridTemplateColumns: "minmax(95px, 1fr) repeat(2, minmax(90px, 1fr))", gap: 8, padding: "8px 10px", background: "#f8fafc", borderRadius: 7, fontSize: 12}}>
+                      <div><span style={{display: "block", color: "#64748b", fontSize: 10, fontWeight: 700}}>Tipo</span><strong>{getTipoLabel(periodo.tipo)}</strong></div>
+                      <div><span style={{display: "block", color: "#64748b", fontSize: 10, fontWeight: 700}}>Desde</span><strong>{formatDate(periodo.fecha_desde)}</strong></div>
+                      <div><span style={{display: "block", color: "#64748b", fontSize: 10, fontWeight: 700}}>Hasta</span><strong>{formatDate(periodo.fecha_hasta)}</strong></div>
+                    </div>
+                  ))}
+                  {periodos.length > 1 ? <small style={{color: "#64748b"}}>{periodos.length} periodos distintos para este empleado</small> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8}}>
+          <button type="button" style={S.buttonNeutral} onClick={() => setBulkSelected(members.map(m => m.user_id))}>Seleccionar todos</button>
+          <button type="button" style={S.buttonNeutral} onClick={() => setBulkSelected([])}>Quitar selección</button>
+          <span style={{alignSelf: "center", fontSize: 12}}>{bulkSelected.length} seleccionados</span>
+        </div>
+      </div>
+    );
+  }
+
   async function deleteIncidencia(
     row
   ) {
@@ -973,9 +1107,9 @@ export default function AdminAsistenciaIncidencias() {
       return;
     }
 
-    const employee =
-      row?.user?.name ||
-      "el empleado";
+    const employee = row?.es_masiva
+      ? `TODOS los ${row.empleados} empleados de esta incidencia masiva`
+      : row?.user?.name || "el empleado";
 
     const ok =
       window.confirm(
@@ -1254,6 +1388,12 @@ export default function AdminAsistenciaIncidencias() {
   
       empleado:
         row.empleado,
+      es_masiva: !!row.es_masiva,
+      empleados: row.empleados_originales ?? row.empleados_actuales,
+      empleados_originales: row.empleados_originales,
+      empleados_actuales: row.empleados_actuales,
+      miembros_originales: row.miembros_originales || [],
+      miembros_actuales: row.miembros_actuales || [],
   
       tipo:
         row.tipo,
@@ -1844,6 +1984,20 @@ export default function AdminAsistenciaIncidencias() {
               flexWrap: "wrap",
             }}
           >
+            <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 700 }}>
+              Formato
+              <select
+                aria-label="Formato de exportación"
+                value={exportFormat}
+                onChange={(event) => setExportFormat(event.target.value)}
+                disabled={!!exportLoading}
+                style={{ ...S.input, width: "auto", minWidth: 175, padding: "9px 10px" }}
+              >
+                <option value="resumen">Resumen agrupado</option>
+                <option value="detalle">Detalle por empleado</option>
+              </select>
+            </label>
+
             <button
               type="button"
               onClick={() =>
@@ -2071,11 +2225,11 @@ export default function AdminAsistenciaIncidencias() {
                         <td
                           style={S.td}
                         >
-                          <b>
-                            {row.user
-                              ?.name ||
-                              "—"}
-                          </b>
+                          <b>{row.es_masiva
+                            ? (row.alcance === "todos" ? "Todos los empleados" : row.alcance === "unidad" ? "Unidad de servicio" : "Empleados seleccionados")
+                            : (row.user?.name || "—")}</b>
+                          {row.es_masiva ? <div style={{fontSize: 11, color: "#64748b"}}>{row.empleados} empleados · {row.personalizados} modificados</div> : null}
+                          {row.es_masiva ? <button type="button" onClick={() => viewBulk(row)} style={{...S.buttonNeutral, marginTop: 6, fontSize: 11}}>Ver empleados</button> : null}
 
                           {row.user
                             ?.email ? (
@@ -2355,6 +2509,50 @@ export default function AdminAsistenciaIncidencias() {
                   marginTop: 20,
                 }}
               >
+                {!editingGrupoUuid ? (
+                  <div style={{...S.field, gridColumn: "1 / -1"}}>
+                    <label style={S.label}>Aplicar incidencia a *</label>
+                    <select style={S.input} value={form.alcance} onChange={e => setField("alcance", e.target.value)} disabled={saving}>
+                      <option value="individual">Un empleado</option>
+                      <option value="todos">Todos los empleados activos</option>
+                      <option value="unidad">Empleados activos de una unidad</option>
+                      <option value="seleccion">Empleados específicos</option>
+                    </select>
+                  </div>
+                ) : null}
+                {bulkDetail ? (
+                  <div style={{...S.field, gridColumn: "1 / -1"}}>
+                    <label style={S.label}>Modificar *</label>
+                    <select style={S.input} value={bulkMode} onChange={e => setBulkMode(e.target.value)}>
+                      <option value="seleccion">Sólo empleados seleccionados</option>
+                      <option value="originales">Sólo empleados que no han sido modificados</option>
+                      <option value="todos">Todos los empleados del grupo</option>
+                    </select>
+                    <p style={{fontSize: 12, color: "#64748b"}}>Los cambios en empleados seleccionados no alteran al resto.</p>
+                  </div>
+                ) : null}
+                {bulkDetail ? bulkMemberPicker() : null}
+                {(!editingGrupoUuid && form.alcance === "unidad") ? (
+                  <div style={{...S.field, gridColumn: "1 / -1"}}>
+                    <label style={S.label}>Unidad de servicio *</label>
+                    <select style={S.input} value={form.unidad_id} onChange={e => setField("unidad_id", e.target.value)}>
+                      <option value="">Selecciona una unidad</option>
+                      {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                    </select>
+                  </div>
+                ) : null}
+                {(!editingGrupoUuid && form.alcance === "seleccion") ? (
+                  <div style={{...S.field, gridColumn: "1 / -1"}}>
+                    <label style={S.label}>Empleados específicos ({form.user_ids.length} seleccionados) *</label>
+                    <div style={{maxHeight: 175, overflowY: "auto", border: "1px solid #cbd5e1", borderRadius: 9, padding: 8}}>
+                      {usuarios.map(u => <label key={u.id} style={{display: "flex", gap: 7, padding: 4, fontSize: 13}}>
+                        <input type="checkbox" checked={form.user_ids.includes(String(u.id))} onChange={e => setField("user_ids", e.target.checked ? [...form.user_ids, String(u.id)] : form.user_ids.filter(n => n !== String(u.id)))} />
+                        {u.name} {u.email ? ` - ${u.email}` : ""}
+                      </label>)}
+                    </div>
+                  </div>
+                ) : null}
+                {(!editingGrupoUuid ? form.alcance === "individual" : !bulkDetail) ? (
                 <div
                   style={{
                     ...S.field,
@@ -2412,6 +2610,8 @@ export default function AdminAsistenciaIncidencias() {
                     )}
                   </select>
                 </div>
+
+                ) : null}
 
                 <div
                   style={{
@@ -2644,6 +2844,22 @@ export default function AdminAsistenciaIncidencias() {
         </div>
       ) : null}
 
+      {bulkDetail && !modalOpen ? (
+        <div style={S.modalBackdrop}>
+          <div style={{...S.modal, maxWidth: 760}}>
+            <div style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+              <div><strong>Detalle de incidencia masiva</strong><div style={S.muted}>{bulkDetail.empleados?.length || 0} empleados incluidos · {formatDate(bulkDetail.fecha_desde)} al {formatDate(bulkDetail.fecha_hasta)}</div></div>
+              <button style={S.buttonNeutral} onClick={() => {setBulkDetail(null);setBulkSelected([]);}}>Cerrar</button>
+            </div>
+            <div style={{marginTop: 15}}>{bulkMemberPicker()}</div>
+            <div style={{display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14, flexWrap: "wrap"}}>
+              {canDelete ? <button type="button" style={{...S.buttonDelete, width: "auto", height: "auto", minHeight: 42, padding: "9px 14px", fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0, opacity: (!bulkSelected.length || bulkLoading) ? 0.55 : 1}} disabled={!bulkSelected.length || bulkLoading} onClick={removeBulkSelected}>Retirar seleccionados</button> : null}
+              {canEdit ? <button type="button" style={S.buttonPrimary} onClick={() => {const row = {grupo_uuid: bulkDetail.grupo_uuid};setBulkDetail(null);openEdit(row);}}>Editar empleados</button> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {generalHistoryOpen ? (
         <div
           style={
@@ -2798,7 +3014,7 @@ export default function AdminAsistenciaIncidencias() {
                   <thead>
                     <tr>
                       <th style={S.th}>
-                        Empleado
+                        Empleado / Alcance
                       </th>
       
                       <th style={S.th}>
@@ -2845,13 +3061,18 @@ export default function AdminAsistenciaIncidencias() {
                               style={S.td}
                             >
                               <b>
-                                {row
-                                  ?.empleado
-                                  ?.name ||
-                                  "—"}
+                                {row.es_masiva
+                                  ? (row.alcance === "unidad" ? "Incidencia por unidad" : row.alcance === "seleccion" ? "Grupo de empleados" : "Todos los empleados")
+                                  : (row?.empleado?.name || "—")}
                               </b>
+                              {row.es_masiva && (
+                                <div style={{marginTop: 4, fontSize: 11, color: "#64748b"}}>
+                                  {row.empleados_originales ?? "—"} empleados originalmente
+                                  {row.deleted ? " · Grupo eliminado" : ` · ${row.empleados_actuales ?? "—"} incluidos actualmente`}
+                                </div>
+                              )}
       
-                              {row
+                              {!row.es_masiva && row
                                 ?.empleado
                                 ?.email ? (
                                 <div
@@ -3214,15 +3435,14 @@ export default function AdminAsistenciaIncidencias() {
                 <div
                   style={S.muted}
                 >
-                  {historyItem
-                    ?.empleado
-                    ?.name ||
-                    "Empleado"}
-      
-                  {historyItem
-                    ?.empleado
-                    ?.email
+                  {historyItem?.es_masiva
+                    ? `Incidencia masiva`
+                    : (historyItem?.empleado?.name || "Empleado")}
+                  {!historyItem?.es_masiva && historyItem?.empleado?.email
                     ? ` · ${historyItem.empleado.email}`
+                    : ""}
+                  {historyItem?.es_masiva && historyItem.empleados_originales != null
+                    ? ` · ${historyItem.empleados_originales} originalmente`
                     : ""}
                 </div>
               </div>
@@ -3374,6 +3594,32 @@ export default function AdminAsistenciaIncidencias() {
               </div>
             ) : null}
       
+            {historyItem?.es_masiva && (
+              <div style={{marginTop: 13, padding: 12, border: "1px solid #dbeafe", background: "#eff6ff", borderRadius: 10}}>
+                <div style={{fontWeight: 900, fontSize: 13, color: "#1e3a8a"}}>Empleados del grupo</div>
+                <div style={{fontSize: 12, color: "#475569", marginTop: 5}}>
+                  {historyItem.empleados_originales ?? "—"} originalmente
+                  {historyItem.empleados_actuales !== undefined && historyItem.empleados_actuales !== null
+                    ? ` · ${historyItem.empleados_actuales} actualmente`
+                    : ""}
+                </div>
+                {Array.isArray(historyItem.miembros_originales) && historyItem.miembros_originales.length > 0 ? (
+                  <div style={{marginTop: 8, maxHeight: 170, overflowY: "auto", background: "white", borderRadius: 7, padding: 8}}>
+                    {historyItem.miembros_originales.map((miembro, i) => (
+                      <div key={miembro.id ?? i} style={{padding: "5px 2px", borderBottom: i === historyItem.miembros_originales.length - 1 ? "none" : "1px solid #f1f5f9", fontSize: 12}}>
+                        <b>{miembro.name || `Empleado #${miembro.id}`}</b>
+                        {miembro.email ? <span style={{color: "#64748b"}}> · {miembro.email}</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{marginTop: 8, fontSize: 12, color: "#64748b"}}>
+                    Este grupo se registró antes de almacenar la lista completa de integrantes en el historial. Se conservan los movimientos y cantidades disponibles.
+                  </div>
+                )}
+              </div>
+            )}
+
             {historyError ? (
               <div
                 style={{
@@ -3433,11 +3679,10 @@ export default function AdminAsistenciaIncidencias() {
               >
                 {historyItems.map(
                   (item) => {
-                    const changes =
-                      Object.entries(
-                        item?.changes ||
-                          {}
-                      );
+                    const detalles = Array.isArray(item?.changes?.detalle_empleados)
+                      ? item.changes.detalle_empleados : [];
+                    const changes = Object.entries(item?.changes || {})
+                      .filter(([field]) => field !== "detalle_empleados" && field !== "user_ids");
       
                     return (
                       <div
@@ -3506,6 +3751,21 @@ export default function AdminAsistenciaIncidencias() {
                           </b>
                         </div>
       
+                        {detalles.length > 0 && (
+                          <div style={{ marginTop: 12, padding: 11, background: "#eef6ff", border: "1px solid #bfdbfe", borderRadius: 9 }}>
+                            <div style={{ fontWeight: 800, marginBottom: 8 }}>Detalle por empleado ({detalles.length})</div>
+                            {detalles.map((detalle, indice) => (
+                              <div key={`${detalle.user_id}-${indice}`} style={{ padding: "9px 0", borderTop: indice ? "1px solid #cbd5e1" : "none", fontSize: 12 }}>
+                                <b>{detalle.empleado}</b>
+                                <div>Antes: {getTipoLabel(detalle.antes?.tipo)} · {formatDate(detalle.antes?.fecha_desde)} al {formatDate(detalle.antes?.fecha_hasta)}</div>
+                                <div>Después: {getTipoLabel(detalle.despues?.tipo)} · {formatDate(detalle.despues?.fecha_desde)} al {formatDate(detalle.despues?.fecha_hasta)}</div>
+                                {detalle.antes?.observaciones !== detalle.despues?.observaciones && (
+                                  <div>Observaciones: {detalle.antes?.observaciones || "—"} → {detalle.despues?.observaciones || "—"}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {changes.length >
                         0 ? (
                           <div
@@ -3554,6 +3814,7 @@ export default function AdminAsistenciaIncidencias() {
                                     )}
                                   </div>
       
+                                  {values && typeof values === "object" && !Array.isArray(values) && ("before" in values || "after" in values) ? <>
                                   <div
                                     style={{
                                       marginTop:
@@ -3589,6 +3850,7 @@ export default function AdminAsistenciaIncidencias() {
                                         ?.after
                                     )}
                                   </div>
+                                  </> : <div style={{ marginTop: 6, fontSize: 12 }}>{formatHistoryValue(field, values)}</div>}
                                 </div>
                               )
                             )}

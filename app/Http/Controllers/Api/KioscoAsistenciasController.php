@@ -8,9 +8,11 @@ use App\Models\AsistenciaHistory;
 use App\Models\User;
 use App\Models\UserControlAcceso;
 use App\Models\AsistenciaIncidencia;
+use App\Models\AsistenciaEntradaIncidencia;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -183,6 +185,10 @@ class KioscoAsistenciasController extends Controller
                             )
                             : null,
                     
+                    'dia_no_laborable_hoy' => $config->turno
+                        ? $this->getEstadoDia(now(self::TIMEZONE), $config->turno) === 'fuera_dia_laborable'
+                        : false,
+
                     'incidencia_hoy' =>
                         $incidenciaHoy
                             ? [
@@ -578,6 +584,7 @@ class KioscoAsistenciasController extends Controller
                 'between:-180,180',
             ],
         
+            'motivo_entrada_incidencia' => ['nullable', 'string', 'min:10', 'max:2000'],
             'entrada_precision_metros' => [
                 'required',
                 'numeric',
@@ -640,29 +647,6 @@ class KioscoAsistenciasController extends Controller
                 )
                 ->first();
         
-        if ($incidenciaHoy) {
-            $tipoLabel =
-                match (
-                    $incidenciaHoy->tipo
-                ) {
-                    'vacaciones' =>
-                        'Vacaciones',
-        
-                    'incapacidad' =>
-                        'Incapacidad',
-        
-                    'festivo' =>
-                        'Día festivo',
-        
-                    default =>
-                        'Incidencia',
-                };
-        
-            return response()->json([
-                'message' =>
-                    "{$user->name} tiene registrada la incidencia {$tipoLabel} para el día de hoy. No puede registrar entrada.",
-            ], 409);
-        }
 
         /*
          * No permitir más de una entrada
@@ -761,6 +745,13 @@ class KioscoAsistenciasController extends Controller
                 $turno
             );
 
+        $requiereRevision = $incidenciaHoy || $estadoDia === 'fuera_dia_laborable';
+        if ($requiereRevision && mb_strlen(trim($data['motivo_entrada_incidencia'] ?? '')) < 10) {
+            throw ValidationException::withMessages([
+                'motivo_entrada_incidencia' => 'Explica por qué el empleado trabajará de manera extraordinaria (mínimo 10 caracteres).',
+            ]);
+        }
+
         $firmaEntradaPath =
             $this->guardarFirmaEntrada(
                 $data['firma_entrada']
@@ -771,6 +762,8 @@ class KioscoAsistenciasController extends Controller
                 $data['foto_entrada']
             );
 
+        DB::beginTransaction();
+        try {
         $asistencia = Asistencia::create([
             'user_id' =>
                 $user->id,
@@ -914,8 +907,22 @@ class KioscoAsistenciasController extends Controller
                 null,
         ]);
 
-        $asistencia =
-            $asistencia->fresh();
+        if ($requiereRevision) {
+            AsistenciaEntradaIncidencia::create([
+                'asistencia_id' => $asistencia->id,
+                'user_id' => $user->id,
+                'fecha' => $fechaActual,
+                'tipo_excepcion' => $incidenciaHoy
+                    ? ($estadoDia === 'fuera_dia_laborable' ? 'ambas' : 'incidencia')
+                    : 'dia_no_laborable',
+                'incidencia_id' => $incidenciaHoy?->id,
+                'incidencia_tipo' => $incidenciaHoy?->tipo,
+                'incidencia_observaciones' => $incidenciaHoy?->observaciones,
+                'motivo' => trim($data['motivo_entrada_incidencia']),
+                'estado' => 'pendiente',
+            ]);
+        }
+        $asistencia = $asistencia->fresh('entradaIncidencia');
         
         /*
          * Registrar creación en el historial
@@ -945,9 +952,15 @@ class KioscoAsistenciasController extends Controller
                 ),
         ]);
 
+        DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
         return response()->json([
             'message' =>
-                "Entrada registrada correctamente para {$user->name}.",
+                ($requiereRevision ? "Entrada extraordinaria registrada para {$user->name}. Pendiente de revisión." : "Entrada registrada correctamente para {$user->name}."),
 
             'asistencia' =>
                 $this->formatAsistencia(

@@ -47,6 +47,7 @@ import AdminForms from "./pages/admin/AdminForms";
 import AdminControlAcceso from "./pages/admin/AdminControlAcceso";
 import AdminAsistencias from "./pages/admin/AdminAsistencias";
 import AdminAsistenciaIncidencias from "./pages/admin/AdminAsistenciaIncidencias";
+import AdminEntradasConIncidencia from "./pages/admin/AdminEntradasConIncidencia";
 
 // PWA SW register (vite-plugin-pwa)
 import { registerSW } from "virtual:pwa-register";
@@ -510,6 +511,10 @@ function AdminIndexRedirect() {
       path: "/admin/asistencia-incidencias",
       permission:
         "asistencias.incidencias.view",
+    },
+    {
+      path: "/admin/entradas-con-incidencia",
+      permission: "asistencias.incidencias.entrada.revisar",
     },
   ];
 
@@ -1386,6 +1391,15 @@ function App() {
                 permission="asistencias.view"
               >
                 <AdminAsistencias />
+              </RequireModulePermission>
+            }
+          />
+
+          <Route
+            path="entradas-con-incidencia"
+            element={
+              <RequireModulePermission permission="asistencias.incidencias.entrada.revisar">
+                <AdminEntradasConIncidencia />
               </RequireModulePermission>
             }
           />

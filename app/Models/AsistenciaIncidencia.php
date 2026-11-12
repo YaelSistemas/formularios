@@ -13,6 +13,9 @@ class AsistenciaIncidencia extends Model
     protected $fillable = [
         'user_id',
         'grupo_uuid',
+        'es_masiva',
+        'alcance',
+        'personalizada',
         'fecha',
         'tipo',
         'observaciones',
@@ -21,6 +24,8 @@ class AsistenciaIncidencia extends Model
 
     protected $casts = [
         'fecha' => 'date',
+        'es_masiva' => 'boolean',
+        'personalizada' => 'boolean',
     ];
 
     /**

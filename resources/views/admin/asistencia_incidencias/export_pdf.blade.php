@@ -75,11 +75,11 @@
         }
 
         .col-employee {
-            width: 17%;
+            width: 16%;
         }
 
         .col-email {
-            width: 18%;
+            width: 16%;
         }
 
         .col-type {
@@ -95,18 +95,18 @@
         }
 
         .col-observations {
-            width: 20%;
+            width: 17%;
         }
 
         .col-created-by {
-            width: 12%;
+            width: 11%;
         }
     </style>
 </head>
 
 <body>
     <h1 class="title">
-        REPORTE DE INCIDENCIAS DE ASISTENCIA
+        REPORTE DE INCIDENCIAS DE ASISTENCIA — {{ strtoupper($formato ?? "resumen") }}
     </h1>
 
     <div class="generated">
@@ -139,6 +139,10 @@
                 <th class="col-days">
                     Días
                 </th>
+
+                @if (($formato ?? 'resumen') === 'resumen')
+                    <th style="width: 6%;">Empleados</th>
+                @endif
 
                 <th class="col-observations">
                     Observaciones
@@ -177,6 +181,10 @@
                         {{ $row['dias'] }}
                     </td>
 
+                    @if (($formato ?? 'resumen') === 'resumen')
+                        <td>{{ $row['empleados'] }}</td>
+                    @endif
+
                     <td class="left">
                         {{ $row['observaciones'] ?: '—' }}
                     </td>
@@ -188,7 +196,7 @@
             @empty
                 <tr>
                     <td
-                        colspan="8"
+                        colspan="{{ ($formato ?? 'resumen') === 'resumen' ? 9 : 8 }}"
                         class="empty"
                     >
                         No hay incidencias para mostrar.
