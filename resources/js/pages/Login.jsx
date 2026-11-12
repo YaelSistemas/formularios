@@ -18,6 +18,7 @@ export default function Login() {
 
   const [showUserHelp, setShowUserHelp] = useState(false);
   const [showPasswordHelp, setShowPasswordHelp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const normalizePermissions = (user) => {
     if (!user) return [];
@@ -505,6 +506,28 @@ export default function Login() {
       outline: "none",
     },
 
+    passwordContainer: {
+      position: "relative",
+      width: "100%",
+    },
+
+    passwordToggle: {
+      position: "absolute",
+      top: "50%",
+      right: 10,
+      transform: "translateY(-50%)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: 30,
+      height: 30,
+      padding: 0,
+      border: "none",
+      background: "transparent",
+      color: "#64748b",
+      cursor: "pointer",
+    },
+
     button: {
       width: "100%",
       minHeight: 46,
@@ -617,16 +640,18 @@ export default function Login() {
               <br />
               <strong>Siglas disponibles:</strong>
               <br />
-              VSI - Vysisa
               <br />
-              TTI - Tip Top
+              VSI - VYSISA = VSI001234
               <br />
-              VSU - Vysureste
+              TTI - TIP TOP = TTI001234
               <br />
-              RPS - Reprosisa
+              VSU - VYSISA DEL SURESTE = VSU001234
               <br />
+              VSP - PEÑASQUITO = VSP001234
               <br />
-              <strong>Ejemplo:</strong> VSI09999 o TTI09999
+              INM - INMITEC = INM001234
+              <br />
+              RPS - REPROSISA = RPS01234
             </div>
           ) : null}
           
@@ -677,25 +702,80 @@ export default function Login() {
           
           {showPasswordHelp ? (
             <div style={styles.helpText}>
-              Ingresa tu CURP.
+              Ingresa tu CURP tal como fue registrada.
+              <br />
+              <br />
+              <strong>Importante:</strong> Escríbela en MAYÚSCULAS así se registró tu contraseña. El sistema distingue mayúsculas de minúsculas.
+              <br />
               <br />
               <strong>Ejemplo:</strong> ABCD010101HDFXXX01
             </div>
           ) : null}
           
-          <input
-            id="login-password"
-            name="password"
-            type="password"
-            value={password}
-            onChange={(event) =>
-              setPassword(event.target.value)
-            }
-            autoComplete="current-password"
-            placeholder="Ingresa tu contraseña: ABCD010101HDFXXX01"
-            required
-            style={styles.input}
-          />
+          <div style={styles.passwordContainer}>
+            <input
+              id="login-password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(event) =>
+                setPassword(event.target.value)
+              }
+              autoComplete="current-password"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="Ingresa tu contraseña: ABCD010101HDFXXX01"
+              required
+              style={{
+                ...styles.input,
+                paddingRight: 48,
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={showPassword}
+              title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              style={styles.passwordToggle}
+            >
+              {showPassword ? (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M10.58 10.59a2 2 0 0 0 2.83 2.83" />
+                  <path d="M9.88 5.09A10.94 10.94 0 0 1 12 4.9c7 0 10 7.1 10 7.1a13.34 13.34 0 0 1-4.07 4.64" />
+                  <path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7.1 10 7.1a10.7 10.7 0 0 0 5.12-1.27" />
+                  <path d="M2 2l20 20" />
+                </svg>
+              ) : (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
 
         <button
