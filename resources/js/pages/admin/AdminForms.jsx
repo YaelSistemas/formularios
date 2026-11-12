@@ -619,45 +619,117 @@ export default function AdminForms() {
       setUnpublishingFormId(null);
     }
   };
-
+  
   const openAssignmentsModal = async (f) => {
     if (!canAssignForms) {
       setErr("No tienes permiso para asignar formularios.");
       return;
     }
-
+  
     setErr("");
     setAssignmentForm(f);
     setOpenAssignments(true);
     setAssignmentSearch("");
     setSelectedUserIds([]);
     setUsers([]);
-
+  
+    setLoadingUsers(true);
+    setLoadingAssignments(true);
+  
     try {
-      setLoadingUsers(true);
-      setLoadingAssignments(true);
-
-      const [usersResp, assignmentsResp] = await Promise.all([
-        apiGet("/admin/users?per_page=1000&page=1&q="),
+      // Cargar la primera página y las asignaciones actuales.
+      const [firstPage, assignmentsResp] = await Promise.all([
+        apiGet("/admin/users?per_page=100&page=1&q="),
         apiGet(`/admin/forms/${f.id}/assignments`),
       ]);
-
-      const usersList = Array.isArray(usersResp)
-        ? usersResp
-        : Array.isArray(usersResp?.users)
-        ? usersResp.users
-        : Array.isArray(usersResp?.data)
-        ? usersResp.data
-        : [];
-
-      const assignedIds = Array.isArray(assignmentsResp?.user_ids)
-        ? assignmentsResp.user_ids.map((id) => Number(id))
-        : [];
-
-      setUsers(usersList);
+  
+      // Laravel devuelve los usuarios dentro de "data".
+      if (!Array.isArray(firstPage?.data)) {
+        throw new Error(
+          "La respuesta de usuarios no tiene el formato esperado."
+        );
+      }
+  
+      const totalPages = Number(firstPage.last_page);
+  
+      if (!Number.isSafeInteger(totalPages) || totalPages < 1) {
+        throw new Error(
+          "No se pudo determinar el total de páginas de usuarios."
+        );
+      }
+  
+      // Preparar las consultas de las páginas restantes.
+      const requests = [];
+  
+      for (let page = 2; page <= totalPages; page++) {
+        requests.push(
+          apiGet(`/admin/users?per_page=100&page=${page}&q=`)
+        );
+      }
+  
+      // Descargar todas las páginas restantes.
+      const remainingPages = await Promise.all(requests);
+  
+      // Reunir los usuarios de todas las páginas.
+      const allUsers = [...firstPage.data];
+  
+      remainingPages.forEach((response) => {
+        if (!Array.isArray(response?.data)) {
+          throw new Error(
+            "No se pudo cargar una de las páginas de usuarios."
+          );
+        }
+  
+        allUsers.push(...response.data);
+      });
+  
+      // Evitar usuarios duplicados.
+      const uniqueUsers = Array.from(
+        new Map(
+          allUsers.map((user) => [Number(user.id), user])
+        ).values()
+      );
+  
+      // Verificar que la descarga esté completa.
+      const expectedTotal = Number(firstPage.total);
+  
+      if (
+        !Number.isSafeInteger(expectedTotal) ||
+        uniqueUsers.length !== expectedTotal
+      ) {
+        throw new Error(
+          "La lista de usuarios está incompleta. " +
+          "Vuelve a abrir las asignaciones."
+        );
+      }
+  
+      // Conservar las asignaciones que ya tenía el formulario.
+      if (!Array.isArray(assignmentsResp?.user_ids)) {
+        throw new Error(
+          "No se pudieron recuperar las asignaciones existentes."
+        );
+      }
+  
+      const assignedIds = assignmentsResp.user_ids.map(
+        (id) => Number(id)
+      );
+  
+      // Actualizar la interfaz solamente si todo se descargó.
+      setUsers(uniqueUsers);
       setSelectedUserIds(assignedIds);
+  
     } catch (e) {
-      setErr(e?.message || "Error cargando asignaciones");
+      setErr(
+        e?.message ||
+        "Error cargando usuarios y asignaciones."
+      );
+  
+      // No permitir guardar desde una lista incompleta.
+      setOpenAssignments(false);
+      setAssignmentForm(null);
+      setUsers([]);
+      setSelectedUserIds([]);
+  
     } finally {
       setLoadingUsers(false);
       setLoadingAssignments(false);
