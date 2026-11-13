@@ -361,6 +361,7 @@ class AsistenciasController extends Controller
         $fechasConEntrada = $registros->map(fn ($a) => $a->fecha?->toDateString())->filter()->all();
         $diasIncidencia = AsistenciaIncidencia::query()
             ->where('user_id', $user->id)
+            ->whereDate('fecha', '<=', $fechaActual)
             ->orderByDesc('fecha')
             ->orderByRaw("CASE WHEN tipo = 'festivo' THEN 0 WHEN tipo = 'vacaciones' THEN 1 ELSE 2 END")
             ->limit(200)->get()
