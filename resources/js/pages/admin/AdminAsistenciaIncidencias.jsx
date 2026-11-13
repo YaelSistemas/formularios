@@ -282,6 +282,8 @@ const EMPTY_FILTERS = {
   fecha_desde: "",
   fecha_hasta: "",
   user_id: "",
+  empresa_id: "",
+  unidad_servicio_id: "",
   tipo: "",
   search: "",
 };
@@ -307,6 +309,7 @@ export default function AdminAsistenciaIncidencias() {
     setTipos,
   ] = useState([]);
   const [unidades, setUnidades] = useState([]);
+  const [empresas, setEmpresas] = useState([]);
   const [bulkDetail, setBulkDetail] = useState(null);
   const [bulkSelected, setBulkSelected] = useState([]);
   const [bulkMode, setBulkMode] = useState("seleccion");
@@ -521,6 +524,14 @@ export default function AdminAsistenciaIncidencias() {
       );
     }
 
+    if (currentFilters.empresa_id) {
+      params.set("empresa_id", currentFilters.empresa_id);
+    }
+
+    if (currentFilters.unidad_servicio_id) {
+      params.set("unidad_servicio_id", currentFilters.unidad_servicio_id);
+    }
+
     if (currentFilters.tipo) {
       params.set(
         "tipo",
@@ -713,6 +724,7 @@ export default function AdminAsistenciaIncidencias() {
 
       setTipos(Array.isArray(data?.tipos) ? data.tipos : []);
       setUnidades(Array.isArray(data?.unidades) ? data.unidades : []);
+      setEmpresas(Array.isArray(data?.empresas) ? data.empresas : []);
     } catch (err) {
       setError(
         err?.message ||
@@ -1797,6 +1809,44 @@ export default function AdminAsistenciaIncidencias() {
             </select>
           </div>
       
+          <div style={S.field}>
+            <label style={S.label}>Empresa laboral</label>
+            <select
+              value={filters.empresa_id}
+              onChange={(e) => setFilters((prev) => ({
+                ...prev,
+                empresa_id: e.target.value,
+              }))}
+              style={S.input}
+            >
+              <option value="">Todas</option>
+              {empresas.map((empresa) => (
+                <option key={empresa.id} value={empresa.id}>
+                  {empresa.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={S.field}>
+            <label style={S.label}>Unidad laboral</label>
+            <select
+              value={filters.unidad_servicio_id}
+              onChange={(e) => setFilters((prev) => ({
+                ...prev,
+                unidad_servicio_id: e.target.value,
+              }))}
+              style={S.input}
+            >
+              <option value="">Todas</option>
+              {unidades.map((unidad) => (
+                <option key={unidad.id} value={unidad.id}>
+                  {unidad.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div style={S.field}>
             <label style={S.label}>
               Tipo

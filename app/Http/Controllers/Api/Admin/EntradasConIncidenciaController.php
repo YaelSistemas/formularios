@@ -18,6 +18,8 @@ class EntradasConIncidenciaController extends Controller
             'estado' => ['nullable', Rule::in(['todos','pendiente','visto_bueno','observada','no_avalada'])],
             'desde' => ['nullable','date'], 'hasta' => ['nullable','date','after_or_equal:desde'],
             'buscar' => ['nullable','string','max:150'], 'per_page' => ['nullable','integer','between:1,100'],
+            'empresa_id' => ['nullable','integer','exists:empresas,id'],
+            'unidad_servicio_id' => ['nullable','integer','exists:unidades_servicio,id'],
         ]);
         $query = AsistenciaEntradaIncidencia::with(['user:id,name,email', 'revisadoPor:id,name', 'asistencia', 'revisiones.actor:id,name']);
         if (($data['estado'] ?? 'todos') !== 'todos') $query->where('estado', $data['estado']);
@@ -27,6 +29,41 @@ class EntradasConIncidenciaController extends Controller
             $term = $data['buscar'];
             $query->whereHas('user', fn ($q) => $q->where('name', 'like', "%{$term}%")->orWhere('email', 'like', "%{$term}%"));
         }
+        // Usar snapshots laborales de la asistencia. Si fue eliminada,
+        // consultar la configuración laboral histórica de ese día.
+        $empresaId = $data['empresa_id'] ?? null;
+        $unidadId = $data['unidad_servicio_id'] ?? null;
+        if ($empresaId || $unidadId) {
+            $query->where(function ($q) use ($empresaId, $unidadId) {
+                $q->whereHas('asistencia', function ($asistencia) use ($empresaId, $unidadId) {
+                    if ($empresaId) {
+                        $asistencia->where('empresa_id_snapshot', (int) $empresaId);
+                    }
+                    if ($unidadId) {
+                        $asistencia->where('unidad_servicio_id_snapshot', (int) $unidadId);
+                    }
+                })->orWhere(function ($deleted) use ($empresaId, $unidadId) {
+                    $deleted->whereDoesntHave('asistencia')
+                        ->whereExists(function ($sub) use ($empresaId, $unidadId) {
+                            $sub->selectRaw('1')
+                                ->from('user_control_accesos as uca_filtro')
+                                ->whereColumn('uca_filtro.user_id', 'asistencia_entradas_incidencia.user_id')
+                                ->whereColumn('uca_filtro.fecha_inicio', '<=', 'asistencia_entradas_incidencia.fecha')
+                                ->where(function ($vigencia) {
+                                    $vigencia->whereNull('uca_filtro.fecha_fin')
+                                        ->orWhereColumn('uca_filtro.fecha_fin', '>=', 'asistencia_entradas_incidencia.fecha');
+                                });
+                            if ($empresaId) {
+                                $sub->where('uca_filtro.empresa_id', (int) $empresaId);
+                            }
+                            if ($unidadId) {
+                                $sub->where('uca_filtro.unidad_servicio_id', (int) $unidadId);
+                            }
+                        });
+                });
+            });
+        }
+
         $pagina = $query->orderByDesc('fecha')->orderByDesc('id')->paginate($data['per_page'] ?? 25);
         $pagina->getCollection()->each(function ($registro) {
             $asistencia = $registro->asistencia;
@@ -42,6 +79,10 @@ class EntradasConIncidenciaController extends Controller
         });
         return response()->json([
             'registros' => $pagina,
+            'filtros' => [
+                'empresas' => \App\Models\Empresa::query()->orderBy('nombre')->get(['id', 'nombre']),
+                'unidades' => \App\Models\UnidadServicio::query()->orderBy('nombre')->get(['id', 'nombre']),
+            ],
             'pendientes' => AsistenciaEntradaIncidencia::where('estado', 'pendiente')
                 ->whereHas('asistencia')
                 ->count(),

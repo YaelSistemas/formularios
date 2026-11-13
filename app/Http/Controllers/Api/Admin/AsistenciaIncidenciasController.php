@@ -32,6 +32,38 @@ class AsistenciaIncidenciasController extends Controller
     ];
 
     /**
+     * Filtrar por empresa/unidad laborales vigentes en la fecha de incidencia.
+     * No usa asignaciones de Formularios ni modifica las incidencias masivas.
+     */
+    private function aplicarFiltroLaboralIncidencias($query, array $data): void
+    {
+        $empresaId = $data['empresa_id'] ?? null;
+        $unidadId = $data['unidad_servicio_id'] ?? null;
+
+        if (!$empresaId && !$unidadId) {
+            return;
+        }
+
+        $query->whereExists(function ($sub) use ($empresaId, $unidadId) {
+            $sub->selectRaw('1')
+                ->from('user_control_accesos as uca_filtro')
+                ->whereColumn('uca_filtro.user_id', 'asistencia_incidencias.user_id')
+                ->whereColumn('uca_filtro.fecha_inicio', '<=', 'asistencia_incidencias.fecha')
+                ->where(function ($q) {
+                    $q->whereNull('uca_filtro.fecha_fin')
+                      ->orWhereColumn('uca_filtro.fecha_fin', '>=', 'asistencia_incidencias.fecha');
+                });
+
+            if ($empresaId) {
+                $sub->where('uca_filtro.empresa_id', (int) $empresaId);
+            }
+            if ($unidadId) {
+                $sub->where('uca_filtro.unidad_servicio_id', (int) $unidadId);
+            }
+        });
+    }
+
+    /**
      * Listado administrativo
      * de incidencias.
      */
@@ -64,6 +96,8 @@ class AsistenciaIncidenciasController extends Controller
                 ),
             ],
 
+            'empresa_id' => ['nullable', 'integer', 'exists:empresas,id'],
+            'unidad_servicio_id' => ['nullable', 'integer', 'exists:unidades_servicio,id'],
             'search' => [
                 'nullable',
                 'string',
@@ -129,6 +163,8 @@ class AsistenciaIncidenciasController extends Controller
             );
         }
 
+        $this->aplicarFiltroLaboralIncidencias($query, $data);
+
         $registros =
             $query
                 ->orderByDesc('fecha')
@@ -189,6 +225,7 @@ class AsistenciaIncidenciasController extends Controller
             'usuarios' =>
                 $usuarios,
             'unidades' => \App\Models\UnidadServicio::query()->orderBy('nombre')->get(['id', 'nombre']),
+            'empresas' => \App\Models\Empresa::query()->orderBy('nombre')->get(['id', 'nombre']),
 
             'tipos' => [
                 [
@@ -247,6 +284,8 @@ class AsistenciaIncidenciasController extends Controller
             'user_id' => 'nullable|integer|exists:users,id',
             'tipo' => 'nullable|in:vacaciones,incapacidad,festivo',
             'search' => 'nullable|string|max:100',
+            'empresa_id' => 'nullable|integer|exists:empresas,id',
+            'unidad_servicio_id' => 'nullable|integer|exists:unidades_servicio,id',
         ]);
         $query = AsistenciaIncidencia::query()->with([
             'user:id,name,email,activo',
@@ -265,6 +304,8 @@ class AsistenciaIncidenciasController extends Controller
                 });
             });
         }
+
+        $this->aplicarFiltroLaboralIncidencias($query, $data);
 
         // Un periodo sólo puede reunir fechas consecutivas del mismo empleado,
         // grupo, tipo, observaciones y registrador. Nunca sumar días de otros usuarios.
@@ -1791,6 +1832,8 @@ class AsistenciaIncidenciasController extends Controller
                     ),
                 ],
     
+            'empresa_id' => ['nullable', 'integer', 'exists:empresas,id'],
+            'unidad_servicio_id' => ['nullable', 'integer', 'exists:unidades_servicio,id'],
                 'search' => [
                     'nullable',
                     'string',
@@ -1883,6 +1926,8 @@ class AsistenciaIncidenciasController extends Controller
             );
         }
     
+        $this->aplicarFiltroLaboralIncidencias($query, $data);
+
         $registros =
             $query
                 ->orderByDesc(

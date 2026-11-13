@@ -181,9 +181,13 @@ function Status({ value }) {
 }
 export default function AdminEntradasConIncidencia() {
   const [records, setRecords] = useState([]);
+  const [empresas, setEmpresas] = useState([]);
+  const [unidades, setUnidades] = useState([]);
   const [filters, setFilters] = useState({
     estado: "pendiente",
     buscar: "",
+    empresa_id: "",
+    unidad_servicio_id: "",
     desde: "",
     hasta: "",
     per_page: "25"
@@ -191,6 +195,8 @@ export default function AdminEntradasConIncidencia() {
   const [applied, setApplied] = useState({
     estado: "pendiente",
     buscar: "",
+    empresa_id: "",
+    unidad_servicio_id: "",
     desde: "",
     hasta: "",
     per_page: "25"
@@ -215,6 +221,8 @@ export default function AdminEntradasConIncidencia() {
       const query = new URLSearchParams({ ...applied, page: String(page) });
       const data = await apiGet(`/admin/entradas-con-incidencia?${query}`);
       setRecords(data?.registros?.data || []);
+      setEmpresas(Array.isArray(data?.filtros?.empresas) ? data.filtros.empresas : []);
+      setUnidades(Array.isArray(data?.filtros?.unidades) ? data.filtros.unidades : []);
       setLastPage(data?.registros?.last_page || 1);
       setTotal(data?.registros?.total || 0);
       setPendientes(data?.pendientes || 0);
@@ -241,6 +249,8 @@ export default function AdminEntradasConIncidencia() {
     const clean = {
       estado: "pendiente",
       buscar: "",
+      empresa_id: "",
+      unidad_servicio_id: "",
       desde: "",
       hasta: "",
       per_page: "25"
@@ -370,6 +380,34 @@ export default function AdminEntradasConIncidencia() {
               <option value="visto_bueno">Con visto bueno</option>
               <option value="observada">Observadas</option>
               <option value="no_avalada">No avaladas</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="ei-empresa" style={S.label}>Empresa laboral</label>
+            <select
+              id="ei-empresa"
+              value={filters.empresa_id}
+              onChange={e => setFilters(v => ({ ...v, empresa_id: e.target.value }))}
+              style={S.input}
+            >
+              <option value="">Todas</option>
+              {empresas.map(empresa => (
+                <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="ei-unidad" style={S.label}>Unidad laboral</label>
+            <select
+              id="ei-unidad"
+              value={filters.unidad_servicio_id}
+              onChange={e => setFilters(v => ({ ...v, unidad_servicio_id: e.target.value }))}
+              style={S.input}
+            >
+              <option value="">Todas</option>
+              {unidades.map(unidad => (
+                <option key={unidad.id} value={unidad.id}>{unidad.nombre}</option>
+              ))}
             </select>
           </div>
           <div>
