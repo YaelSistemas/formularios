@@ -2299,9 +2299,13 @@ export default function AdminAsistenciaIncidencias() {
 
                         <td
                           style={S.td}
+                          title={row.dias == null
+                            ? (row.es_masiva
+                              ? "Los días efectivos pueden variar por empleado o faltar configuración de turno. Consulta Ver empleados."
+                              : "No hay un turno vigente configurado para todas las fechas de vacaciones.")
+                            : undefined}
                         >
-                          {row.dias ??
-                            "—"}
+                          {row.dias ?? (row.es_masiva ? "Ver empleados" : "Sin turno")}
                         </td>
 
                         <td
@@ -3551,18 +3555,30 @@ export default function AdminAsistenciaIncidencias() {
                 <div
                   style={S.label}
                 >
-                  Días
+                  {historyItem.dias_recalculados
+                    ? "Días efectivos actuales"
+                    : "Días registrados"}
                 </div>
-      
+
                 <div
                   style={{
                     marginTop: 5,
                     fontWeight: 800,
                   }}
                 >
-                  {historyItem.dias ??
-                    "—"}
+                  {historyItem.dias_recalculados && historyItem.dias_efectivos === null
+                    ? "Ver empleados / Sin turno"
+                    : historyItem.dias ?? "—"}
                 </div>
+
+                {historyItem.dias_recalculados &&
+                  historyItem.dias_originales !== null &&
+                  historyItem.dias_originales !== undefined &&
+                  historyItem.dias_originales !== historyItem.dias_efectivos ? (
+                    <div style={{marginTop: 6, fontSize: 11, color: "#64748b"}}>
+                      Días calendario del periodo: {historyItem.dias_originales}
+                    </div>
+                  ) : null}
               </div>
             </div>
       

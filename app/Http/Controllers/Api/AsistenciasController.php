@@ -333,6 +333,7 @@ class AsistenciasController extends Controller
                     'fecha',
                     $fechaActual
                 )
+                ->orderByRaw("CASE WHEN tipo = 'festivo' THEN 0 WHEN tipo = 'vacaciones' THEN 1 ELSE 2 END")
                 ->first();
         
         // Sólo el turno vigente define si hoy es laborable.
@@ -360,7 +361,10 @@ class AsistenciasController extends Controller
         $fechasConEntrada = $registros->map(fn ($a) => $a->fecha?->toDateString())->filter()->all();
         $diasIncidencia = AsistenciaIncidencia::query()
             ->where('user_id', $user->id)
-            ->orderByDesc('fecha')->limit(100)->get()
+            ->orderByDesc('fecha')
+            ->orderByRaw("CASE WHEN tipo = 'festivo' THEN 0 WHEN tipo = 'vacaciones' THEN 1 ELSE 2 END")
+            ->limit(200)->get()
+            ->unique(fn ($inc) => $inc->fecha->toDateString())
             ->reject(fn ($inc) => in_array($inc->fecha->toDateString(), $fechasConEntrada, true))
             ->map(fn ($inc) => [
                 'id' => 'incidencia-' . $inc->id,
@@ -954,6 +958,7 @@ class AsistenciasController extends Controller
                     'fecha',
                     $fechaActual
                 )
+                ->orderByRaw("CASE WHEN tipo = 'festivo' THEN 0 WHEN tipo = 'vacaciones' THEN 1 ELSE 2 END")
                 ->first();
         
 
@@ -1693,6 +1698,7 @@ class AsistenciasController extends Controller
                     'fecha',
                     $fechaEntrada
                 )
+                ->orderByRaw("CASE WHEN tipo = 'festivo' THEN 0 WHEN tipo = 'vacaciones' THEN 1 ELSE 2 END")
                 ->first();
         
         if ($incidenciaFecha) {

@@ -97,7 +97,8 @@ class KioscoAsistenciasController extends Controller
                             'fecha',
                             $today
                         )
-                        ->first();
+                ->orderByRaw("CASE WHEN tipo = 'festivo' THEN 0 WHEN tipo = 'vacaciones' THEN 1 ELSE 2 END")
+                ->first();
 
                 $unidadLaboral =
                     $actual
@@ -645,6 +646,7 @@ class KioscoAsistenciasController extends Controller
                     'fecha',
                     $fechaActual
                 )
+                ->orderByRaw("CASE WHEN tipo = 'festivo' THEN 0 WHEN tipo = 'vacaciones' THEN 1 ELSE 2 END")
                 ->first();
         
 

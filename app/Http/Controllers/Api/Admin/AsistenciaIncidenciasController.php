@@ -7,6 +7,7 @@ use App\Models\Asistencia;
 use App\Models\AsistenciaIncidencia;
 use App\Models\AsistenciaIncidenciaHistory;
 use App\Models\User;
+use App\Support\Asistencias\DiasEfectivosIncidencia;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -155,7 +156,7 @@ class AsistenciaIncidenciasController extends Controller
                     'observaciones' => $items->pluck('observaciones')->unique()->count() === 1 ? $primero->observaciones : 'Valores diferentes por empleado',
                     'fecha_desde' => Carbon::parse($primero->fecha)->format('Y-m-d'),
                     'fecha_hasta' => Carbon::parse($ultimo->fecha)->format('Y-m-d'),
-                    'dias' => $masiva ? $items->pluck('fecha')->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))->unique()->count() : $items->count(),
+                    'dias' => DiasEfectivosIncidencia::paraGrupo($items),
                     'registrado_por' => $primero->registradoPor,
                     'created_at' => $primero->created_at,
                     'updated_at' => $items->max('updated_at'),
@@ -231,7 +232,7 @@ class AsistenciaIncidenciasController extends Controller
                     'tipo' => $this->labelTipo($grupo['tipo'] ?? ''),
                     'fecha_desde' => $this->formatDateExport($grupo['fecha_desde'] ?? null),
                     'fecha_hasta' => $this->formatDateExport($grupo['fecha_hasta'] ?? null),
-                    'dias' => $grupo['dias'] ?? 0,
+                    'dias' => $grupo['dias'] ?? ($grupo['es_masiva'] ? 'Por empleado' : 'Sin turno'),
                     'empleados' => $grupo['es_masiva'] ? ($grupo['empleados'] ?? 0) : 1,
                     'observaciones' => $grupo['observaciones'] ?? '',
                     'registrado_por' => $grupo['registrado_por']?->name ?? '',
@@ -273,6 +274,26 @@ class AsistenciaIncidenciasController extends Controller
         $previousDate = null;
         foreach ($records as $item) {
             $date = Carbon::parse($item->fecha)->toDateString();
+
+            // El detalle exportado sólo debe abarcar fechas efectivas.
+            // Si un día de vacaciones coincide con un festivo o descanso,
+            // se omite antes de formar los tramos consecutivos. La incidencia
+            // original y su historial permanecen intactos.
+            if ($item->tipo === 'vacaciones') {
+                $diasDeLaFecha = DiasEfectivosIncidencia::paraPeriodo(
+                    (int) $item->user_id,
+                    $item->tipo,
+                    $date,
+                    $date
+                );
+
+                if ($diasDeLaFecha === 0) {
+                    $lastKey = null;
+                    $previousDate = null;
+                    continue;
+                }
+            }
+
             $key = implode('|', [
                 $item->grupo_uuid ?: 'registro-'.$item->id,
                 $item->user_id, $item->tipo,
@@ -292,6 +313,8 @@ class AsistenciaIncidenciasController extends Controller
                     'fecha_desde' => $this->formatDateExport($date),
                     'fecha_hasta' => $this->formatDateExport($date),
                     'dias' => 1,
+                    '_user_id' => (int) $item->user_id,
+                    '_tipo' => $item->tipo,
                     'empleados' => 1,
                     'observaciones' => $item->observaciones ?? '',
                     'registrado_por' => $item->registradoPor?->name ?? '',
@@ -300,6 +323,20 @@ class AsistenciaIncidenciasController extends Controller
             $lastKey = $key;
             $previousDate = $date;
         }
+        foreach ($rows as &$row) {
+            $userId = (int) ($row['_user_id'] ?? 0);
+            if ($userId > 0) {
+                $row['dias'] = DiasEfectivosIncidencia::paraPeriodo(
+                    $userId,
+                    $row['_tipo'],
+                    Carbon::createFromFormat('d/m/Y', $row['fecha_desde'])->toDateString(),
+                    Carbon::createFromFormat('d/m/Y', $row['fecha_hasta'])->toDateString()
+                );
+            }
+            $row['dias'] ??= 'Sin turno';
+            unset($row['_user_id'], $row['_tipo']);
+        }
+        unset($row);
         return [$formato, $rows];
     }
 
@@ -507,6 +544,11 @@ class AsistenciaIncidenciasController extends Controller
                             ->toDateString(),
                     ]
                 )
+                ->where(function ($q) use ($data) {
+                    $data['tipo'] === 'festivo'
+                        ? $q->where('tipo', 'festivo')
+                        : $q->where('tipo', '!=', 'festivo');
+                })
                 ->orderBy('fecha')
                 ->first();
 
@@ -670,7 +712,7 @@ class AsistenciaIncidenciasController extends Controller
                 ),
 
             'dias' =>
-                $primero->es_masiva ? $registros->pluck('fecha')->map(fn ($fecha) => Carbon::parse($fecha)->toDateString())->unique()->count() : $registros->count(),
+                DiasEfectivosIncidencia::paraGrupo($registros),
 
             'registrado_por' =>
                 $primero
@@ -805,6 +847,27 @@ class AsistenciaIncidenciasController extends Controller
             ? ($history->last()?->action === 'deleted' ? 0 : ($latestSnapshot['empleados'] ?? null))
             : null;
 
+        // El snapshot es la fotografía histórica; el total efectivo
+        // debe reflejar los turnos y festivos vigentes al consultar.
+        // Si la incidencia fue eliminada, no hay días actuales que
+        // recalcular y se conserva el conteo histórico del snapshot.
+        $diasOriginales = ($latestSnapshot['es_masiva'] ?? false)
+            && !empty($latestSnapshot['fecha_desde'])
+            && !empty($latestSnapshot['fecha_hasta'])
+                ? (int) Carbon::parse($latestSnapshot['fecha_desde'])
+                    ->diffInDays(Carbon::parse($latestSnapshot['fecha_hasta'])) + 1
+                : ($latestSnapshot['dias'] ?? null);
+
+        $eliminada = $history->last()?->action === 'deleted';
+        $registrosActuales = $eliminada
+            ? collect()
+            : AsistenciaIncidencia::query()
+                ->where('grupo_uuid', $grupoUuid)
+                ->get();
+        $diasEfectivos = $registrosActuales->isNotEmpty()
+            ? DiasEfectivosIncidencia::paraGrupo($registrosActuales)
+            : null;
+
         return response()->json([
             'incidencia' => [
                 'grupo_uuid' =>
@@ -836,10 +899,14 @@ class AsistenciaIncidenciasController extends Controller
                         'fecha_hasta'
                     ] ?? null,
     
-                'dias' =>
-                    ($latestSnapshot['es_masiva'] ?? false) && !empty($latestSnapshot['fecha_desde']) && !empty($latestSnapshot['fecha_hasta'])
-                        ? (int) Carbon::parse($latestSnapshot['fecha_desde'])->diffInDays(Carbon::parse($latestSnapshot['fecha_hasta'])) + 1
-                        : ($latestSnapshot['dias'] ?? null),
+                // "dias" sigue disponible para compatibilidad; los campos
+                // adicionales permiten distinguir el dato original del actual.
+                'dias' => $registrosActuales->isNotEmpty()
+                    ? $diasEfectivos
+                    : $diasOriginales,
+                'dias_originales' => $diasOriginales,
+                'dias_efectivos' => $diasEfectivos,
+                'dias_recalculados' => $registrosActuales->isNotEmpty(),
     
                 'observaciones' =>
                     $latestSnapshot[
@@ -1305,6 +1372,11 @@ class AsistenciaIncidenciasController extends Controller
                             ->toDateString(),
                     ]
                 )
+                ->where(function ($q) use ($data) {
+                    $data['tipo'] === 'festivo'
+                        ? $q->where('tipo', 'festivo')
+                        : $q->where('tipo', '!=', 'festivo');
+                })
                 ->orderBy('fecha')
                 ->first();
 
@@ -1503,7 +1575,13 @@ class AsistenciaIncidenciasController extends Controller
         }
         $ids = $usuarios->pluck('id')->all();
         if (!$ids) throw ValidationException::withMessages(['alcance' => 'No hay empleados activos para el alcance seleccionado.']);
-        $ocupados = AsistenciaIncidencia::whereIn('user_id', $ids)->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->get(['user_id', 'fecha']);
+        $ocupados = AsistenciaIncidencia::whereIn('user_id', $ids)
+            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+            ->where(function ($q) use ($data) {
+                $data['tipo'] === 'festivo'
+                    ? $q->where('tipo', 'festivo')
+                    : $q->where('tipo', '!=', 'festivo');
+            })->get(['user_id', 'fecha']);
         $asistencias = Asistencia::whereIn('user_id', $ids)->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->get(['user_id', 'fecha']);
         // Política segura: no reemplazar registros ni asistencias ya existentes.
         if ($ocupados->isNotEmpty() || $asistencias->isNotEmpty()) {
@@ -1554,13 +1632,13 @@ class AsistenciaIncidenciasController extends Controller
                     && $periodos[$lastIndex]['observaciones'] === $entry->observaciones;
                 if ($sePuedeUnir) {
                     $periodos[$lastIndex]['fecha_hasta'] = $fecha;
-                    $periodos[$lastIndex]['dias']++;
+                    $periodos[$lastIndex]['dias'] = DiasEfectivosIncidencia::paraPeriodo((int) $id, $entry->tipo, $periodos[$lastIndex]['fecha_desde'], $fecha);
                 } else {
                     $periodos[] = [
                         'tipo' => $entry->tipo,
                         'fecha_desde' => $fecha,
                         'fecha_hasta' => $fecha,
-                        'dias' => 1,
+                        'dias' => DiasEfectivosIncidencia::paraPeriodo((int) $id, $entry->tipo, $fecha, $fecha),
                         'observaciones' => $entry->observaciones,
                     ];
                 }
@@ -1605,7 +1683,12 @@ class AsistenciaIncidenciasController extends Controller
         if ($data['modo'] === 'seleccion') $memberIds = $memberIds->intersect($data['user_ids'] ?? [])->values();
         if ($memberIds->isEmpty()) throw ValidationException::withMessages(['user_ids' => 'No hay empleados seleccionados para modificar.']);
         $conflicts = AsistenciaIncidencia::whereIn('user_id', $memberIds)->where('grupo_uuid', '!=', $grupoUuid)
-            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->exists();
+            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+            ->where(function ($q) use ($data) {
+                $data['tipo'] === 'festivo'
+                    ? $q->where('tipo', 'festivo')
+                    : $q->where('tipo', '!=', 'festivo');
+            })->exists();
         $attendance = Asistencia::whereIn('user_id', $memberIds)->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])->exists();
         if ($conflicts || $attendance) throw ValidationException::withMessages(['fecha_desde' => 'Hay asistencias u otras incidencias en las fechas elegidas. No se modificó ningún empleado.']);
         DB::transaction(function () use ($group, $memberIds, $data, $desde, $hasta, $grupoUuid, $request) {
@@ -1827,7 +1910,7 @@ class AsistenciaIncidenciasController extends Controller
                     'observaciones' => $items->pluck('observaciones')->unique()->count() === 1 ? $first->observaciones : 'Valores diferentes por empleado',
                     'fecha_desde' => Carbon::parse($first->fecha)->format('Y-m-d'),
                     'fecha_hasta' => Carbon::parse($last->fecha)->format('Y-m-d'),
-                    'dias' => $bulk ? $items->pluck('fecha')->map(fn ($date) => Carbon::parse($date)->format('Y-m-d'))->unique()->count() : $items->count(),
+                    'dias' => DiasEfectivosIncidencia::paraGrupo($items),
                     'registrado_por' => $first->registradoPor,
                 ];
             })->values();
@@ -1913,7 +1996,7 @@ class AsistenciaIncidenciasController extends Controller
                 ),
     
             'dias' =>
-                $primero->es_masiva ? $registros->pluck('fecha')->map(fn ($fecha) => Carbon::parse($fecha)->toDateString())->unique()->count() : $registros->count(),
+                DiasEfectivosIncidencia::paraGrupo($registros),
     
             'observaciones' =>
                 $primero->observaciones,
