@@ -337,6 +337,7 @@ export default function AdminUsers() {
   const [fPassword, setFPassword] = useState("");
   const [fRole, setFRole] = useState("");
   const [fActivo, setFActivo] = useState(true);
+  const [fFormulariosEnabled, setFFormulariosEnabled] = useState(false);
   const [fEmpresas, setFEmpresas] = useState([]);
   const [fGrupos, setFGrupos] = useState([]);
   const [fUnidadesServicio, setFUnidadesServicio] = useState([]);
@@ -514,6 +515,7 @@ export default function AdminUsers() {
     setFPassword("");
     setFRole("");
     setFActivo(true);
+    setFFormulariosEnabled(false);
     setFEmpresas([]);
     setFGrupos([]);
     setFUnidadesServicio([]);
@@ -560,6 +562,7 @@ export default function AdminUsers() {
     setFRole(roleValue);
 
     setFActivo(u.activo === true || u.activo === 1);
+    setFFormulariosEnabled(u.formularios_habilitado !== false && u.formularios_habilitado !== 0);
 
     const empresaIds = Array.isArray(u.empresas)
       ? u.empresas.map((e) => Number(e?.id)).filter(Boolean)
@@ -688,13 +691,13 @@ export default function AdminUsers() {
     if (!fRole) {
       errors.role = `No se puede ${actionText} el usuario porque falta el rol.`;
     }
-    if (!fUnidadesServicio.length) {
+    if (fFormulariosEnabled && !fUnidadesServicio.length) {
       errors.unidad_servicio = `No se puede ${actionText} el usuario porque falta la unidad de servicio.`;
     }
-    if (!fEmpresas.length) {
+    if (fFormulariosEnabled && !fEmpresas.length) {
       errors.empresa = `No se puede ${actionText} el usuario porque falta la empresa.`;
     }
-    if (!fGrupos.length) {
+    if (fFormulariosEnabled && !fGrupos.length) {
       errors.grupo = `No se puede ${actionText} el usuario porque falta el grupo.`;
     }
 
@@ -769,6 +772,7 @@ export default function AdminUsers() {
         email: fEmail.trim(),
         roles: [fRole],
         activo: !!fActivo,
+        formularios_habilitado: !!fFormulariosEnabled,
       
         empresa_ids: fEmpresas,
         grupo_ids: fGrupos,
@@ -1844,6 +1848,36 @@ export default function AdminUsers() {
                     </div>
                   </div>
 
+                  <div style={{ ...S.fieldWrap, gridColumn: "1 / -1" }}>
+                    <div style={S.label}>Participa en Formularios</div>
+                    <div style={S.toggleWrap}>
+                      <button
+                        type="button"
+                        onClick={() => setFFormulariosEnabled((prev) => !prev)}
+                        aria-pressed={fFormulariosEnabled}
+                        style={{
+                          ...S.toggleButton,
+                          background: fFormulariosEnabled ? "#22c55e" : "#cbd5e1",
+                        }}
+                      >
+                        <span style={{ ...S.toggleThumb, left: fFormulariosEnabled ? 30 : 4 }} />
+                      </button>
+                      <span style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: fFormulariosEnabled ? "#166534" : "#64748b",
+                      }}>
+                        {fFormulariosEnabled ? "Sí" : "No"}
+                      </span>
+                    </div>
+                    <div style={S.helper}>
+                      Al desactivar Formularios se conserva la configuración guardada
+                      de empresas, grupos y unidades de servicio.
+                    </div>
+                  </div>
+
+                  {fFormulariosEnabled ? (
+                    <>
                   <div style={S.fieldWrap}>
                     <MultiSelectInlineBox
                       label="Unidades de servicio"
@@ -1900,6 +1934,8 @@ export default function AdminUsers() {
                       height={140}
                     />
                   </div>
+                  </>
+                  ) : null}
 
                   <div
                   style={{
@@ -2433,6 +2469,13 @@ export default function AdminUsers() {
                                 {renderHistoryValue("text", snapshot?.email)}
                               </div>
 
+                              {snapshot?.formularios_habilitado !== undefined ? (
+                                <div style={S.historyFieldBox}>
+                                  <div style={S.historyFieldLabel}>Participa en Formularios</div>
+                                  {renderHistoryValue("boolean", snapshot.formularios_habilitado)}
+                                </div>
+                              ) : null}
+
                               <div style={S.historyFieldBox}>
                                 <div style={S.historyFieldLabel}>Rol</div>
                                 {renderHistoryValue("list", snapshot?.roles)}
@@ -2604,6 +2647,13 @@ export default function AdminUsers() {
                                 <div style={S.historyFieldLabel}>Correo / Usuario</div>
                                 {renderHistoryValue("text", snapshot?.email)}
                               </div>
+
+                              {snapshot?.formularios_habilitado !== undefined ? (
+                                <div style={S.historyFieldBox}>
+                                  <div style={S.historyFieldLabel}>Participa en Formularios</div>
+                                  {renderHistoryValue("boolean", snapshot.formularios_habilitado)}
+                                </div>
+                              ) : null}
 
                               <div style={S.historyFieldBox}>
                                 <div style={S.historyFieldLabel}>Rol</div>

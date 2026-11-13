@@ -71,6 +71,7 @@ class UsersController extends Controller
                 'name' => $u->name,
                 'email' => $u->email,
                 'activo' => (bool) ($u->activo ?? true),
+                'formularios_habilitado' => (bool) $u->formularios_habilitado,
                 'roles' => $u->getRoleNames()->values(),
 
                 'empresas' => $u->empresas?->map(fn ($e) => [
@@ -164,6 +165,7 @@ class UsersController extends Controller
             'roles.min' => 'No se puede crear el usuario porque falta el rol.',
             'roles.*.exists' => 'El rol seleccionado no existe.',
 
+            'formularios_habilitado.boolean' => 'La participación en Formularios no es válida.',
             'activo.required' => 'No se puede crear el usuario porque falta el estado.',
             'activo.boolean' => 'El estado enviado no es válido.',
 
@@ -244,13 +246,15 @@ class UsersController extends Controller
 
             'activo' => ['required', 'boolean'],
 
-            'empresa_ids' => ['required', 'array', 'min:1'],
+            'formularios_habilitado' => ['sometimes', 'boolean'],
+
+            'empresa_ids' => [Rule::requiredIf(fn () => (bool) $request->input('formularios_habilitado', true)), 'array', Rule::when((bool) $request->input('formularios_habilitado', true), ['min:1'])],
             'empresa_ids.*' => ['integer', Rule::exists('empresas', 'id')],
 
-            'grupo_ids' => ['required', 'array', 'min:1'],
+            'grupo_ids' => [Rule::requiredIf(fn () => (bool) $request->input('formularios_habilitado', true)), 'array', Rule::when((bool) $request->input('formularios_habilitado', true), ['min:1'])],
             'grupo_ids.*' => ['integer', Rule::exists('grupos', 'id')],
 
-            'unidad_servicio_ids' => ['required', 'array', 'min:1'],
+            'unidad_servicio_ids' => [Rule::requiredIf(fn () => (bool) $request->input('formularios_habilitado', true)), 'array', Rule::when((bool) $request->input('formularios_habilitado', true), ['min:1'])],
             'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
 
             'control_acceso' => [
@@ -315,10 +319,15 @@ class UsersController extends Controller
                 'password' => Hash::make($data['password']),
             ]);
         
+            $user->formularios_habilitado = (bool) ($data['formularios_habilitado'] ?? true);
+            $user->save();
+
             $user->syncRoles($data['roles']);
-            $user->empresas()->sync($data['empresa_ids']);
-            $user->grupos()->sync($data['grupo_ids']);
-            $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
+            if ($user->formularios_habilitado) {
+                $user->empresas()->sync($data['empresa_ids']);
+                $user->grupos()->sync($data['grupo_ids']);
+                $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
+            }
         
             if (!empty($data['control_acceso'])) {
                 $this->createControlAcceso(
@@ -359,6 +368,7 @@ class UsersController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'activo' => (bool) ($user->activo ?? true),
+                'formularios_habilitado' => (bool) $user->formularios_habilitado,
                 'roles' => $user->getRoleNames()->values(),
 
                 'empresas' => $user->empresas->map(fn ($e) => [
@@ -403,6 +413,7 @@ class UsersController extends Controller
             'roles.min' => 'No se puede actualizar el usuario porque falta el rol.',
             'roles.*.exists' => 'El rol seleccionado no existe.',
 
+            'formularios_habilitado.boolean' => 'La participación en Formularios no es válida.',
             'activo.required' => 'No se puede actualizar el usuario porque falta el estado.',
             'activo.boolean' => 'El estado enviado no es válido.',
 
@@ -482,13 +493,15 @@ class UsersController extends Controller
 
             'activo' => ['required', 'boolean'],
 
-            'empresa_ids' => ['required', 'array', 'min:1'],
+            'formularios_habilitado' => ['sometimes', 'boolean'],
+
+            'empresa_ids' => [Rule::requiredIf(fn () => (bool) $request->input('formularios_habilitado', true)), 'array', Rule::when((bool) $request->input('formularios_habilitado', true), ['min:1'])],
             'empresa_ids.*' => ['integer', Rule::exists('empresas', 'id')],
 
-            'grupo_ids' => ['required', 'array', 'min:1'],
+            'grupo_ids' => [Rule::requiredIf(fn () => (bool) $request->input('formularios_habilitado', true)), 'array', Rule::when((bool) $request->input('formularios_habilitado', true), ['min:1'])],
             'grupo_ids.*' => ['integer', Rule::exists('grupos', 'id')],
 
-            'unidad_servicio_ids' => ['required', 'array', 'min:1'],
+            'unidad_servicio_ids' => [Rule::requiredIf(fn () => (bool) $request->input('formularios_habilitado', true)), 'array', Rule::when((bool) $request->input('formularios_habilitado', true), ['min:1'])],
             'unidad_servicio_ids.*' => ['integer', Rule::exists('unidades_servicio', 'id')],
 
             'control_acceso' => [
@@ -559,6 +572,7 @@ class UsersController extends Controller
             $user->name = trim($data['name']);
             $user->email = trim($data['email']);
             $user->activo = (bool) $data['activo'];
+            $user->formularios_habilitado = (bool) ($data['formularios_habilitado'] ?? $user->formularios_habilitado);
         
             if ($passwordChanged) {
                 $user->password = Hash::make($data['password']);
@@ -567,9 +581,11 @@ class UsersController extends Controller
             $user->save();
         
             $user->syncRoles($data['roles']);
-            $user->empresas()->sync($data['empresa_ids']);
-            $user->grupos()->sync($data['grupo_ids']);
-            $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
+            if ($user->formularios_habilitado) {
+                $user->empresas()->sync($data['empresa_ids']);
+                $user->grupos()->sync($data['grupo_ids']);
+                $user->unidadesServicio()->sync($data['unidad_servicio_ids']);
+            }
         
             if (!empty($data['control_acceso'])) {
                 $this->updateControlAcceso(
@@ -612,6 +628,7 @@ class UsersController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'activo' => (bool) ($user->activo ?? true),
+                'formularios_habilitado' => (bool) $user->formularios_habilitado,
                 'roles' => $user->getRoleNames()->values(),
 
                 'empresas' => $user->empresas->map(fn ($e) => [
@@ -801,6 +818,7 @@ class UsersController extends Controller
                 $vigenciaControl,
     
             'activo' => (bool) ($user->activo ?? true),
+                'formularios_habilitado' => (bool) $user->formularios_habilitado,
         ];
     }
 
@@ -817,6 +835,11 @@ class UsersController extends Controller
                 'type' => 'text',
             ],
     
+            'formularios_habilitado' => [
+                'label' => 'Participa en Formularios',
+                'type' => 'boolean',
+            ],
+
             'roles' => [
                 'label' => 'Rol',
                 'type' => 'list',
