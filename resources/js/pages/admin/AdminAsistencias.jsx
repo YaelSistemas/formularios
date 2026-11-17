@@ -620,6 +620,7 @@ export default function AdminAsistencias() {
   const [filters, setFilters] = useState({
     fecha_desde: "",
     fecha_hasta: "",
+    incluir_futuros: false,
     user_id: "",
     empresa_id: "",
     unidad_servicio_id: "",
@@ -633,6 +634,7 @@ export default function AdminAsistencias() {
   ] = useState({
     fecha_desde: "",
     fecha_hasta: "",
+    incluir_futuros: false,
     user_id: "",
     empresa_id: "",
     unidad_servicio_id: "",
@@ -673,6 +675,7 @@ export default function AdminAsistencias() {
 
     params.set("page", String(requestedPage));
     params.set("per_page", String(currentFilters.per_page));
+    params.set("incluir_futuros", currentFilters.incluir_futuros ? "1" : "0");
 
     if (currentFilters.fecha_desde) {
       params.set("fecha_desde", currentFilters.fecha_desde);
@@ -706,6 +709,8 @@ export default function AdminAsistencias() {
   ) {
     const params =
       new URLSearchParams();
+
+    params.set("incluir_futuros", currentFilters.incluir_futuros ? "1" : "0");
   
     if (currentFilters.fecha_desde) {
       params.set(
@@ -943,10 +948,21 @@ export default function AdminAsistencias() {
     load(1, filters);
   }
 
+  function cambiarFuturos(activado) {
+    const nuevosFiltros = {
+      ...filters,
+      incluir_futuros: activado,
+    };
+    setFilters(nuevosFiltros);
+    setPage(1);
+    load(1, nuevosFiltros);
+  }
+
   function limpiar() {
     const clean = {
       fecha_desde: "",
       fecha_hasta: "",
+      incluir_futuros: false,
       user_id: "",
       empresa_id: "",
       unidad_servicio_id: "",
@@ -1952,6 +1968,40 @@ export default function AdminAsistencias() {
           Consulta administrativa de registros de asistencia.
         </div>
 
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            marginTop: 16,
+            marginBottom: 10,
+            padding: "12px 14px",
+            border: "1px solid #dbeafe",
+            borderRadius: 12,
+            background: "#f8fafc",
+          }}
+        >
+          <input
+            id="asistencias-incluir-futuros"
+            type="checkbox"
+            checked={filters.incluir_futuros}
+            onChange={(e) => cambiarFuturos(e.target.checked)}
+            disabled={loading}
+            style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }}
+          />
+          <label
+            htmlFor="asistencias-incluir-futuros"
+            style={{ cursor: loading ? "wait" : "pointer", fontSize: 13, color: "#0f172a" }}
+          >
+            <strong>Mostrar registros e incidencias futuras</strong>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>
+              {filters.incluir_futuros
+                ? "Se incluyen todas las fechas, también las programadas a futuro."
+                : "Se muestran las asistencias e incidencias hasta el día de hoy."}
+            </div>
+          </label>
+        </div>
+
         <div style={S.filters}>
           <div>
             <div style={S.label}>Fecha desde</div>
@@ -2242,7 +2292,7 @@ export default function AdminAsistencias() {
             <button
               type="button"
               onClick={() =>
-                load(page, filters)
+                load(page, appliedFilters)
               }
               disabled={loading}
               style={S.buttonSecondary}
@@ -2311,9 +2361,9 @@ export default function AdminAsistencias() {
                   </tr>
                 ) : (
                   rows.map((row) => {
-                    const esIncidencia =
-                      row.registro_tipo ===
-                      "incidencia";
+                    const esDescanso = row.registro_tipo === "descanso";
+                    const esIncidencia = row.registro_tipo === "incidencia";
+                    const esSinAsistencia = esIncidencia || esDescanso;
                   
                     return (
                       <tr
@@ -2364,7 +2414,7 @@ export default function AdminAsistencias() {
                         </td>
                   
                         <td style={S.td}>
-                          {esIncidencia
+                          {esSinAsistencia
                             ? "—"
                             : formatTime(
                                 row.hora_entrada
@@ -2372,7 +2422,7 @@ export default function AdminAsistencias() {
                         </td>
                   
                         <td style={S.td}>
-                          {esIncidencia ? (
+                          {esSinAsistencia ? (
                             "—"
                           ) : row.hora_inicio_comida ? (
                             `${formatTime(
@@ -2386,7 +2436,7 @@ export default function AdminAsistencias() {
                         </td>
                   
                         <td style={S.td}>
-                          {esIncidencia
+                          {esSinAsistencia
                             ? "—"
                             : formatTime(
                                 row.hora_salida
@@ -2394,7 +2444,7 @@ export default function AdminAsistencias() {
                         </td>
                   
                         <td style={S.td}>
-                          {esIncidencia
+                          {esSinAsistencia
                             ? "—"
                             : formatSeconds(
                                 row.segundos_presencia
@@ -2402,7 +2452,7 @@ export default function AdminAsistencias() {
                         </td>
                   
                         <td style={S.td}>
-                          {esIncidencia
+                          {esSinAsistencia
                             ? "—"
                             : formatSeconds(
                                 row.segundos_trabajados
@@ -2410,7 +2460,18 @@ export default function AdminAsistencias() {
                         </td>
                   
                         <td style={S.td}>
-                          {esIncidencia ? (
+                          {esDescanso ? (
+                            <span style={{
+                              display: "inline-flex",
+                              padding: "5px 9px",
+                              borderRadius: 999,
+                              border: "1px solid #cbd5e1",
+                              background: "#f8fafc",
+                              color: "#475569",
+                              fontWeight: 900,
+                              fontSize: 11,
+                            }}>Descanso</span>
+                          ) : esIncidencia ? (
                             <div>
                               <IncidenciaBadge
                                 tipo={
@@ -2445,7 +2506,7 @@ export default function AdminAsistencias() {
                   
                         {canViewHistory ? (
                           <td style={S.td}>
-                            {esIncidencia ? (
+                            {esSinAsistencia ? (
                               <span
                                 style={{
                                   color: "#94a3b8",
@@ -2492,7 +2553,7 @@ export default function AdminAsistencias() {
                         ) : null}
                   
                         <td style={S.td}>
-                          {esIncidencia ? (
+                          {esSinAsistencia ? (
                             <span
                               style={{
                                 color: "#94a3b8",
@@ -2591,7 +2652,7 @@ export default function AdminAsistencias() {
             type="button"
             disabled={loading || pagination.current_page <= 1}
             onClick={() =>
-              load(Math.max(1, page - 1), filters)
+              load(Math.max(1, page - 1), appliedFilters)
             }
             style={S.buttonSecondary}
           >
@@ -2615,7 +2676,7 @@ export default function AdminAsistencias() {
               pagination.current_page >= pagination.last_page
             }
             onClick={() =>
-              load(Math.min(pagination.last_page, page + 1), filters)
+              load(Math.min(pagination.last_page, page + 1), appliedFilters)
             }
             style={S.buttonSecondary}
           >

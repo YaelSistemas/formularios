@@ -27,6 +27,11 @@ class AsistenciasAdminController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate([
+            'incluir_futuros' => [
+                'sometimes',
+                'boolean',
+            ],
+
             'fecha_desde' => [
                 'nullable',
                 'date',
@@ -2253,6 +2258,140 @@ class AsistenciasAdminController extends Controller
             : 'fuera_dia_laborable';
     }
 
+    /**
+     * Descansos virtuales para el listado administrativo.
+     * No crean asistencias y respetan la configuracion laboral historica.
+     * Solo se generan fechas hasta hoy, incluso al consultar futuros.
+     */
+    private function buildDescansosVirtualesQuery(array $data)
+    {
+        $hoy = Carbon::now(self::TIMEZONE)->startOfDay();
+        $hasta = !empty($data['fecha_hasta'])
+            ? Carbon::parse($data['fecha_hasta'], self::TIMEZONE)->startOfDay()
+            : $hoy->copy();
+        if ($hasta->gt($hoy)) {
+            $hasta = $hoy->copy();
+        }
+
+        $desde = !empty($data['fecha_desde'])
+            ? Carbon::parse($data['fecha_desde'], self::TIMEZONE)->startOfDay()
+            : $hasta->copy()->subDays(99);
+
+        // Las consultas sin un intervalo completo muestran 100 dias.
+        // Para intervalos explicitos se evita una generacion desmesurada.
+        if ($desde->lte($hasta) && $desde->diffInDays($hasta) > 365) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'fecha_desde' => 'Para consultar descansos, selecciona un intervalo de hasta 366 dias.',
+            ]);
+        }
+
+        // Siempre devolver una consulta con las mismas columnas, incluso
+        // cuando el rango de descanso este vacio (solo fechas futuras).
+        $fechas = [$hasta->toDateString()];
+        if ($desde->lte($hasta)) {
+            $fechas = [];
+            for ($dia = $desde->copy(); $dia->lte($hasta); $dia->addDay()) {
+                $fechas[] = $dia->toDateString();
+            }
+        }
+
+        $calendario = DB::query()->selectRaw('CAST(? AS DATE) AS fecha', [$fechas[0]]);
+        foreach (array_slice($fechas, 1) as $fecha) {
+            $calendario->unionAll(
+                DB::query()->selectRaw('CAST(? AS DATE) AS fecha', [$fecha])
+            );
+        }
+
+        $consulta = DB::query()
+            ->fromSub($calendario, 'calendario')
+            ->join('user_control_accesos as uca', function ($join) {
+                $join->whereColumn('uca.fecha_inicio', '<=', 'calendario.fecha')
+                    ->where(function ($q) {
+                        $q->whereNull('uca.fecha_fin')
+                            ->orWhereColumn('uca.fecha_fin', '>=', 'calendario.fecha');
+                    });
+            })
+            ->join('users as empleado', 'empleado.id', '=', 'uca.user_id')
+            ->join('turnos as t', 't.id', '=', 'uca.turno_id')
+            ->leftJoin('empresas as e', 'e.id', '=', 'uca.empresa_id')
+            ->leftJoin('unidades_servicio as us', 'us.id', '=', 'uca.unidad_servicio_id')
+            ->where(function ($q) {
+                $q->whereNull('t.vigente_desde')
+                    ->orWhereColumn('t.vigente_desde', '<=', 'calendario.fecha');
+            })
+            ->where(function ($q) {
+                $q->whereNull('t.vigente_hasta')
+                    ->orWhereColumn('t.vigente_hasta', '>=', 'calendario.fecha');
+            })
+            ->whereRaw('CASE DAYOFWEEK(calendario.fecha) '
+                . 'WHEN 1 THEN COALESCE(t.domingo,0) '
+                . 'WHEN 2 THEN COALESCE(t.lunes,0) '
+                . 'WHEN 3 THEN COALESCE(t.martes,0) '
+                . 'WHEN 4 THEN COALESCE(t.miercoles,0) '
+                . 'WHEN 5 THEN COALESCE(t.jueves,0) '
+                . 'WHEN 6 THEN COALESCE(t.viernes,0) '
+                . 'WHEN 7 THEN COALESCE(t.sabado,0) END = 0')
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')->from('user_control_accesos as posterior')
+                    ->whereColumn('posterior.user_id', 'uca.user_id')
+                    ->whereColumn('posterior.fecha_inicio', '<=', 'calendario.fecha')
+                    ->where(function ($r) {
+                        $r->whereNull('posterior.fecha_fin')
+                            ->orWhereColumn('posterior.fecha_fin', '>=', 'calendario.fecha');
+                    })
+                    ->where(function ($r) {
+                        $r->whereColumn('posterior.fecha_inicio', '>', 'uca.fecha_inicio')
+                            ->orWhere(function ($tie) {
+                                $tie->whereColumn('posterior.fecha_inicio', '=', 'uca.fecha_inicio')
+                                    ->whereColumn('posterior.id', '>', 'uca.id');
+                            });
+                    });
+            })
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')->from('asistencias as a')
+                    ->whereColumn('a.user_id', 'uca.user_id')
+                    ->whereColumn('a.fecha', 'calendario.fecha');
+            })
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')->from('asistencia_incidencias as inc')
+                    ->whereColumn('inc.user_id', 'uca.user_id')
+                    ->whereColumn('inc.fecha', 'calendario.fecha');
+            })
+            ->selectRaw("CONCAT(uca.user_id, '-', calendario.fecha) AS id")
+            ->addSelect('uca.user_id')
+            ->addSelect('empleado.name as empleado_nombre')
+            ->addSelect('empleado.email as empleado_email')
+            ->addSelect('calendario.fecha');
+
+        foreach ([
+            'hora_entrada', 'hora_inicio_comida', 'hora_fin_comida',
+            'hora_salida', 'segundos_presencia', 'segundos_comida',
+            'segundos_trabajados', 'metodo_entrada', 'estado_dia',
+            'estado_entrada', 'estado_salida', 'estado_comida', 'estado_jornada',
+        ] as $columna) {
+            $consulta->selectRaw('NULL AS ' . $columna);
+        }
+
+        return $consulta
+            ->addSelect('uca.unidad_servicio_id as unidad_servicio_id_snapshot')
+            ->addSelect('us.nombre as unidad_servicio_nombre_snapshot')
+            ->addSelect('uca.empresa_id as empresa_id_snapshot')
+            ->addSelect('e.nombre as empresa_nombre_snapshot')
+            ->addSelect('uca.tipo_trabajo as tipo_trabajo_snapshot')
+            ->addSelect('t.nombre as turno_nombre_snapshot')
+            ->addSelect('t.hora_inicio as turno_hora_inicio_snapshot')
+            ->addSelect('t.hora_fin as turno_hora_fin_snapshot')
+            ->addSelect('t.horas_jornada as turno_horas_jornada_snapshot')
+            ->addSelect('t.minutos_comida as turno_minutos_comida_snapshot')
+            ->addSelect('t.comida_cuenta_jornada as turno_comida_cuenta_jornada_snapshot')
+            ->selectRaw("'descanso' AS registro_tipo")
+            ->selectRaw('NULL AS incidencia_tipo')
+            ->selectRaw('NULL AS incidencia_observaciones')
+            ->when($desde->gt($hasta), function ($q) {
+                $q->whereRaw('1 = 0');
+            });
+    }
+
     private function buildFilteredRegistrosQuery(
         array $data
     ) {
@@ -2617,9 +2756,8 @@ class AsistenciasAdminController extends Controller
          */
         $unionQuery =
             $asistenciasQuery
-                ->unionAll(
-                    $incidenciasQuery
-                );
+                ->unionAll($incidenciasQuery)
+                ->unionAll($this->buildDescansosVirtualesQuery($data));
     
         $query =
             DB::query()
@@ -2645,6 +2783,20 @@ class AsistenciasAdminController extends Controller
             );
         }
     
+        /*
+         * Por defecto mostrar solo asistencias e incidencias
+         * hasta hoy (hora de Mexico). Al activar el interruptor
+         * se conserva el listado completo, incluidas las futuras.
+         * Este filtro aplica tambien a Excel/PDF.
+         */
+        if (!filter_var($data['incluir_futuros'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereDate(
+                'registros.fecha',
+                '<=',
+                Carbon::now(self::TIMEZONE)->toDateString()
+            );
+        }
+
         if (
             !empty(
                 $data['fecha_hasta']
@@ -2772,6 +2924,11 @@ class AsistenciasAdminController extends Controller
         Request $request
     ): array {
         return $request->validate([
+            'incluir_futuros' => [
+                'sometimes',
+                'boolean',
+            ],
+
             'fecha_desde' => [
                 'nullable',
                 'date',
@@ -2887,15 +3044,11 @@ class AsistenciasAdminController extends Controller
                  * Las incidencias no tienen horarios
                  * ni cálculos de jornada.
                  */
-                if (
-                    ($registro->registro_tipo ?? null)
-                    === 'incidencia'
-                ) {
-                    $incidenciaLabel =
-                        $incidenciaLabels[
-                            $registro->incidencia_tipo
-                        ]
-                        ?? 'Incidencia';
+                if (in_array(($registro->registro_tipo ?? null), ['incidencia', 'descanso'], true)) {
+                    $esDescanso = ($registro->registro_tipo ?? null) === 'descanso';
+                    $incidenciaLabel = $esDescanso
+                        ? 'Descanso'
+                        : ($incidenciaLabels[$registro->incidencia_tipo] ?? 'Incidencia');
                 
                     return [
                         'fecha' =>
@@ -2969,10 +3122,10 @@ class AsistenciasAdminController extends Controller
                             $incidenciaLabel,
                 
                         'metodo_entrada' =>
-                            'Incidencia',
+                            $esDescanso ? '—' : 'Incidencia',
                 
                         'incidencia_tipo' =>
-                            $incidenciaLabel,
+                            $esDescanso ? '—' : $incidenciaLabel,
                 
                         'incidencia_observaciones' =>
                             $registro
