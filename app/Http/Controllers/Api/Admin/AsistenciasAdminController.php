@@ -2808,26 +2808,24 @@ class AsistenciasAdminController extends Controller
     }
 
     private function formatExportTime(
-        $value
+        $value,
+        ?string $empresaLaboral = null
     ): string {
         if (!$value) {
             return '—';
         }
     
-        if (
-            $value instanceof
-            \DateTimeInterface
-        ) {
-            return $value->format(
-                'H:i:s'
-            );
+        // Desfase exclusivamente visual para asistencias de Reprosisa.
+        // No modifica la BD, el cálculo ni las fechas editables.
+        $hora = $value instanceof \DateTimeInterface
+            ? Carbon::instance($value)->copy()
+            : Carbon::parse($value, self::TIMEZONE);
+
+        if (mb_strtolower(trim((string) $empresaLaboral)) === 'reprosisa') {
+            $hora->subHour();
         }
-    
-        return Carbon::parse(
-            $value
-        )->format(
-            'H:i:s'
-        );
+
+        return $hora->format('H:i:s');
     }
     
     private function formatExportDuration(
@@ -3075,28 +3073,16 @@ class AsistenciasAdminController extends Controller
                         ?? '—',
     
                     'entrada' =>
-                        $this->formatExportTime(
-                            $registro
-                                ->hora_entrada
-                        ),
+                        $this->formatExportTime($registro->hora_entrada, $registro->empresa_nombre_snapshot),
     
                     'inicio_comida' =>
-                        $this->formatExportTime(
-                            $registro
-                                ->hora_inicio_comida
-                        ),
+                        $this->formatExportTime($registro->hora_inicio_comida, $registro->empresa_nombre_snapshot),
     
                     'fin_comida' =>
-                        $this->formatExportTime(
-                            $registro
-                                ->hora_fin_comida
-                        ),
+                        $this->formatExportTime($registro->hora_fin_comida, $registro->empresa_nombre_snapshot),
     
                     'salida' =>
-                        $this->formatExportTime(
-                            $registro
-                                ->hora_salida
-                        ),
+                        $this->formatExportTime($registro->hora_salida, $registro->empresa_nombre_snapshot),
     
                     'presencia' =>
                         $this->formatExportDuration(

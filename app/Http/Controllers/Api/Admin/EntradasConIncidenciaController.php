@@ -72,10 +72,11 @@ class EntradasConIncidenciaController extends Controller
                 'asistencia_eliminada',
                 $asistencia === null
             );
+            $desfaseVisual = mb_strtolower(trim((string) ($asistencia?->empresa_nombre_snapshot ?? ''))) === 'reprosisa';
             $registro->setAttribute('entrada_hora', $asistencia?->getRawOriginal('hora_entrada')
-                ? Carbon::parse($asistencia->getRawOriginal('hora_entrada'), 'America/Mexico_City')->format('H:i:s') : null);
+                ? Carbon::parse($asistencia->getRawOriginal('hora_entrada'), 'America/Mexico_City')->subHours($desfaseVisual ? 1 : 0)->format('H:i:s') : null);
             $registro->setAttribute('salida_hora', $asistencia?->getRawOriginal('hora_salida')
-                ? Carbon::parse($asistencia->getRawOriginal('hora_salida'), 'America/Mexico_City')->format('H:i:s') : null);
+                ? Carbon::parse($asistencia->getRawOriginal('hora_salida'), 'America/Mexico_City')->subHours($desfaseVisual ? 1 : 0)->format('H:i:s') : null);
         });
         return response()->json([
             'registros' => $pagina,

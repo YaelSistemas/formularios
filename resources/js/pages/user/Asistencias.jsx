@@ -168,10 +168,19 @@ function getRevisionLabel(estado) {
   return labels[estado] || estado || "—";
 }
 
-function formatTime(value) {
+// Únicamente presentación: los timestamps reales no se modifican.
+function esEmpresaReprosisa(nombre) {
+  return String(nombre || "").trim().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").toLowerCase() === "reprosisa";
+}
+
+function formatTime(value, empresaLaboral = null) {
   if (!value) return "—";
 
   const date = new Date(value);
+  if (!Number.isNaN(date.getTime()) && esEmpresaReprosisa(empresaLaboral)) {
+    date.setTime(date.getTime() - 60 * 60 * 1000);
+  }
 
   return new Intl.DateTimeFormat(
     "es-MX",
@@ -2878,8 +2887,7 @@ export default function Asistencias() {
             >
               <b>Entrada:</b>{" "}
               {formatTime(
-                actual.hora_entrada
-              )}
+                actual.hora_entrada, actual?.empresa_laboral?.nombre)}
             </div>
 
             {canCreate ? (
@@ -3054,16 +3062,14 @@ export default function Asistencias() {
             >
               <b>Entrada:</b>{" "}
               {formatTime(
-                registroHoy?.hora_entrada
-              )}
+                registroHoy?.hora_entrada, registroHoy?.empresa_laboral?.nombre)}
         
               {registroHoy?.hora_salida ? (
                 <>
                   {" · "}
                   <b>Salida:</b>{" "}
                   {formatTime(
-                    registroHoy?.hora_salida
-                  )}
+                    registroHoy?.hora_salida, registroHoy?.empresa_laboral?.nombre)}
                 </>
               ) : null}
             </div>
@@ -3292,14 +3298,12 @@ export default function Asistencias() {
 
                         <td style={S.td}>
                           {formatTime(
-                            item.hora_entrada
-                          )}
+                            item.hora_entrada, item?.empresa_laboral?.nombre)}
                         </td>
 
                         <td style={S.td}>
                           {formatTime(
-                            item.hora_salida
-                          )}
+                            item.hora_salida, item?.empresa_laboral?.nombre)}
                         </td>
 
                         <td style={S.td}>
@@ -3695,8 +3699,7 @@ export default function Asistencias() {
                               {formatTime(
                                 user
                                   .asistencia_actual
-                                  .hora_entrada
-                              )}
+                                  .hora_entrada, user?.asistencia_actual?.empresa_laboral?.nombre)}
                             </div>
 
                             {tieneComida &&
@@ -3748,8 +3751,7 @@ export default function Asistencias() {
                                   Comida iniciada:{" "}
                                   {formatTime(
                                     asistenciaActual
-                                      ?.hora_inicio_comida
-                                  )}
+                                      ?.hora_inicio_comida, asistenciaActual?.empresa_laboral?.nombre)}
                                 </div>
                             
                                 <button
@@ -3799,13 +3801,11 @@ export default function Asistencias() {
                                 Comida:{" "}
                                 {formatTime(
                                   asistenciaActual
-                                    ?.hora_inicio_comida
-                                )}
+                                    ?.hora_inicio_comida, asistenciaActual?.empresa_laboral?.nombre)}
                                 {" - "}
                                 {formatTime(
                                   asistenciaActual
-                                    ?.hora_fin_comida
-                                )}
+                                    ?.hora_fin_comida, asistenciaActual?.empresa_laboral?.nombre)}
                               </div>
                             ) : null}
 
@@ -3919,8 +3919,7 @@ export default function Asistencias() {
                             >
                               <b>Entrada:</b>{" "}
                               {formatTime(
-                                asistenciaHoy?.hora_entrada
-                              )}
+                                asistenciaHoy?.hora_entrada, asistenciaHoy?.empresa_laboral?.nombre)}
                             </div>
                         
                             {asistenciaHoy?.hora_salida ? (
@@ -3933,8 +3932,7 @@ export default function Asistencias() {
                               >
                                 <b>Salida:</b>{" "}
                                 {formatTime(
-                                  asistenciaHoy?.hora_salida
-                                )}
+                                  asistenciaHoy?.hora_salida, asistenciaHoy?.empresa_laboral?.nombre)}
                               </div>
                             ) : null}
                         
@@ -4254,8 +4252,7 @@ export default function Asistencias() {
 
                 <div style={S.detailValue}>
                   {formatTime(
-                    detailItem.hora_entrada
-                  )}
+                    detailItem.hora_entrada, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 
@@ -4267,8 +4264,7 @@ export default function Asistencias() {
                 <div style={S.detailValue}>
                   {formatTime(
                     detailItem
-                      .hora_inicio_comida
-                  )}
+                      .hora_inicio_comida, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 
@@ -4280,8 +4276,7 @@ export default function Asistencias() {
                 <div style={S.detailValue}>
                   {formatTime(
                     detailItem
-                      .hora_fin_comida
-                  )}
+                      .hora_fin_comida, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 
@@ -4292,8 +4287,7 @@ export default function Asistencias() {
 
                 <div style={S.detailValue}>
                   {formatTime(
-                    detailItem.hora_salida
-                  )}
+                    detailItem.hora_salida, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 

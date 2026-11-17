@@ -83,9 +83,18 @@ function formatDate(value) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-function formatTime(value) {
+// Únicamente presentación: los timestamps reales no se modifican.
+function esEmpresaReprosisa(nombre) {
+  return String(nombre || "").trim().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").toLowerCase() === "reprosisa";
+}
+
+function formatTime(value, empresaLaboral = null) {
   if (!value) return "—";
   const date = new Date(value);
+  if (!Number.isNaN(date.getTime()) && esEmpresaReprosisa(empresaLaboral)) {
+    date.setTime(date.getTime() - 60 * 60 * 1000);
+  }
   if (Number.isNaN(date.getTime())) {
     const raw = String(value);
     return raw.length >= 19 ? raw.slice(11, 19) : raw;
@@ -2359,7 +2368,7 @@ export default function AdminAsistencias() {
                             ? "—"
                             : formatTime(
                                 row.hora_entrada
-                              )}
+                              , row?.empresa_nombre_snapshot)}
                         </td>
                   
                         <td style={S.td}>
@@ -2368,9 +2377,9 @@ export default function AdminAsistencias() {
                           ) : row.hora_inicio_comida ? (
                             `${formatTime(
                               row.hora_inicio_comida
-                            )} - ${formatTime(
+                            , row?.empresa_nombre_snapshot)} - ${formatTime(
                               row.hora_fin_comida
-                            )}`
+                            , row?.empresa_nombre_snapshot)}`
                           ) : (
                             "—"
                           )}
@@ -2381,7 +2390,7 @@ export default function AdminAsistencias() {
                             ? "—"
                             : formatTime(
                                 row.hora_salida
-                              )}
+                              , row?.empresa_nombre_snapshot)}
                         </td>
                   
                         <td style={S.td}>
@@ -4255,8 +4264,7 @@ export default function AdminAsistencias() {
                 <div style={S.detailValue}>
                   {formatTime(
                     detailItem
-                      .hora_entrada
-                  )}
+                      .hora_entrada, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 
@@ -4268,8 +4276,7 @@ export default function AdminAsistencias() {
                 <div style={S.detailValue}>
                   {formatTime(
                     detailItem
-                      .hora_inicio_comida
-                  )}
+                      .hora_inicio_comida, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 
@@ -4281,8 +4288,7 @@ export default function AdminAsistencias() {
                 <div style={S.detailValue}>
                   {formatTime(
                     detailItem
-                      .hora_fin_comida
-                  )}
+                      .hora_fin_comida, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 
@@ -4294,8 +4300,7 @@ export default function AdminAsistencias() {
                 <div style={S.detailValue}>
                   {formatTime(
                     detailItem
-                      .hora_salida
-                  )}
+                      .hora_salida, detailItem?.empresa_laboral?.nombre)}
                 </div>
               </div>
 

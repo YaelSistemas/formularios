@@ -32,7 +32,7 @@ class KioscoAsistenciasController extends Controller
                 'user:id,name,email,activo',
                 'unidadServicio:id,nombre',
 
-                'turno:id,nombre,hora_inicio,hora_fin,horas_jornada,minutos_comida,comida_cuenta_jornada,activo',
+                'turno:id,nombre,hora_inicio,hora_fin,horas_jornada,minutos_comida,comida_cuenta_jornada,lunes,martes,miercoles,jueves,viernes,sabado,domingo,activo',
             ])
             ->where('kiosco_habilitado', true)
             ->whereDate('fecha_inicio', '<=', $today)
