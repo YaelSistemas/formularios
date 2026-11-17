@@ -109,9 +109,14 @@ class AsistenciasController extends Controller
                             '/'
                         )
                     : null,
+
             'firma_capturada_at' =>
                 $puedeVerFirma
-                    ? $asistencia->firma_capturada_at
+                && $asistencia->getRawOriginal('firma_capturada_at')
+                    ? Carbon::parse(
+                        $asistencia->getRawOriginal('firma_capturada_at'),
+                        'UTC'
+                    )->toIso8601String()
                     : null,
             
             'puede_ver_firma' =>
@@ -132,7 +137,11 @@ class AsistenciasController extends Controller
             
             'foto_capturada_at' =>
                 $puedeVerFoto
-                    ? $asistencia->foto_capturada_at
+                && $asistencia->getRawOriginal('foto_capturada_at')
+                    ? Carbon::parse(
+                        $asistencia->getRawOriginal('foto_capturada_at'),
+                        'UTC'
+                    )->toIso8601String()
                     : null,
             
             'puede_ver_foto' =>
