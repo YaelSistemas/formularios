@@ -1077,34 +1077,32 @@ class UsersController extends Controller
         ]);
     }
     
+    /**
+     * Un cambio real de empresa, unidad, turno o tipo de trabajo
+     * crea una nueva configuracion con vigencia automatica desde hoy.
+     * La configuracion anterior permanece para consultas historicas.
+     * No se usa la fecha_inicio enviada por el formulario como una
+     * fecha que el administrador deba cambiar manualmente.
+     */
     private function updateControlAcceso(
         User $user,
         array $data
     ): UserControlAcceso {
         $actual = null;
-        
-        /*
-         * Si el formulario nos indicó exactamente qué
-         * configuración estamos editando, usamos esa.
-         */
+
         if (!empty($data['id'])) {
             $actual = UserControlAcceso::query()
                 ->where('id', $data['id'])
                 ->where('user_id', $user->id)
                 ->first();
-        
+
             if (!$actual) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'control_acceso.id' =>
-                        'La configuración de Control de acceso no pertenece a este usuario.',
+                    'control_acceso.id' => 'La configuracion laboral no pertenece a este usuario.',
                 ]);
             }
         }
-        
-        /*
-         * Compatibilidad por si alguna petición antigua
-         * todavía no envía el ID.
-         */
+
         if (!$actual) {
             $actual = UserControlAcceso::query()
                 ->where('user_id', $user->id)
@@ -1112,102 +1110,95 @@ class UsersController extends Controller
                 ->orderByDesc('id')
                 ->first();
         }
-    
-        /*
-         * Si todavía no existe configuración,
-         * simplemente creamos la primera.
-         */
+
         if (!$actual) {
-            return $this->createControlAcceso(
-                $user,
-                $data
-            );
+            return $this->createControlAcceso($user, $data);
         }
-    
-        $nuevaFechaInicio =
-            $data['fecha_inicio'];
-    
-        $fechaInicioActual =
-            $actual->fecha_inicio
-                ->format('Y-m-d');
-    
-        /*
-         * Si mantiene exactamente la misma fecha inicial,
-         * interpretamos que está corrigiendo esa misma
-         * configuración y actualizamos el registro.
-         */
-        if (
-            $nuevaFechaInicio ===
-            $fechaInicioActual
-        ) {
+
+        $hoy = now('America/Mexico_City')->toDateString();
+        $inicioActual = $actual->fecha_inicio->format('Y-m-d');
+        $finActual = $actual->fecha_fin?->format('Y-m-d');
+
+        // No convertir una configuracion ya terminada en la vigente.
+        // La interfaz debe editar la configuracion actual, no una anterior.
+        if ($finActual !== null && $finActual < $hoy) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'control_acceso' => 'Esta configuracion laboral ya termino. '
+                    .'Selecciona la configuracion vigente para registrar un cambio.',
+            ]);
+        }
+
+        $camposLaborales = ['empresa_id', 'unidad_servicio_id', 'turno_id', 'tipo_trabajo'];
+        $cambiaAsignacion = false;
+        foreach ($camposLaborales as $campo) {
+            if ((string) ($actual->{$campo} ?? '') !== (string) ($data[$campo] ?? '')) {
+                $cambiaAsignacion = true;
+                break;
+            }
+        }
+
+        if (!$cambiaAsignacion) {
+            // Kiosco y fecha final se pueden actualizar sin producir una
+            // nueva asignacion laboral. Nunca sobrescribimos el inicio.
+            $ajustes = [
+                'kiosco_habilitado' => (bool) $data['kiosco_habilitado'],
+                'fecha_fin' => $data['fecha_fin'] ?? null,
+            ];
             $this->validateControlAccesoOverlap(
                 $user,
-                $data,
+                array_merge($data, [
+                    'fecha_inicio' => $inicioActual,
+                    'fecha_fin' => $ajustes['fecha_fin'],
+                ]),
                 $actual->id
             );
-    
-            $actual->update([
-                'empresa_id' =>
-                    $data['empresa_id'],
-            
-                'unidad_servicio_id' =>
-                    $data['unidad_servicio_id'],
-            
-                'turno_id' =>
-                    $data['turno_id'],
-    
-                'tipo_trabajo' =>
-                    $data['tipo_trabajo'],
-    
-                'kiosco_habilitado' =>
-                    (bool) $data['kiosco_habilitado'],
-    
-                'fecha_inicio' =>
-                    $data['fecha_inicio'],
-    
-                'fecha_fin' =>
-                    $data['fecha_fin'] ?? null,
-            ]);
-    
+            $actual->update($ajustes);
             return $actual->fresh();
         }
-    
-        /*
-         * Para conservar historial, una nueva configuración
-         * debe iniciar después de la configuración vigente.
-         */
-        if (
-            $nuevaFechaInicio <
-            $fechaInicioActual
-        ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'control_acceso.fecha_inicio' =>
-                    'La nueva configuración no puede comenzar antes de la configuración laboral vigente.',
+
+        // Una fecha efectiva opcional puede habilitarse mas adelante
+        // para correcciones retroactivas auditadas. Por defecto: hoy.
+        if ($inicioActual >= $hoy) {
+            // Configuracion creada hoy (o futura): no existe un dia
+            // anterior de esta vigencia que sea necesario cerrar.
+            // Corregirla dentro de la misma jornada evita rangos invalidos.
+            $this->validateControlAccesoOverlap(
+                $user,
+                array_merge($data, [
+                    'fecha_inicio' => $inicioActual,
+                    'fecha_fin' => $finActual,
+                ]),
+                $actual->id
+            );
+            $actual->update([
+                'empresa_id' => $data['empresa_id'],
+                'unidad_servicio_id' => $data['unidad_servicio_id'],
+                'turno_id' => $data['turno_id'],
+                'tipo_trabajo' => $data['tipo_trabajo'],
+                'kiosco_habilitado' => (bool) $data['kiosco_habilitado'],
             ]);
+            return $actual->fresh();
         }
-    
-        /*
-         * Cerramos automáticamente la configuración anterior
-         * un día antes de que empiece la nueva.
-         */
-        $finAnterior = \Carbon\Carbon::parse(
-            $nuevaFechaInicio,
-            'America/Mexico_City'
-        )
-            ->subDay()
-            ->toDateString();
-    
-        $actual->fecha_fin =
-            $finAnterior;
-    
+
+        // Conservar el fin programado de la vigencia anterior para
+        // la nueva, sin permitir que haya una asignacion solapada.
+        $fechaCorte = \Carbon\Carbon::parse($hoy, 'America/Mexico_City')
+            ->subDay()->toDateString();
+
+        $actual->fecha_fin = $fechaCorte;
         $actual->save();
-    
-        return $this->createControlAcceso(
-            $user,
-            $data
-        );
+
+        return $this->createControlAcceso($user, [
+            'empresa_id' => $data['empresa_id'],
+            'unidad_servicio_id' => $data['unidad_servicio_id'],
+            'turno_id' => $data['turno_id'],
+            'tipo_trabajo' => $data['tipo_trabajo'],
+            'kiosco_habilitado' => (bool) $data['kiosco_habilitado'],
+            'fecha_inicio' => $hoy,
+            'fecha_fin' => $finActual,
+        ]);
     }
-    
+
     private function validateControlAccesoOverlap(
         User $user,
         array $data,

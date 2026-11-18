@@ -8,6 +8,7 @@ use App\Models\AsistenciaIncidencia;
 use App\Models\AsistenciaIncidenciaHistory;
 use App\Models\User;
 use App\Support\Asistencias\DiasEfectivosIncidencia;
+use App\Support\Asistencias\SnapshotLaboralIncidencia;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,8 +33,8 @@ class AsistenciaIncidenciasController extends Controller
     ];
 
     /**
-     * Filtrar por empresa/unidad laborales vigentes en la fecha de incidencia.
-     * No usa asignaciones de Formularios ni modifica las incidencias masivas.
+     * Incidencias nuevas: filtrar por datos congelados al crear.
+     * Incidencias anteriores: compatibilidad con la búsqueda por vigencia.
      */
     private function aplicarFiltroLaboralIncidencias($query, array $data): void
     {
@@ -44,22 +45,26 @@ class AsistenciaIncidenciasController extends Controller
             return;
         }
 
-        $query->whereExists(function ($sub) use ($empresaId, $unidadId) {
-            $sub->selectRaw('1')
-                ->from('user_control_accesos as uca_filtro')
-                ->whereColumn('uca_filtro.user_id', 'asistencia_incidencias.user_id')
-                ->whereColumn('uca_filtro.fecha_inicio', '<=', 'asistencia_incidencias.fecha')
-                ->where(function ($q) {
-                    $q->whereNull('uca_filtro.fecha_fin')
-                      ->orWhereColumn('uca_filtro.fecha_fin', '>=', 'asistencia_incidencias.fecha');
+        $query->where(function ($q) use ($empresaId, $unidadId) {
+            $q->where(function ($snapshot) use ($empresaId, $unidadId) {
+                $snapshot->where('asistencia_incidencias.snapshot_laboral_registrado', true);
+                if ($empresaId) $snapshot->where('asistencia_incidencias.empresa_id_snapshot', (int) $empresaId);
+                if ($unidadId) $snapshot->where('asistencia_incidencias.unidad_servicio_id_snapshot', (int) $unidadId);
+            })->orWhere(function ($legado) use ($empresaId, $unidadId) {
+                $legado->where('asistencia_incidencias.snapshot_laboral_registrado', false);
+                $legado->whereExists(function ($sub) use ($empresaId, $unidadId) {
+                    $sub->selectRaw('1')
+                        ->from('user_control_accesos as uca_filtro')
+                        ->whereColumn('uca_filtro.user_id', 'asistencia_incidencias.user_id')
+                        ->whereColumn('uca_filtro.fecha_inicio', '<=', 'asistencia_incidencias.fecha')
+                        ->where(function ($q) {
+                            $q->whereNull('uca_filtro.fecha_fin')
+                                ->orWhereColumn('uca_filtro.fecha_fin', '>=', 'asistencia_incidencias.fecha');
+                        });
+                    if ($empresaId) $sub->where('uca_filtro.empresa_id', (int) $empresaId);
+                    if ($unidadId) $sub->where('uca_filtro.unidad_servicio_id', (int) $unidadId);
                 });
-
-            if ($empresaId) {
-                $sub->where('uca_filtro.empresa_id', (int) $empresaId);
-            }
-            if ($unidadId) {
-                $sub->where('uca_filtro.unidad_servicio_id', (int) $unidadId);
-            }
+            });
         });
     }
 
@@ -626,6 +631,7 @@ class AsistenciaIncidenciasController extends Controller
                     )
                 ) {
                     AsistenciaIncidencia::create([
+                        ...SnapshotLaboralIncidencia::paraFecha((int) $data['user_id'], $fecha->toDateString()),
                         'user_id' =>
                             $data['user_id'],
         
@@ -1441,7 +1447,8 @@ class AsistenciaIncidenciasController extends Controller
                 $fechaDesde,
                 $fechaHasta,
                 $grupoUuid,
-                $before
+                $before,
+                $actuales
             ) {
                 AsistenciaIncidencia::query()
                     ->where(
@@ -1459,6 +1466,9 @@ class AsistenciaIncidenciasController extends Controller
                     )
                 ) {
                     AsistenciaIncidencia::create([
+                        ...(((int) $actuales->first()->user_id === (int) $data['user_id'])
+                            ? SnapshotLaboralIncidencia::existente($actuales->first(), (int) $data['user_id'], $fecha->toDateString())
+                            : SnapshotLaboralIncidencia::paraFecha((int) $data['user_id'], $fecha->toDateString())),
                         'user_id' =>
                             $data['user_id'],
 
@@ -1634,7 +1644,12 @@ class AsistenciaIncidenciasController extends Controller
             $rows = [];
             foreach ($ids as $id) {
                 for ($dia = $desde->copy(); $dia->lte($hasta); $dia->addDay()) {
+                    $snapshot = SnapshotLaboralIncidencia::paraFecha((int) $id, $dia->toDateString());
+                    if (is_array($snapshot['turno_dias_snapshot'])) {
+                        $snapshot['turno_dias_snapshot'] = json_encode($snapshot['turno_dias_snapshot']);
+                    }
                     $rows[] = [
+                        ...$snapshot,
                         'user_id' => $id, 'grupo_uuid' => $uuid, 'es_masiva' => true,
                         'alcance' => $data['alcance'], 'personalizada' => false,
                         'fecha' => $dia->toDateString(), 'tipo' => $data['tipo'],
@@ -1740,7 +1755,12 @@ class AsistenciaIncidenciasController extends Controller
             foreach ($memberIds as $id) {
                 $initial = $old[$id]->first();
                 for ($day = $desde->copy(); $day->lte($hasta); $day->addDay()) {
+                    $snapshot = SnapshotLaboralIncidencia::existente($initial, (int) $id, $day->toDateString());
+                    if (is_array($snapshot['turno_dias_snapshot'])) {
+                        $snapshot['turno_dias_snapshot'] = json_encode($snapshot['turno_dias_snapshot']);
+                    }
                     $rows[] = [
+                        ...$snapshot,
                         'user_id' => $id, 'grupo_uuid' => $grupoUuid, 'es_masiva' => true,
                         'alcance' => $initial->alcance, 'personalizada' => true,
                         'fecha' => $day->toDateString(), 'tipo' => $data['tipo'],

@@ -87,6 +87,23 @@ class DiasEfectivosIncidencia
             return 0;
         }
 
+        // Una incidencia nueva conserva el calendario del turno capturado.
+        // Así el conteo no cambia si después editan el turno del empleado.
+        $incidencia = AsistenciaIncidencia::query()
+            ->where('user_id', $userId)
+            ->whereDate('fecha', $fecha)
+            ->where('tipo', 'vacaciones')
+            ->first(['snapshot_laboral_registrado', 'turno_dias_snapshot']);
+        if ($incidencia && $incidencia->snapshot_laboral_registrado) {
+            $dias = $incidencia->turno_dias_snapshot;
+            if (!is_array($dias)) {
+                return null; // No había un turno válido al registrar.
+            }
+            $nombreDia = [1 => 'lunes', 2 => 'martes', 3 => 'miercoles',
+                4 => 'jueves', 5 => 'viernes', 6 => 'sabado', 7 => 'domingo'];
+            return !empty($dias[$nombreDia[Carbon::parse($fecha)->dayOfWeekIso]]) ? 1 : 0;
+        }
+
         if (!array_key_exists($userId, self::$configuraciones)) {
             self::$configuraciones[$userId] = UserControlAcceso::query()
                 ->with('turno')

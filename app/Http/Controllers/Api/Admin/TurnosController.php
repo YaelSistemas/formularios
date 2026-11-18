@@ -145,7 +145,53 @@ class TurnosController extends Controller
         $data = $this->validateData($request);
     
         $before = $this->buildSnapshot($turno);
-    
+
+        // Los descansos virtuales consultan directamente el calendario
+        // del turno. No permitir sobrescribir un calendario utilizado
+        // en configuraciones laborales de días transcurridos.
+        $camposHistoricos = [
+            'nombre', 'hora_inicio', 'hora_fin', 'horas_jornada',
+            'minutos_comida', 'comida_cuenta_jornada',
+            'lunes', 'martes', 'miercoles', 'jueves',
+            'viernes', 'sabado', 'domingo',
+            'vigente_desde', 'vigente_hasta',
+        ];
+        $cambioHistorico = false;
+        foreach ($camposHistoricos as $campo) {
+            $nuevo = $data[$campo] ?? null;
+            $anterior = $before[$campo] ?? null;
+            // Los booleanos, decimales y fechas pueden tener casts
+            // distintos aunque representen el mismo valor.
+            if (is_bool($anterior)) {
+                $distinto = (bool) $nuevo !== $anterior;
+            } elseif (in_array($campo, ['horas_jornada'], true)) {
+                $distinto = (float) $nuevo !== (float) $anterior;
+            } else {
+                $distinto = (string) ($nuevo ?? '') !== (string) ($anterior ?? '');
+            }
+            if ($distinto) {
+                $cambioHistorico = true;
+                break;
+            }
+        }
+
+        if ($cambioHistorico) {
+            $hoy = now('America/Mexico_City')->toDateString();
+            $tieneUsoHistorico = UserControlAcceso::query()
+                ->where('turno_id', $turno->id)
+                ->whereDate('fecha_inicio', '<=', $hoy)
+                ->exists();
+
+            if ($tieneUsoHistorico) {
+                throw ValidationException::withMessages([
+                    'turno' => 'Este turno ya tiene historial laboral. '
+                        .'Para cambiar horarios o días laborables crea un turno nuevo '
+                        .'y asígnalo al empleado (el historial laboral se registrará automáticamente). '
+                        .'El turno anterior se conserva para descansos e incidencias.',
+                ]);
+            }
+        }
+
         $turno->update($data);
     
         $turno->refresh();

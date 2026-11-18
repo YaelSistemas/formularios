@@ -2553,7 +2553,9 @@ class AsistenciasAdminController extends Controller
                      * a la fecha de la incidencia.
                      */
                     DB::raw("
-                        (
+                        CASE WHEN asistencia_incidencias.snapshot_laboral_registrado = 1
+                             THEN asistencia_incidencias.unidad_servicio_id_snapshot
+                             ELSE (
                             SELECT
                                 uca.unidad_servicio_id
                             FROM
@@ -2573,14 +2575,16 @@ class AsistenciasAdminController extends Controller
                                 uca.id DESC
                             LIMIT 1
                         )
-                        as unidad_servicio_id_snapshot
+                        END as unidad_servicio_id_snapshot
                     "),
     
                     /*
                      * Nombre de la unidad laboral.
                      */
                     DB::raw("
-                        (
+                        CASE WHEN asistencia_incidencias.snapshot_laboral_registrado = 1
+                             THEN asistencia_incidencias.unidad_servicio_nombre_snapshot
+                             ELSE (
                             SELECT
                                 us.nombre
                             FROM
@@ -2604,7 +2608,7 @@ class AsistenciasAdminController extends Controller
                                 uca.id DESC
                             LIMIT 1
                         )
-                        as unidad_servicio_nombre_snapshot
+                        END as unidad_servicio_nombre_snapshot
                     "),
     
                     /*
@@ -2612,7 +2616,9 @@ class AsistenciasAdminController extends Controller
                      * a la fecha de la incidencia.
                      */
                     DB::raw("
-                        (
+                        CASE WHEN asistencia_incidencias.snapshot_laboral_registrado = 1
+                             THEN asistencia_incidencias.empresa_id_snapshot
+                             ELSE (
                             SELECT
                                 uca.empresa_id
                             FROM
@@ -2632,14 +2638,16 @@ class AsistenciasAdminController extends Controller
                                 uca.id DESC
                             LIMIT 1
                         )
-                        as empresa_id_snapshot
+                        END as empresa_id_snapshot
                     "),
                     
                     /*
                      * Nombre de la empresa laboral.
                      */
                     DB::raw("
-                        (
+                        CASE WHEN asistencia_incidencias.snapshot_laboral_registrado = 1
+                             THEN asistencia_incidencias.empresa_nombre_snapshot
+                             ELSE (
                             SELECT
                                 e.nombre
                             FROM
@@ -2663,7 +2671,7 @@ class AsistenciasAdminController extends Controller
                                 uca.id DESC
                             LIMIT 1
                         )
-                        as empresa_nombre_snapshot
+                        END as empresa_nombre_snapshot
                     "),
 
                     /*
@@ -2671,7 +2679,9 @@ class AsistenciasAdminController extends Controller
                      * a esa fecha.
                      */
                     DB::raw("
-                        (
+                        CASE WHEN asistencia_incidencias.snapshot_laboral_registrado = 1
+                             THEN asistencia_incidencias.tipo_trabajo_snapshot
+                             ELSE (
                             SELECT
                                 uca.tipo_trabajo
                             FROM
@@ -2691,7 +2701,7 @@ class AsistenciasAdminController extends Controller
                                 uca.id DESC
                             LIMIT 1
                         )
-                        as tipo_trabajo_snapshot
+                        END as tipo_trabajo_snapshot
                     "),
     
                     /*
@@ -2699,7 +2709,9 @@ class AsistenciasAdminController extends Controller
                      * a esa fecha.
                      */
                     DB::raw("
-                        (
+                        CASE WHEN asistencia_incidencias.snapshot_laboral_registrado = 1
+                             THEN asistencia_incidencias.turno_nombre_snapshot
+                             ELSE (
                             SELECT
                                 t.nombre
                             FROM
@@ -2723,7 +2735,7 @@ class AsistenciasAdminController extends Controller
                                 uca.id DESC
                             LIMIT 1
                         )
-                        as turno_nombre_snapshot
+                        END as turno_nombre_snapshot
                     "),
     
                     DB::raw(
