@@ -1450,6 +1450,12 @@ class AsistenciaIncidenciasController extends Controller
                 $before,
                 $actuales
             ) {
+                // Usar el snapshot específico de cada fecha que ya existía.
+                // Las fechas nuevas obtienen su configuración laboral propia.
+                $snapshotsPorFecha = $actuales
+                    ->where('user_id', (int) $data['user_id'])
+                    ->keyBy(fn ($registro) => Carbon::parse($registro->fecha)->toDateString());
+
                 AsistenciaIncidencia::query()
                     ->where(
                         'grupo_uuid',
@@ -1466,9 +1472,16 @@ class AsistenciaIncidenciasController extends Controller
                     )
                 ) {
                     AsistenciaIncidencia::create([
-                        ...(((int) $actuales->first()->user_id === (int) $data['user_id'])
-                            ? SnapshotLaboralIncidencia::existente($actuales->first(), (int) $data['user_id'], $fecha->toDateString())
-                            : SnapshotLaboralIncidencia::paraFecha((int) $data['user_id'], $fecha->toDateString())),
+                        ...($snapshotsPorFecha->has($fecha->toDateString())
+                            ? SnapshotLaboralIncidencia::existente(
+                                $snapshotsPorFecha->get($fecha->toDateString()),
+                                (int) $data['user_id'],
+                                $fecha->toDateString()
+                            )
+                            : SnapshotLaboralIncidencia::paraFecha(
+                                (int) $data['user_id'],
+                                $fecha->toDateString()
+                            )),
                         'user_id' =>
                             $data['user_id'],
 
@@ -1754,8 +1767,13 @@ class AsistenciaIncidenciasController extends Controller
             $rows = []; $now = now();
             foreach ($memberIds as $id) {
                 $initial = $old[$id]->first();
+                $snapshotsPorFecha = $old[$id]
+                    ->keyBy(fn ($registro) => Carbon::parse($registro->fecha)->toDateString());
                 for ($day = $desde->copy(); $day->lte($hasta); $day->addDay()) {
-                    $snapshot = SnapshotLaboralIncidencia::existente($initial, (int) $id, $day->toDateString());
+                    $fechaDia = $day->toDateString();
+                    $snapshot = $snapshotsPorFecha->has($fechaDia)
+                        ? SnapshotLaboralIncidencia::existente($snapshotsPorFecha->get($fechaDia), (int) $id, $fechaDia)
+                        : SnapshotLaboralIncidencia::paraFecha((int) $id, $fechaDia);
                     if (is_array($snapshot['turno_dias_snapshot'])) {
                         $snapshot['turno_dias_snapshot'] = json_encode($snapshot['turno_dias_snapshot']);
                     }

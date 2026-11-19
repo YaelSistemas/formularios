@@ -369,6 +369,22 @@ class AsistenciasAdminController extends Controller
                 "A{$excelRow}"
             );
     
+            // Una segunda línea gris sólo en los horarios de Reprosisa.
+            foreach (['G' => 'entrada', 'H' => 'inicio_comida', 'I' => 'fin_comida', 'J' => 'salida'] as $col => $key) {
+                $cdmx = $row[$key . '_cdmx'] ?? null;
+                if (!$cdmx || ($row[$key] ?? '—') === '—') {
+                    continue;
+                }
+                $rich = new \PhpOffice\PhpSpreadsheet\RichText\RichText();
+                $rich->createTextRun($row[$key]);
+                $secondary = $rich->createTextRun("\n" . $cdmx . ' CDMX');
+                $secondary->getFont()->setSize(9)->getColor()->setARGB('FF64748B');
+                $cell = $sheet->getCell($col . $excelRow);
+                $cell->setValue($rich);
+                $sheet->getStyle($col . $excelRow)->getAlignment()->setWrapText(true);
+                $sheet->getRowDimension($excelRow)->setRowHeight(31);
+            }
+
             $excelRow++;
         }
     
@@ -3003,6 +3019,21 @@ class AsistenciasAdminController extends Controller
         return $hora->format('H:i:s');
     }
     
+    // Hora original de CDMX. La resta visual para Reprosisa se mantiene
+    // exclusivamente en formatExportTime(); no se modifica la base de datos.
+    private function formatExportCdmxTime($value, ?string $empresaLaboral = null): ?string
+    {
+        if (!$value || mb_strtolower(trim((string) $empresaLaboral)) !== 'reprosisa') {
+            return null;
+        }
+
+        $hora = $value instanceof \DateTimeInterface
+            ? Carbon::instance($value)->copy()
+            : Carbon::parse($value, self::TIMEZONE);
+
+        return $hora->format('H:i:s');
+    }
+
     private function formatExportDuration(
         $value
     ): string {
@@ -3245,15 +3276,27 @@ class AsistenciasAdminController extends Controller
     
                     'entrada' =>
                         $this->formatExportTime($registro->hora_entrada, $registro->empresa_nombre_snapshot),
+
+                    'entrada_cdmx' =>
+                        $this->formatExportCdmxTime($registro->hora_entrada, $registro->empresa_nombre_snapshot),
     
                     'inicio_comida' =>
                         $this->formatExportTime($registro->hora_inicio_comida, $registro->empresa_nombre_snapshot),
+
+                    'inicio_comida_cdmx' =>
+                        $this->formatExportCdmxTime($registro->hora_inicio_comida, $registro->empresa_nombre_snapshot),
     
                     'fin_comida' =>
                         $this->formatExportTime($registro->hora_fin_comida, $registro->empresa_nombre_snapshot),
+
+                    'fin_comida_cdmx' =>
+                        $this->formatExportCdmxTime($registro->hora_fin_comida, $registro->empresa_nombre_snapshot),
     
                     'salida' =>
                         $this->formatExportTime($registro->hora_salida, $registro->empresa_nombre_snapshot),
+
+                    'salida_cdmx' =>
+                        $this->formatExportCdmxTime($registro->hora_salida, $registro->empresa_nombre_snapshot),
     
                     'presencia' =>
                         $this->formatExportDuration(

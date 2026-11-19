@@ -109,6 +109,23 @@ function formatTime(value, empresaLaboral = null) {
   }).format(date);
 }
 
+// Presentación dual para Reprosisa: la hora operativa sigue siendo la principal.
+// La segunda línea muestra la hora real en Ciudad de México, sin alterar datos.
+function HoraReprosisa({ value, empresaLaboral }) {
+  if (!value) return "—";
+  const reprosisa = esEmpresaReprosisa(empresaLaboral);
+  return (
+    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+      <span style={{ whiteSpace: "nowrap" }}>{formatTime(value, empresaLaboral)}</span>
+      {reprosisa && (
+        <span style={{ color: "#64748b", fontSize: 10, whiteSpace: "nowrap", fontWeight: 400 }}>
+          {formatTime(value)} CDMX
+        </span>
+      )}
+    </div>
+  );
+}
+
 function formatSeconds(value) {
   if (value === null || value === undefined || value === "") {
     return "—";
@@ -156,6 +173,43 @@ function formatDateTime(value) {
       hour12: false,
     }
   ).format(date);
+}
+
+// En Reprosisa mostramos la hora operativa (-1 h) y debajo la hora CDMX.
+// Estos helpers son visuales; no modifican los registros ni sus auditorías.
+function FechaHoraDualReprosisa({ value, empresaLaboral }) {
+  if (!value) return "—";
+  const esReprosisa = esEmpresaReprosisa(empresaLaboral);
+  const fecha = new Date(value);
+  const horaOperativa = esReprosisa && !Number.isNaN(fecha.getTime())
+    ? formatDateTime(new Date(fecha.getTime() - 60 * 60 * 1000))
+    : formatDateTime(value);
+  return (
+    <div style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
+      <span>{horaOperativa}</span>
+      {esReprosisa && (
+        <span style={{ color: "#64748b", fontSize: 10, fontWeight: 400, whiteSpace: "nowrap" }}>
+          {formatDateTime(value)} CDMX
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Las horas guardadas en los snapshots de historial son HH:mm:ss,
+// no marcas de tiempo: se aplica el ajuste sin interpretarlas como fechas UTC.
+function HoraHistorialReprosisa({ value, empresaLaboral }) {
+  if (!value || value === "—") return "—";
+  const raw = String(value).slice(0, 8);
+  if (!esEmpresaReprosisa(empresaLaboral) || !/^\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  const [h, m, sec] = raw.split(":").map(Number);
+  const ajustada = `${String((h + 23) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  return (
+    <div style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
+      <span>{ajustada}</span>
+      <span style={{ color: "#64748b", fontSize: 10, fontWeight: 400, whiteSpace: "nowrap" }}>{raw} CDMX</span>
+    </div>
+  );
 }
 
 function formatTipoTrabajo(value) {
@@ -2414,35 +2468,27 @@ export default function AdminAsistencias() {
                         </td>
                   
                         <td style={S.td}>
-                          {esSinAsistencia
-                            ? "—"
-                            : formatTime(
-                                row.hora_entrada
-                              , row?.empresa_nombre_snapshot)}
-                        </td>
-                  
-                        <td style={S.td}>
-                          {esSinAsistencia ? (
-                            "—"
-                          ) : row.hora_inicio_comida ? (
-                            `${formatTime(
-                              row.hora_inicio_comida
-                            , row?.empresa_nombre_snapshot)} - ${formatTime(
-                              row.hora_fin_comida
-                            , row?.empresa_nombre_snapshot)}`
-                          ) : (
-                            "—"
+                          {esSinAsistencia ? "—" : (
+                            <HoraReprosisa value={row.hora_entrada} empresaLaboral={row.empresa_nombre_snapshot} />
                           )}
                         </td>
-                  
+
                         <td style={S.td}>
-                          {esSinAsistencia
-                            ? "—"
-                            : formatTime(
-                                row.hora_salida
-                              , row?.empresa_nombre_snapshot)}
+                          {esSinAsistencia ? "—" : row.hora_inicio_comida ? (
+                            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3 }}>
+                              <HoraReprosisa value={row.hora_inicio_comida} empresaLaboral={row.empresa_nombre_snapshot} />
+                              <span>–</span>
+                              <HoraReprosisa value={row.hora_fin_comida} empresaLaboral={row.empresa_nombre_snapshot} />
+                            </div>
+                          ) : "—"}
                         </td>
-                  
+
+                        <td style={S.td}>
+                          {esSinAsistencia ? "—" : (
+                            <HoraReprosisa value={row.hora_salida} empresaLaboral={row.empresa_nombre_snapshot} />
+                          )}
+                        </td>
+
                         <td style={S.td}>
                           {esSinAsistencia
                             ? "—"
@@ -3627,7 +3673,12 @@ export default function AdminAsistencias() {
                                             800,
                                         }}
                                       >
-                                        {formatHistoryValue(
+                                        {change.type === "time" ? (
+                                          <HoraHistorialReprosisa
+                                            value={change.old}
+                                            empresaLaboral={item.snapshot?.empresa_nombre || historyItem?.empresa_nombre_snapshot || historyItems.find(h => h.snapshot?.empresa_nombre)?.snapshot?.empresa_nombre}
+                                          />
+                                        ) : formatHistoryValue(
                                           change.field,
                                           change.type,
                                           change.old
@@ -3659,7 +3710,12 @@ export default function AdminAsistencias() {
                                             800,
                                         }}
                                       >
-                                        {formatHistoryValue(
+                                        {change.type === "time" ? (
+                                          <HoraHistorialReprosisa
+                                            value={change.new}
+                                            empresaLaboral={item.snapshot?.empresa_nombre || historyItem?.empresa_nombre_snapshot || historyItems.find(h => h.snapshot?.empresa_nombre)?.snapshot?.empresa_nombre}
+                                          />
+                                        ) : formatHistoryValue(
                                           change.field,
                                           change.type,
                                           change.new
@@ -3736,7 +3792,12 @@ export default function AdminAsistencias() {
                                           fontWeight: 800,
                                         }}
                                       >
-                                        {field.value}
+                                        {field.label === "Hora de entrada" ? (
+                                          <HoraHistorialReprosisa
+                                            value={field.value}
+                                            empresaLaboral={item.snapshot?.empresa_nombre || historyItem?.empresa_nombre_snapshot}
+                                          />
+                                        ) : field.value}
                                       </div>
                                     </div>
                                   )
@@ -3800,7 +3861,12 @@ export default function AdminAsistencias() {
                                           fontWeight: 800,
                                         }}
                                       >
-                                        {field.value}
+                                        {["Hora de entrada", "Inicio de comida", "Fin de comida", "Hora de salida"].includes(field.label) ? (
+                                          <HoraHistorialReprosisa
+                                            value={field.value}
+                                            empresaLaboral={item.snapshot?.empresa_nombre || historyItem?.empresa_nombre_snapshot}
+                                          />
+                                        ) : field.value}
                                       </div>
                                     </div>
                                   )
@@ -4323,9 +4389,10 @@ export default function AdminAsistencias() {
                 </div>
 
                 <div style={S.detailValue}>
-                  {formatTime(
-                    detailItem
-                      .hora_entrada, detailItem?.empresa_laboral?.nombre)}
+                  <HoraReprosisa
+                    value={detailItem.hora_entrada}
+                    empresaLaboral={detailItem?.empresa_laboral?.nombre || detailItem?.empresa_nombre_snapshot}
+                  />
                 </div>
               </div>
 
@@ -4335,9 +4402,10 @@ export default function AdminAsistencias() {
                 </div>
 
                 <div style={S.detailValue}>
-                  {formatTime(
-                    detailItem
-                      .hora_inicio_comida, detailItem?.empresa_laboral?.nombre)}
+                  <HoraReprosisa
+                    value={detailItem.hora_inicio_comida}
+                    empresaLaboral={detailItem?.empresa_laboral?.nombre || detailItem?.empresa_nombre_snapshot}
+                  />
                 </div>
               </div>
 
@@ -4347,9 +4415,10 @@ export default function AdminAsistencias() {
                 </div>
 
                 <div style={S.detailValue}>
-                  {formatTime(
-                    detailItem
-                      .hora_fin_comida, detailItem?.empresa_laboral?.nombre)}
+                  <HoraReprosisa
+                    value={detailItem.hora_fin_comida}
+                    empresaLaboral={detailItem?.empresa_laboral?.nombre || detailItem?.empresa_nombre_snapshot}
+                  />
                 </div>
               </div>
 
@@ -4359,9 +4428,10 @@ export default function AdminAsistencias() {
                 </div>
 
                 <div style={S.detailValue}>
-                  {formatTime(
-                    detailItem
-                      .hora_salida, detailItem?.empresa_laboral?.nombre)}
+                  <HoraReprosisa
+                    value={detailItem.hora_salida}
+                    empresaLaboral={detailItem?.empresa_laboral?.nombre || detailItem?.empresa_nombre_snapshot}
+                  />
                 </div>
               </div>
 
@@ -4685,10 +4755,10 @@ export default function AdminAsistencias() {
                               S.detailValue
                             }
                           >
-                            {formatDateTime(
-                              detailItem
-                                .firma_capturada_at
-                            )}
+                            <FechaHoraDualReprosisa
+                              value={detailItem.firma_capturada_at}
+                              empresaLaboral={detailItem?.empresa_laboral?.nombre || detailItem?.empresa_nombre_snapshot}
+                            />
                           </div>
                         </div>
                     
@@ -4832,10 +4902,10 @@ export default function AdminAsistencias() {
                               S.detailValue
                             }
                           >
-                            {formatDateTime(
-                              detailItem
-                                .foto_capturada_at
-                            )}
+                            <FechaHoraDualReprosisa
+                              value={detailItem.foto_capturada_at}
+                              empresaLaboral={detailItem?.empresa_laboral?.nombre || detailItem?.empresa_nombre_snapshot}
+                            />
                           </div>
                         </div>
                     
@@ -4981,10 +5051,10 @@ export default function AdminAsistencias() {
                           </div>
                       
                           <div style={S.detailValue}>
-                            {formatDateTime(
-                              detailItem
-                                .entrada_ubicacion_capturada_at
-                            )}
+                            <FechaHoraDualReprosisa
+                              value={detailItem.entrada_ubicacion_capturada_at}
+                              empresaLaboral={detailItem?.empresa_laboral?.nombre || detailItem?.empresa_nombre_snapshot}
+                            />
                           </div>
                         </div>
                       </div>

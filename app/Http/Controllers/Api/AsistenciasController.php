@@ -10,6 +10,7 @@ use App\Models\AsistenciaIncidencia;
 use App\Models\AsistenciaEntradaIncidencia;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -1073,18 +1074,17 @@ class AsistenciasController extends Controller
             ]);
         }
 
-        $firmaEntradaPath =
-            $this->guardarFirmaEntrada(
-                $data['firma_entrada']
-            );
+        // Rutas exclusivas de ESTA solicitud. Si falla, sólo se eliminan estos archivos.
+        $firmaEntradaPath = null;
+        $fotoEntradaPath = null;
+        $transaccionIniciada = false;
 
-        $fotoEntradaPath =
-            $this->guardarFotoEntrada(
-                $data['foto_entrada']
-            );
-
-        DB::beginTransaction();
         try {
+            $firmaEntradaPath = $this->guardarFirmaEntrada($data['firma_entrada']);
+            $fotoEntradaPath = $this->guardarFotoEntrada($data['foto_entrada']);
+
+            DB::beginTransaction();
+            $transaccionIniciada = true;
         $asistencia = Asistencia::create([
             'user_id' => $user->id,
 
@@ -1267,8 +1267,34 @@ class AsistenciasController extends Controller
         ]);
 
         DB::commit();
+        $transaccionIniciada = false;
         } catch (\Throwable $e) {
-            DB::rollBack();
+            if ($transaccionIniciada) {
+                DB::rollBack();
+            }
+
+            // Los archivos del disco public no participan en el rollback de MySQL.
+            // Nunca eliminar evidencias de otras solicitudes o asistencias existentes.
+            try {
+                $rutasFallidas = array_filter([$firmaEntradaPath, $fotoEntradaPath]);
+                if ($rutasFallidas) {
+                    Storage::disk('public')->delete($rutasFallidas);
+                }
+            } catch (\Throwable $errorLimpieza) {
+                report($errorLimpieza);
+            }
+
+            // Duplicado detectado por el índice único, incluso con peticiones simultáneas.
+            $esDuplicadoAsistencia = $e instanceof QueryException
+                && (int) ($e->errorInfo[1] ?? 0) === 1062
+                && str_contains($e->getMessage(), 'asistencias_user_fecha_unique');
+
+            if ($esDuplicadoAsistencia) {
+                return response()->json([
+                    'message' => 'Ya registraste una entrada el día de hoy. No puedes registrar otra entrada.',
+                ], 409);
+            }
+
             throw $e;
         }
 

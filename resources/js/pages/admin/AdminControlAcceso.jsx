@@ -1951,7 +1951,7 @@ export default function AdminControlAcceso() {
           </div>
         ) : null}
 
-        {err ? (
+        {err && !openForm ? (
           <div
             style={{
               marginTop: 12,
@@ -3100,24 +3100,32 @@ export default function AdminControlAcceso() {
                   </div>
                 </div>
 
+              </div>
+
+              <div
+                style={{
+                  ...S.modalFooter,
+                  zIndex: 3,
+                }}
+              >
                 {err ? (
                   <div
+                    role="alert"
                     style={{
-                      color:
-                        "#b91c1c",
-                      fontWeight: 800,
+                      flexBasis: "100%",
+                      padding: "10px 12px",
+                      border: "1px solid #fecaca",
+                      background: "#fef2f2",
+                      borderRadius: 10,
+                      color: "#b91c1c",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      lineHeight: 1.5,
                     }}
                   >
                     {err}
                   </div>
                 ) : null}
-              </div>
-
-              <div
-                style={
-                  S.modalFooter
-                }
-              >
                 <Btn
                   type="button"
                   onClick={

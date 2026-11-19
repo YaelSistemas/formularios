@@ -92,6 +92,13 @@
         .nowrap {
             white-space: nowrap;
         }
+        .hora-cdmx {
+            display: block;
+            margin-top: 2px;
+            font-size: 6px;
+            color: #64748b;
+            white-space: nowrap;
+        }
     </style>
 </head>
 
@@ -236,18 +243,30 @@
 
                     <td class="nowrap">
                         {{ $row['entrada'] }}
+                        @if (!empty($row['entrada_cdmx']))
+                            <span class="hora-cdmx">{{ $row['entrada_cdmx'] }} CDMX</span>
+                        @endif
                     </td>
 
                     <td class="nowrap">
                         {{ $row['inicio_comida'] }}
+                        @if (!empty($row['inicio_comida_cdmx']))
+                            <span class="hora-cdmx">{{ $row['inicio_comida_cdmx'] }} CDMX</span>
+                        @endif
                     </td>
 
                     <td class="nowrap">
                         {{ $row['fin_comida'] }}
+                        @if (!empty($row['fin_comida_cdmx']))
+                            <span class="hora-cdmx">{{ $row['fin_comida_cdmx'] }} CDMX</span>
+                        @endif
                     </td>
 
                     <td class="nowrap">
                         {{ $row['salida'] }}
+                        @if (!empty($row['salida_cdmx']))
+                            <span class="hora-cdmx">{{ $row['salida_cdmx'] }} CDMX</span>
+                        @endif
                     </td>
 
                     <td class="nowrap">

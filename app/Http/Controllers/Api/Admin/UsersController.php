@@ -1079,7 +1079,8 @@ class UsersController extends Controller
     
     /**
      * Un cambio real de empresa, unidad, turno o tipo de trabajo
-     * crea una nueva configuracion con vigencia automatica desde hoy.
+     * crea una nueva configuracion desde hoy, o desde manana si hoy
+     * ya existen asistencias o incidencias del empleado.
      * La configuracion anterior permanece para consultas historicas.
      * No se usa la fecha_inicio enviada por el formulario como una
      * fecha que el administrador deba cambiar manualmente.
@@ -1156,12 +1157,30 @@ class UsersController extends Controller
             return $actual->fresh();
         }
 
-        // Una fecha efectiva opcional puede habilitarse mas adelante
-        // para correcciones retroactivas auditadas. Por defecto: hoy.
-        if ($inicioActual >= $hoy) {
-            // Configuracion creada hoy (o futura): no existe un dia
-            // anterior de esta vigencia que sea necesario cerrar.
-            // Corregirla dentro de la misma jornada evita rangos invalidos.
+        // Las vigencias son por DIA, no por hora. Si ya existe una
+        // asistencia o incidencia de hoy, no cambiar la asignacion de
+        // ese dia: el siguiente periodo debe comenzar manana.
+        // Las incidencias futuras NO bloquean el cambio laboral.
+        $hayRegistrosHoy = DB::table('asistencias')
+            ->where('user_id', $user->id)
+            ->whereDate('fecha', $hoy)
+            ->exists()
+            || DB::table('asistencia_incidencias')
+                ->where('user_id', $user->id)
+                ->whereDate('fecha', $hoy)
+                ->exists()
+            || DB::table('asistencia_entradas_incidencia')
+                ->where('user_id', $user->id)
+                ->whereDate('fecha', $hoy)
+                ->exists();
+
+        $inicioNuevo = $hayRegistrosHoy
+            ? \Carbon\Carbon::parse($hoy, 'America/Mexico_City')->addDay()->toDateString()
+            : $hoy;
+
+        if ($inicioActual >= $inicioNuevo) {
+            // Es una configuracion creada para hoy (sin registros hoy)
+            // o para una fecha futura. No es necesario partir el periodo.
             $this->validateControlAccesoOverlap(
                 $user,
                 array_merge($data, [
@@ -1180,9 +1199,21 @@ class UsersController extends Controller
             return $actual->fresh();
         }
 
-        // Conservar el fin programado de la vigencia anterior para
-        // la nueva, sin permitir que haya una asignacion solapada.
-        $fechaCorte = \Carbon\Carbon::parse($hoy, 'America/Mexico_City')
+        // No extender silenciosamente una configuracion con fecha final
+        // programada. Si termina hoy, una nueva vigencia desde manana
+        // requiere que el administrador revise primero ese fin.
+        if ($finActual !== null && $finActual < $inicioNuevo) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'control_acceso.fecha_fin' => 'La configuracion actual termina antes del inicio del nuevo periodo. '
+                    .'Revisa la fecha final de la configuracion laboral antes de cambiar la asignacion.',
+            ]);
+        }
+
+        // Cerrar la vigencia anterior el dia previo al nuevo inicio.
+        // Si habia actividad hoy, esa fecha sigue perteneciendo a la
+        // configuracion anterior. La transaccion del update revierte
+        // ambos cambios si la nueva configuracion no puede crearse.
+        $fechaCorte = \Carbon\Carbon::parse($inicioNuevo, 'America/Mexico_City')
             ->subDay()->toDateString();
 
         $actual->fecha_fin = $fechaCorte;
@@ -1194,7 +1225,7 @@ class UsersController extends Controller
             'turno_id' => $data['turno_id'],
             'tipo_trabajo' => $data['tipo_trabajo'],
             'kiosco_habilitado' => (bool) $data['kiosco_habilitado'],
-            'fecha_inicio' => $hoy,
+            'fecha_inicio' => $inicioNuevo,
             'fecha_fin' => $finActual,
         ]);
     }
