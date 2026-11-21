@@ -7,6 +7,7 @@ use App\Models\Asistencia;
 use App\Models\AsistenciaHistory;
 use App\Models\AsistenciaIncidencia;
 use Carbon\Carbon;
+use App\Support\Asistencias\CalculadoraJornada;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -1302,21 +1303,22 @@ class AsistenciasAdminController extends Controller
         ]);
     
         /*
-         * No permitir mover una asistencia
-         * a una fecha que tenga una incidencia.
+         * Una asistencia historica puede corregirse en su misma fecha,
+         * aunque despues se haya registrado una incidencia ese dia.
+         * Solo bloquear el CAMBIO de fecha hacia un dia con incidencia.
+         * No alterar ni eliminar la incidencia ni su revision asociada.
          */
-        $incidenciaFecha =
-            AsistenciaIncidencia::query()
-                ->where(
-                    'user_id',
-                    $asistencia->user_id
-                )
-                ->whereDate(
-                    'fecha',
-                    $data['fecha']
-                )
-                ->first();
-        
+        $fechaOriginal = $asistencia->fecha?->toDateString();
+        $fechaNueva = Carbon::parse($data['fecha'], self::TIMEZONE)->toDateString();
+        $cambiaFecha = $fechaNueva !== $fechaOriginal;
+
+        $incidenciaFecha = $cambiaFecha
+            ? AsistenciaIncidencia::query()
+                ->where('user_id', $asistencia->user_id)
+                ->whereDate('fecha', $fechaNueva)
+                ->first()
+            : null;
+
         if ($incidenciaFecha) {
             $tipoLabel =
                 match (
@@ -1608,66 +1610,21 @@ class AsistenciasAdminController extends Controller
                     ?? 0
                 );
     
-            if (
-                (bool)
-                    $turno
-                        ->comida_cuenta_jornada
-            ) {
-                $segundosTrabajados =
-                    $segundosPresencia;
-            } else {
-                $segundosTrabajados =
-                    max(
-                        0,
-                        $segundosPresencia
-                        - $segundosComidaCalculo
-                    );
-            }
-    
             /*
-             * Jornada requerida.
+             * Misma regla que salida personal y kiosco.
+             * La comida autorizada puede completar la jornada, pero
+             * no se contabiliza como tiempo de trabajo efectivo adicional.
              */
-            $segundosJornada =
-                (int) round(
-                    ((float)
-                        $turno->horas_jornada
-                    )
-                    * 3600
-                );
-    
-            /*
-             * Para determinar el estado de
-             * la jornada, la comida siempre
-             * se descuenta.
-             */
-            $segundosParaEstadoJornada =
-                max(
-                    0,
-                    $segundosPresencia
-                    - $segundosComidaCalculo
-                );
-    
-            $limiteExcedido =
-                $segundosJornada
-                + 3600;
-    
-            if (
-                $segundosParaEstadoJornada
-                < $segundosJornada
-            ) {
-                $estadoJornada =
-                    'incompleta';
-            } elseif (
-                $segundosParaEstadoJornada
-                < $limiteExcedido
-            ) {
-                $estadoJornada =
-                    'cumplida';
-            } else {
-                $estadoJornada =
-                    'excedida';
-            }
-    
+            $calculoJornada = CalculadoraJornada::calcular(
+                $segundosPresencia,
+                $segundosComidaCalculo,
+                (float) $turno->horas_jornada,
+                (bool) $turno->comida_cuenta_jornada,
+                (int) $turno->minutos_comida
+            );
+            $segundosTrabajados = $calculoJornada['segundos_trabajados'];
+            $estadoJornada = $calculoJornada['estado_jornada'];
+
             $estadoSalida =
                 $this->getEstadoHorario(
                     $horaSalida,

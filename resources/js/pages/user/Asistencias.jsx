@@ -671,6 +671,56 @@ function PillBadge({ value, tone = "neutral" }) {
   );
 }
 
+// Contador visual del kiosco: no modifica los valores guardados.
+function ContadorComidaKiosco({ asistencia, minutosPermitidos, ahoraMs }) {
+  if (!asistencia?.hora_inicio_comida) return null;
+
+  const finalizada = !!asistencia.hora_fin_comida;
+  const inicioMs = new Date(asistencia.hora_inicio_comida).getTime();
+  const finMs = finalizada
+    ? new Date(asistencia.hora_fin_comida).getTime()
+    : ahoraMs;
+  const segundos = Number.isFinite(inicioMs) && Number.isFinite(finMs)
+    ? Math.max(0, Math.floor((finMs - inicioMs) / 1000))
+    : 0;
+  const segundosMostrados = finalizada && asistencia.segundos_comida != null
+    ? Math.max(0, Number(asistencia.segundos_comida))
+    : segundos;
+  const limite = Math.max(0, Number(minutosPermitidos || 0) * 60);
+  const excedida = limite > 0 && segundosMostrados > limite;
+
+  return (
+    <div
+      role="status"
+      aria-live="off"
+      style={{
+        width: "100%",
+        boxSizing: "border-box",
+        marginTop: 12,
+        padding: "14px 16px",
+        borderRadius: 12,
+        border: `1px solid ${excedida ? "#fecaca" : "#fed7aa"}`,
+        background: excedida ? "#fef2f2" : "#fff7ed",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <span style={{ fontWeight: 900, color: "#92400e", fontSize: 14 }}>Tiempo de comida</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: excedida ? "#991b1b" : "#9a3412" }}>
+          {finalizada ? "Finalizada" : "En curso"}
+        </span>
+      </div>
+      <div style={{ marginTop: 8, fontSize: "clamp(24px, 5vw, 34px)", lineHeight: 1.2, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: excedida ? "#b91c1c" : "#c2410c" }}>
+        {formatSeconds(segundosMostrados)}
+      </div>
+      {excedida ? (
+        <div style={{ marginTop: 9, color: "#b91c1c", fontWeight: 800, fontSize: 12 }}>
+          Tiempo autorizado superado por {formatSeconds(segundosMostrados - limite)}.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Asistencias() {
   const [me, setMe] = useState(
     () => getStoredUser()
@@ -927,7 +977,12 @@ export default function Asistencias() {
   }, []);
 
   useEffect(() => {
-    if (!actual) {
+    const kioscoConComidaAbierta = activeView === "kiosco" &&
+      kioscoUsuarios.some((usuario) =>
+        usuario?.asistencia_actual?.hora_inicio_comida &&
+        !usuario?.asistencia_actual?.hora_fin_comida
+      );
+    if (!actual && !kioscoConComidaAbierta) {
       return undefined;
     }
 
@@ -940,7 +995,7 @@ export default function Asistencias() {
 
     return () =>
       window.clearInterval(timer);
-  }, [actual]);
+  }, [actual, activeView, kioscoUsuarios]);
 
   useEffect(() => {
     if (!message) {
@@ -2238,11 +2293,7 @@ export default function Asistencias() {
     }
   }
 
-  /*
-   * tick se usa para obligar a React
-   * a actualizar el contador cada segundo.
-   */
-  void tick;
+  // tick también actualiza el contador de comida mientras esté en curso.
 
   const minutosComidaTurno =
     Number(
@@ -2261,7 +2312,64 @@ export default function Asistencias() {
   const comidaEnCurso =
     comidaIniciada &&
     !comidaFinalizada;
+
+  // Contador visual: no modifica los tiempos guardados en la asistencia.
+  // "tick" se actualiza una vez por segundo mientras la jornada está abierta.
+  const inicioComidaMs = comidaIniciada
+    ? new Date(actual.hora_inicio_comida).getTime()
+    : NaN;
+  const finComidaMs = comidaFinalizada
+    ? new Date(actual.hora_fin_comida).getTime()
+    : tick;
+  const segundosComidaEnPantalla =
+    Number.isFinite(inicioComidaMs) && Number.isFinite(finComidaMs)
+      ? Math.max(0, Math.floor((finComidaMs - inicioComidaMs) / 1000))
+      : 0;
+  const segundosComidaPermitidos = Math.max(0, minutosComidaTurno * 60);
+  const comidaExcedida =
+    comidaIniciada &&
+    segundosComidaPermitidos > 0 &&
+    segundosComidaEnPantalla > segundosComidaPermitidos;
   
+  // La tarjeta de comida se alinea siempre con el borde derecho de
+  // "Registrar salida", sin modificar el ancho de ninguno de los botones.
+  const botonesJornadaRef = useRef(null);
+  const salidaButtonRef = useRef(null);
+  const [anchoTarjetaComida, setAnchoTarjetaComida] = useState(null);
+
+  useEffect(() => {
+    if (!actual || !comidaIniciada || !canCreate) return undefined;
+
+    const fila = botonesJornadaRef.current;
+    const salida = salidaButtonRef.current;
+    if (!fila || !salida) return undefined;
+
+    const medir = () => {
+      const primero = fila.querySelector("button");
+      if (!primero) return;
+      const inicio = primero.getBoundingClientRect().left;
+      const fin = salida.getBoundingClientRect().right;
+      const ancho = Math.ceil(fin - inicio);
+      if (ancho > 0) {
+        setAnchoTarjetaComida((anterior) => anterior === ancho ? anterior : ancho);
+      }
+    };
+
+    medir();
+    window.addEventListener("resize", medir);
+    const observador = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(medir);
+    if (observador) {
+      observador.observe(fila);
+      Array.from(fila.querySelectorAll("button")).forEach((boton) => observador.observe(boton));
+    }
+    return () => {
+      window.removeEventListener("resize", medir);
+      observador?.disconnect();
+    };
+  }, [actual?.id, comidaIniciada, comidaEnCurso, canCreate]);
+
   const detalleEstados =
     detailItem
       ? getEstadosAsistencia(
@@ -2890,8 +2998,68 @@ export default function Asistencias() {
                 actual.hora_entrada, actual?.empresa_laboral?.nombre)}
             </div>
 
+            {tieneComida && comidaIniciada ? (
+              <div
+                style={{
+                  marginTop: 16,
+                  width: anchoTarjetaComida ?? (comidaEnCurso ? 333 : 158),
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
+                  padding: "14px 16px",
+                  borderRadius: 12,
+                  border: `1px solid ${comidaExcedida ? "#fecaca" : "#fed7aa"}`,
+                  background: comidaExcedida ? "#fef2f2" : "#fff7ed",
+                }}
+                role="status"
+                aria-live="off"
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontWeight: 900, color: "#92400e", fontSize: 14 }}>
+                    Tiempo de comida
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: comidaExcedida ? "#991b1b" : "#9a3412",
+                    }}
+                  >
+                    {comidaEnCurso ? "En curso" : "Finalizada"}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: comidaEnCurso ? "clamp(24px, 5vw, 34px)" : 24,
+                    lineHeight: 1.2,
+                    fontWeight: 900,
+                    fontVariantNumeric: "tabular-nums",
+                    color: comidaExcedida ? "#b91c1c" : "#c2410c",
+                  }}
+                >
+                  {comidaFinalizada && actual.segundos_comida != null
+                    ? formatSeconds(actual.segundos_comida)
+                    : formatSeconds(segundosComidaEnPantalla)}
+                </div>
+                {comidaExcedida ? (
+                  <div style={{ marginTop: 9, color: "#b91c1c", fontWeight: 800, fontSize: 12 }}>
+                    Tiempo autorizado superado por {formatSeconds(segundosComidaEnPantalla - segundosComidaPermitidos)}.
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {canCreate ? (
               <div
+                ref={botonesJornadaRef}
                 style={{
                   display: "flex",
                   flexWrap: "wrap",
@@ -2954,6 +3122,7 @@ export default function Asistencias() {
                 ) : null}
             
                 <button
+                  ref={salidaButtonRef}
                   type="button"
                   onClick={handleSalida}
                   disabled={saving}
@@ -3184,15 +3353,15 @@ export default function Asistencias() {
                 </th>
 
                 <th style={S.th}>
+                  Comida
+                </th>
+
+                <th style={S.th}>
                   Salida
                 </th>
 
                 <th style={S.th}>
                   Presencia
-                </th>
-
-                <th style={S.th}>
-                  Comida
                 </th>
 
                 <th style={S.th}>
@@ -3302,6 +3471,20 @@ export default function Asistencias() {
                         </td>
 
                         <td style={S.td}>
+                          {!turnoTieneComida
+                            ? "No aplica"
+                            : comidaAbierta
+                              ? formatDuration(
+                                  item.hora_inicio_comida
+                                )
+                              : item.hora_inicio_comida
+                                ? formatSeconds(
+                                    item.segundos_comida
+                                  )
+                                : "00:00:00"}
+                        </td>
+
+                        <td style={S.td}>
                           {formatTime(
                             item.hora_salida, item?.empresa_laboral?.nombre)}
                         </td>
@@ -3314,20 +3497,6 @@ export default function Asistencias() {
                             : formatDuration(
                                 item.hora_entrada
                               )}
-                        </td>
-
-                        <td style={S.td}>
-                          {!turnoTieneComida
-                            ? "No aplica"
-                            : comidaAbierta
-                              ? formatDuration(
-                                  item.hora_inicio_comida
-                                )
-                              : item.hora_inicio_comida
-                                ? formatSeconds(
-                                    item.segundos_comida
-                                  )
-                                : "00:00:00"}
                         </td>
 
                         <td style={S.td}>
@@ -3737,23 +3906,17 @@ export default function Asistencias() {
                               </button>
                             ) : null}
                             
+                            {tieneComida && comidaIniciada ? (
+                              <ContadorComidaKiosco
+                                asistencia={asistenciaActual}
+                                minutosPermitidos={minutosComidaTurno}
+                                ahoraMs={tick}
+                              />
+                            ) : null}
+
                             {tieneComida &&
                             comidaEnCurso ? (
                               <>
-                                <div
-                                  style={{
-                                    marginTop: 10,
-                                    fontSize: 13,
-                                    color: "#92400e",
-                                    fontWeight: 800,
-                                  }}
-                                >
-                                  Comida iniciada:{" "}
-                                  {formatTime(
-                                    asistenciaActual
-                                      ?.hora_inicio_comida, asistenciaActual?.empresa_laboral?.nombre)}
-                                </div>
-                            
                                 <button
                                   type="button"
                                   disabled={
@@ -3788,27 +3951,6 @@ export default function Asistencias() {
                               </>
                             ) : null}
                             
-                            {tieneComida &&
-                            comidaFinalizada ? (
-                              <div
-                                style={{
-                                  marginTop: 10,
-                                  fontSize: 13,
-                                  color: "#166534",
-                                  fontWeight: 800,
-                                }}
-                              >
-                                Comida:{" "}
-                                {formatTime(
-                                  asistenciaActual
-                                    ?.hora_inicio_comida, asistenciaActual?.empresa_laboral?.nombre)}
-                                {" - "}
-                                {formatTime(
-                                  asistenciaActual
-                                    ?.hora_fin_comida, asistenciaActual?.empresa_laboral?.nombre)}
-                              </div>
-                            ) : null}
-
                             <button
                               type="button"
                               disabled={

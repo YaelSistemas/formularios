@@ -9,6 +9,7 @@ use App\Models\UserControlAcceso;
 use App\Models\AsistenciaIncidencia;
 use App\Models\AsistenciaEntradaIncidencia;
 use Carbon\Carbon;
+use App\Support\Asistencias\CalculadoraJornada;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Storage;
@@ -1421,84 +1422,21 @@ class AsistenciasController extends Controller
             );
     
         /*
-         * TRABAJO EFECTIVO
+         * TRABAJO EFECTIVO Y ESTADO DE JORNADA.
+         * La comida real siempre se descuenta del tiempo trabajado.
+         * Si el turno lo permite, hasta los minutos autorizados de comida
+         * se suman solo para acreditar el cumplimiento (no para excedentes).
          */
-        if (
-            (bool) $turno->comida_cuenta_jornada
-        ) {
-            $segundosTrabajados =
-                $segundosPresencia;
-        } else {
-            $segundosTrabajados =
-                max(
-                    0,
-                    $segundosPresencia
-                    - $segundosComida
-                );
-        }
-    
-        /*
-         * JORNADA REQUERIDA
-         *
-         * Para determinar el estado de la jornada,
-         * la comida siempre se descuenta,
-         * independientemente de si el turno tiene
-         * activado "comida cuenta dentro de la jornada".
-         *
-         * La jornada se considera cumplida desde
-         * el mínimo requerido hasta 59:59 minutos extra.
-         *
-         * Al alcanzar 1 hora extra completa,
-         * pasa a estado "excedida".
-         */
-        $segundosJornada =
-            (int) round(
-                ((float) $turno->horas_jornada)
-                * 3600
-            );
-        
-        /*
-         * Tiempo efectivo utilizado únicamente
-         * para clasificar el estado de la jornada.
-         */
-        $segundosParaEstadoJornada =
-            max(
-                0,
-                $segundosPresencia
-                - $segundosComida
-            );
-        
-        /*
-         * Una hora de tolerancia.
-         *
-         * Ejemplo jornada 8 h:
-         *
-         * 07:59:59 = incompleta
-         * 08:00:00 = cumplida
-         * 08:59:59 = cumplida
-         * 09:00:00 = excedida
-         */
-        $limiteExcedido =
-            $segundosJornada
-            + 3600;
-        
-        if (
-            $segundosParaEstadoJornada
-            < $segundosJornada
-        ) {
-            $estadoJornada =
-                'incompleta';
-        } elseif (
-            $segundosParaEstadoJornada
-            < $limiteExcedido
-        ) {
-            $estadoJornada =
-                'cumplida';
-        } else {
-            $estadoJornada =
-                'excedida';
-        }
-    
+        $calculoJornada = CalculadoraJornada::calcular(
+            $segundosPresencia,
+            $segundosComida,
+            (float) $turno->horas_jornada,
+            (bool) $turno->comida_cuenta_jornada,
+            (int) $turno->minutos_comida
+        );
+        $segundosTrabajados = $calculoJornada['segundos_trabajados'];
+        $estadoJornada = $calculoJornada['estado_jornada'];
+
         /*
          * ESTADO DE COMIDA
          */
@@ -2093,76 +2031,19 @@ class AsistenciasController extends Controller
                 );
     
             /*
-             * Trabajo efectivo.
+             * Misma regla que en la salida: trabajo efectivo, comida
+             * reconocida para el cumplimiento y tolerancia de 60 minutos.
              */
-            if (
-                (bool)
-                $turno->comida_cuenta_jornada
-            ) {
-                $segundosTrabajados =
-                    $segundosPresencia;
-            } else {
-                $segundosTrabajados =
-                    max(
-                        0,
-                        $segundosPresencia
-                        - $segundosComidaCalculo
-                    );
-            }
-    
-            /*
-             * Jornada requerida.
-             *
-             * Para determinar el estado de la jornada,
-             * la comida siempre se descuenta,
-             * independientemente del valor de
-             * comida_cuenta_jornada.
-             */
-            $segundosJornada =
-                (int) round(
-                    ((float)
-                        $turno->horas_jornada
-                    )
-                    * 3600
-                );
-            
-            /*
-             * Tiempo utilizado únicamente para
-             * clasificar el estado de jornada.
-             */
-            $segundosParaEstadoJornada =
-                max(
-                    0,
-                    $segundosPresencia
-                    - $segundosComidaCalculo
-                );
-            
-            /*
-             * Se permite hasta 59:59 minutos
-             * adicionales sin marcar la jornada
-             * como excedida.
-             */
-            $limiteExcedido =
-                $segundosJornada
-                + 3600;
-            
-            if (
-                $segundosParaEstadoJornada
-                < $segundosJornada
-            ) {
-                $estadoJornada =
-                    'incompleta';
-            } elseif (
-                $segundosParaEstadoJornada
-                < $limiteExcedido
-            ) {
-                $estadoJornada =
-                    'cumplida';
-            } else {
-                $estadoJornada =
-                    'excedida';
-            }
-    
+            $calculoJornada = CalculadoraJornada::calcular(
+                $segundosPresencia,
+                $segundosComidaCalculo,
+                (float) $turno->horas_jornada,
+                (bool) $turno->comida_cuenta_jornada,
+                (int) $turno->minutos_comida
+            );
+            $segundosTrabajados = $calculoJornada['segundos_trabajados'];
+            $estadoJornada = $calculoJornada['estado_jornada'];
+
             $estadoSalida =
                 $this->getEstadoHorario(
                     $horaSalida,
